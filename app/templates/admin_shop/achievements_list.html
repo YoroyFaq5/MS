@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Достижения — управление{% endblock %}
+
+{% block content %}
+{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark'} %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold">🏆 Достижения — управление</h2>
+    <p class="text-muted small mb-0">Презентационные данные достижений. Правила разблокировки — в коде (achievement_rules.py)</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin_shop.list_items') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-shop me-1"></i>Магазин
+    </a>
+    <a href="{{ url_for('admin_shop.new_achievement') }}" class="btn btn-danger btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Новое достижение
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th class="ps-4">Код</th>
+            <th>Название</th>
+            <th>Категория</th>
+            <th>Редкость</th>
+            <th>Триггер</th>
+            <th class="text-center">Скрытое</th>
+            <th class="text-center">Статус</th>
+            <th class="text-end pe-4">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in achievements %}
+          <tr>
+            <td class="ps-4"><code class="small">{{ a.code }}</code></td>
+            <td class="fw-medium">{{ a.icon or '' }} {{ a.name }}</td>
+            <td class="text-muted small">{{ a.category.value }}</td>
+            <td><span class="badge {{ RARITY_BADGE.get(a.rarity.value, 'bg-secondary') }}">{{ a.rarity.value }}</span></td>
+            <td class="text-muted small">{{ a.trigger.value }}</td>
+            <td class="text-center">{% if a.is_hidden %}<i class="bi bi-eye-slash text-muted"></i>{% endif %}</td>
+            <td class="text-center">
+              {% if a.is_active %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle">Активно</span>
+              {% else %}
+              <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Отключено</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              <div class="d-flex gap-1 justify-content-end flex-wrap">
+                <a href="{{ url_for('admin_shop.edit_achievement', achievement_id=a.id) }}" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <button type="button" class="btn btn-sm btn-outline-warning"
+                        data-bs-toggle="collapse" data-bs-target="#grant-a-{{ a.id }}">
+                  Выдать
+                </button>
+              </div>
+              <div class="collapse mt-2" id="grant-a-{{ a.id }}">
+                <form method="POST" action="{{ url_for('admin_shop.grant_achievement', achievement_id=a.id) }}"
+                      class="d-flex gap-1">
+                  <select name="player_id" class="form-select form-select-sm" required>
+                    <option value="">— игрок —</option>
+                    {% for p in players %}
+                    <option value="{{ p.id }}">{{ p.display_name }}</option>
+                    {% endfor %}
+                  </select>
+                  <input type="text" name="reason" class="form-control form-control-sm" placeholder="причина" required minlength="3">
+                  <button type="submit" class="btn btn-sm btn-warning text-nowrap">OK</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">Достижений пока нет</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

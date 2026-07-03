@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}Игра #{{ game.id }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('games.list_games') }}" class="btn btn-outline-secondary btn-sm">← Все игры</a>
+  <div>
+    <h2 class="mb-0 fw-bold">🎮 Игра #{{ game.id }}</h2>
+    <p class="text-muted small mb-0">{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</p>
+  </div>
+  <div class="ms-auto d-flex gap-2">
+    {% if game.is_finished %}
+      {% if game.win_side.value == 'mafia' %}
+        <span class="badge bg-danger fs-6 px-3 py-2">🔫 Победила Мафия</span>
+      {% elif game.win_side.value == 'city' %}
+        <span class="badge bg-success fs-6 px-3 py-2">🏙 Победил Город</span>
+      {% else %}
+        <span class="badge bg-secondary fs-6 px-3 py-2">Ничья</span>
+      {% endif %}
+    {% else %}
+      <span class="badge bg-warning text-dark fs-6 px-3 py-2">⏳ В процессе</span>
+    {% endif %}
+  </div>
+</div>
+
+{% if game.notes %}
+<div class="alert alert-secondary mb-4">
+  <i class="bi bi-sticky me-2"></i>{{ game.notes }}
+</div>
+{% endif %}
+
+<!-- Players table -->
+<div class="card mb-4">
+  <div class="card-header fw-semibold">🪑 Состав игры</div>
+  {% if not game.is_finished %}
+  {% if current_user.is_admin %}
+  <form method="POST" action="{{ url_for('games.finish_game', game_id=game.id) }}" id="finishForm">
+  {% endif %}
+  {% endif %}
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        {% if current_user.is_admin %}
+        <thead>
+          <tr>
+            <th class="ps-4">Место</th>
+            <th>Игрок</th>
+            <th class="text-center">Роль</th>
+            <th class="text-center">Базовые</th>
+            <th class="text-center" style="width:110px">Бонус</th>
+            <th class="text-center" style="width:90px">ПУ</th>
+            <th class="text-end pe-4">Итого</th>
+          </tr>
+        </thead>
+        {% else %}
+        <thead>
+          <tr>
+            <th class="ps-4">Место</th>
+            <th>Игрок</th>
+            <th class="text-center">Роль</th>
+            <th class="text-end pe-4">Итого</th>
+          </tr>
+        </thead>
+        {% endif %}
+        {% if current_user.is_admin %}
+        <tbody>
+          {% for slot in slots %}
+          <tr>
+            <td class="ps-4">
+              <span class="badge bg-body-secondary text-body border">{{ slot.seat_number }}</span>
+            </td>
+            <td class="fw-medium">
+              <a href="{{ url_for('profile.view_profile', player_id=slot.player_id) }}"
+                 class="text-decoration-none">{{ slot.player.display_name }}
+                  {% if slot.is_pu %}
+                    <span class="ms-1" title="Первый убиенный">💀</span>
+                  {% endif %}
+              </a>
+            </td>
+            <td class="text-center">
+              {% if game.is_finished or not roles_editable %}
+                {% if slot.role.value == 'mafia' %}<span class="badge bg-danger">🔫 Мафия</span>
+                {% elif slot.role.value == 'don' %}<span class="badge bg-dark border border-secondary">🎩 Дон</span>
+                {% elif slot.role.value == 'sheriff' %}<span class="badge bg-info text-dark">🔍 Шериф</span>
+                {% else %}<span class="badge bg-secondary">👤 Мирный</span>{% endif %}
+              {% else %}
+                <select name="role_{{ slot.id }}" class="form-select form-select-sm role-select" style="min-width:130px">
+                  <option value="civilian" {% if slot.role.value == 'civilian' %}selected{% endif %}>👤 Мирный</option>
+                  <option value="mafia"    {% if slot.role.value == 'mafia'    %}selected{% endif %}>🔫 Мафия</option>
+                  <option value="don"      {% if slot.role.value == 'don'      %}selected{% endif %}>🎩 Дон</option>
+                  <option value="sheriff"  {% if slot.role.value == 'sheriff'  %}selected{% endif %}>🔍 Шериф</option>
+                </select>
+              {% endif %}
+            </td>
+            <td class="text-center text-muted">{{ slot.base_score }}</td>
+            <!-- Bonus -->
+            <td class="text-center">
+              {% if game.is_finished %}
+                <span class="{% if slot.bonus_score > 0 %}text-success{% elif slot.bonus_score < 0 %}text-danger{% endif %}">
+                  {{ '+' if slot.bonus_score > 0 else '' }}{{ slot.bonus_score }}
+                </span>
+              {% else %}
+                <input type="number" name="bonus_{{ slot.id }}"
+                       value="{{ slot.bonus_score }}"
+                       step="0.01" min="-10" max="10"
+                       class="form-control form-control-sm text-center"
+                       style="width:100px; margin:auto">
+              {% endif %}
+            </td>
+            <!-- PU (Первый Убиенный) -->
+            <td class="text-center">
+              {% if game.is_finished %}
+                {% if slot.is_pu %}
+                  <span class="badge bg-info text-dark" title="Первый убиенный, мафий в списке: {{ slot.pu_mafia_count }}">
+                    ПУ +{{ slot.pu_bonus }}
+                  </span>
+                {% else %}—{% endif %}
+              {% else %}
+                <div class="d-flex flex-column align-items-center gap-1">
+                  <div class="form-check m-0">
+                    <input class="form-check-input pu-check" type="checkbox"
+                           name="pu_{{ slot.id }}" value="1"
+                           id="pu_{{ slot.id }}"
+                           onchange="togglePuCount(this, {{ slot.id }})">
+                    <label class="form-check-label small" for="pu_{{ slot.id }}">ПУ</label>
+                  </div>
+                  <select name="pu_mafia_{{ slot.id }}"
+                          id="pu_mafia_{{ slot.id }}"
+                          class="form-select form-select-sm d-none"
+                          style="width:70px">
+                    <option value="0">0 🔫</option>
+                    <option value="1">1 🔫</option>
+                    <option value="2">2 🔫</option>
+                    <option value="3">3 🔫</option>
+                  </select>
+                </div>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4 fw-bold {% if slot.total_score > 0 %}text-success{% endif %}">
+              {{ slot.total_score }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% else %}
+        <tbody>
+          {% for slot in slots %}
+          <tr>
+            <td class="ps-4">
+              <span class="badge bg-body-secondary text-body border">{{ slot.seat_number }}</span>
+            </td>
+            <td class="fw-medium">
+              <a href="{{ url_for('profile.view_profile', player_id=slot.player_id) }}"
+                 class="text-decoration-none">{{ slot.player.display_name }}
+                  {% if slot.is_pu %}
+                    <span class="ms-1" title="Первый убиенный">💀</span>
+                  {% endif %}
+              </a>
+            </td>
+            <td class="text-center">
+              {% if game.is_finished or not roles_editable %}
+                {% if slot.role.value == 'mafia' %}<span class="badge bg-danger">🔫 Мафия</span>
+                {% elif slot.role.value == 'don' %}<span class="badge bg-dark border border-secondary">🎩 Дон</span>
+                {% elif slot.role.value == 'sheriff' %}<span class="badge bg-info text-dark">🔍 Шериф</span>
+                {% else %}<span class="badge bg-secondary">👤 Мирный</span>{% endif %}
+              {% else %}
+                <span class="badge bg-secondary">👤</span>
+              {% endif %}
+            </td>
+            <!-- PU (Первый Убиенный) -->
+            <td class="text-end pe-4 fw-bold {% if slot.total_score > 0 %}text-success{% endif %}">
+              {{ slot.total_score }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+
+  {% if not game.is_finished %}
+  {% if current_user.is_admin %}
+  <!-- Finish game panel -->
+  <div class="card-footer">
+    <div class="row align-items-end g-3">
+      <div class="col-md-4">
+        <label class="form-label fw-medium mb-1">🏆 Кто победил?</label>
+        <select name="win_side" class="form-select" required>
+          <option value="city">🏙 Город (мирные + шериф)</option>
+          <option value="mafia">🔫 Мафия (мафия + дон)</option>
+          <option value="none">— Ничья / отмена</option>
+        </select>
+      </div>
+      <div class="col-md-auto">
+        <button type="submit" class="btn btn-danger px-4"
+                onclick="return confirm('Завершить игру? Это изменит рейтинг.')">
+          <i class="bi bi-flag-fill me-1"></i>Завершить игру
+        </button>
+      </div>
+    </div>
+  </div>
+  </form>
+  {% endif %}
+  {% endif %}
+</div>
+
+{% if game.is_finished %}
+<div class="d-flex gap-2">
+  <a href="{{ url_for('ratings.leaderboard') }}" class="btn btn-outline-warning">
+    <i class="bi bi-trophy me-1"></i>Посмотреть рейтинг
+  </a>
+  {% if current_user.is_admin %}
+  <a href="{{ url_for('games.new_game') }}" class="btn btn-danger">
+    <i class="bi bi-plus-lg me-1"></i>Новая игра
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+function togglePuCount(checkbox, slotId) {
+  const sel = document.getElementById('pu_mafia_' + slotId);
+  if (sel) sel.classList.toggle('d-none', !checkbox.checked);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Номинации{% endblock %}
+
+{% block content %}
+{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark'} %}
+
+<div class="mb-4">
+  <h2 class="mb-0 fw-bold"><i class="bi bi-patch-check text-warning me-2"></i>Номинации клуба</h2>
+  <p class="text-muted small mb-0">Титулы клуба и лучшие игроки по ролям каждого сезона</p>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-award me-2"></i>Титулы клуба (текущие рекордсмены)</div>
+  <div class="card-body">
+    {% if global_holders %}
+    <div class="row g-3">
+      {% for pt in global_holders %}
+      <div class="col-md-6 col-lg-4">
+        <div class="stat-card card p-3 h-100">
+          <div class="d-flex justify-content-between align-items-start mb-1">
+            <span class="fw-semibold">
+              {% if pt.title.icon %}<i class="bi {{ pt.title.icon }} me-1"></i>{% endif %}{{ pt.title.name }}
+            </span>
+            <span class="badge {{ RARITY_BADGE.get(pt.title.rarity.value, 'bg-secondary') }}">{{ pt.title.rarity.value }}</span>
+          </div>
+          <div class="text-muted small mb-2">{{ pt.title.description or '' }}</div>
+          <a href="{{ url_for('profile.view_profile', player_id=pt.player_id) }}" class="fw-bold text-warning text-decoration-none">
+            {{ pt.player.display_name }}
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-muted text-center py-3">Рекорды клуба ещё не рассчитаны.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-calendar2-range me-2"></i>Номинации сезона
+    {% if current_season %}«{{ current_season.name }}»{% endif %}
+  </div>
+  <div class="card-body">
+    {% if current_season %}
+    <p class="text-muted small">Лидеры по текущим результатам сезона — итоговые номинации присуждаются при закрытии сезона.</p>
+    <div class="row g-3">
+      {% for entry in current_leaders %}
+      <div class="col-md-6 col-lg-3">
+        <div class="stat-card card p-3 text-center h-100">
+          <div class="stat-label mb-1">
+            {% if entry.title and entry.title.icon %}<i class="bi {{ entry.title.icon }} me-1"></i>{% endif %}
+            {{ entry.title.name if entry.title else '—' }}
+          </div>
+          {% if entry.player %}
+          <a href="{{ url_for('profile.view_profile', player_id=entry.player.id) }}" class="stat-value fs-5 text-decoration-none">
+            {{ entry.player.display_name }}
+          </a>
+          {% else %}
+          <div class="stat-value fs-6 text-muted">—</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-muted text-center py-3">Активный сезон не найден.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header fw-semibold"><i class="bi bi-clock-history me-2"></i>История сезонных номинаций</div>
+  <div class="card-body">
+    {% if history %}
+    <div class="accordion" id="historyAccordion">
+      {% for h in history %}
+      <div class="accordion-item bg-transparent">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#hist{{ loop.index }}">
+            {{ h.season.name }}
+          </button>
+        </h2>
+        <div id="hist{{ loop.index }}" class="accordion-collapse collapse" data-bs-parent="#historyAccordion">
+          <div class="accordion-body">
+            <div class="d-flex gap-2 flex-wrap">
+              {% for award in h.awards %}
+              <span class="badge bg-body-secondary text-body border">
+                {% if award.title.icon %}<i class="bi {{ award.title.icon }} me-1"></i>{% endif %}
+                {{ award.title.name }} — <strong class="ms-1">{{ award.player_name }}</strong>
+              </span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-muted text-center py-3">Сезонные номинации ещё не присуждались.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

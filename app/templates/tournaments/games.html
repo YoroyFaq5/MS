@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Игры — {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('tournaments.tournament_detail', tournament_id=tournament.id) }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  <div>
+    <h2 class="mb-0 fw-bold">🎮 Игры турнира</h2>
+    <p class="text-muted small mb-0">{{ tournament.name }} · {{ games|length }} игр</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if games %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th class="ps-4">№</th>
+            <th>Дата</th>
+            <th class="text-center">Этап</th>
+            <th class="text-center">Победитель</th>
+            <th class="text-center">Рейтинговая?</th>
+            <th class="text-center">Статус</th>
+            <th class="text-end pe-4"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for game in games %}
+          <tr>
+            <td class="ps-4 text-muted">{{ loop.index }}</td>
+            <td>{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            <td class="text-center">
+              {% if game.stage %}
+                <span class="badge bg-body-secondary text-body border">{{ game.stage.name }}</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if game.win_side.value == 'mafia' %}<span class="badge bg-danger">🔫 Мафия</span>
+              {% elif game.win_side.value == 'city' %}<span class="badge bg-success">🏙 Город</span>
+              {% else %}<span class="badge bg-secondary">—</span>{% endif %}
+            </td>
+            <td class="text-center">
+              {% if game.is_ranked %}
+                <span class="text-success"><i class="bi bi-check-circle-fill"></i></span>
+              {% else %}
+                <span class="text-muted"><i class="bi bi-dash-circle"></i></span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if game.is_finished %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle">Завершена</span>
+              {% else %}
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">В процессе</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              <a href="{{ url_for('games.game_detail', game_id=game.id) }}"
+                 class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-controller fs-1 d-block mb-3 opacity-25"></i>
+      <p>Игры турнира пока не сыграны</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

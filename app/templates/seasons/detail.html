@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+{% block title %}{{ season.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('seasons.index', year=season.year) }}" class="btn btn-outline-secondary btn-sm">← Сезоны {{ season.year }}</a>
+  <div class="flex-grow-1">
+    <h2 class="mb-0 fw-bold">📅 {{ season.name }}</h2>
+    <p class="text-muted small mb-0">
+      {{ season.starts_at.strftime('%d.%m.%Y') }} — {{ season.ends_at.strftime('%d.%m.%Y') }}
+    </p>
+  </div>
+  <span class="badge fs-6
+    {% if season.status.value == 'active' %}bg-success
+    {% elif season.status.value == 'waiting_tiebreak' %}bg-warning text-dark
+    {% else %}bg-secondary{% endif %}">
+    {% if season.status.value == 'active' %}🟢 Активен
+    {% elif season.status.value == 'finished' %}✅ Завершён
+    {% elif season.status.value == 'waiting_tiebreak' %}⚠️ Ничья
+    {% endif %}
+  </span>
+</div>
+
+<!-- Winner / tiebreak block -->
+{% if season.status.value == 'finished' and season.winner %}
+<div class="card mb-4 border-warning" style="background: rgba(251,191,36,.05)">
+  <div class="card-body d-flex align-items-center gap-4 py-3">
+    <div class="fs-2">🏆</div>
+    <div>
+      <div class="text-muted small mb-1">Победитель сезона</div>
+      <div class="fw-bold fs-5">{{ season.winner.display_name }}</div>
+    </div>
+    <div class="ms-auto text-end">
+      <div class="text-muted small">Очки</div>
+      <div class="fw-bold fs-4 text-warning">{{ season.winner_score }}</div>
+    </div>
+    {% if season.year_tournament_id %}
+    <a href="{{ url_for('tournaments.tournament_detail', tournament_id=season.year_tournament_id) }}"
+       class="btn btn-sm btn-outline-warning ms-2">
+      <i class="bi bi-trophy me-1"></i>Стол года
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% elif season.status.value == 'waiting_tiebreak' %}
+<div class="card mb-4 border-warning">
+  <div class="card-header bg-warning bg-opacity-10 fw-semibold text-warning">
+    ⚠️ Ничья — требуется выбор победителя
+  </div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Следующие игроки набрали одинаковое количество очков.
+      Администратор должен выбрать победителя вручную.
+    </p>
+
+    <!-- Tied players -->
+    <div class="d-flex flex-wrap gap-2 mb-4">
+      {% for r in tiebreak_candidates %}
+      <div class="card text-center p-3" style="min-width:140px">
+        <div class="fw-bold">{{ r.display_name }}</div>
+        <div class="fs-5 text-warning fw-bold">{{ r.season_rating }}</div>
+        <div class="text-muted small">{{ r.games_played }} игр · {{ (r.win_rate * 100)|round(1) }}%</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    <form method="POST" action="{{ url_for('seasons.resolve_tiebreak', season_id=season.id) }}"
+          onsubmit="return confirm('Назначить этого игрока победителем сезона? Действие необратимо.')">
+      <div class="row g-2 align-items-end">
+        <div class="col-auto">
+          <label class="form-label small fw-medium">Выбрать победителя:</label>
+          <select name="winner_player_id" class="form-select" required>
+            <option value="">— выберите —</option>
+            {% for r in tiebreak_candidates %}
+            <option value="{{ r.player_id }}">{{ r.display_name }} ({{ r.season_rating }} очков)</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-warning text-dark">
+            <i class="bi bi-check-lg me-1"></i>Назначить победителем
+          </button>
+        </div>
+      </div>
+    </form>
+    {% else %}
+    <div class="alert alert-secondary small mb-0">
+      <i class="bi bi-lock me-1"></i>Только администратор может разрешить ничью.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Nominations -->
+{% if season_nominations %}
+<div class="card mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-patch-check text-warning me-2"></i>Номинации сезона</div>
+  <div class="card-body">
+    <div class="d-flex gap-2 flex-wrap">
+      {% for pt in season_nominations %}
+      <a href="{{ url_for('profile.view_profile', player_id=pt.player_id) }}" class="text-decoration-none">
+        <span class="badge bg-body-secondary text-body border">
+          {% if pt.title.icon %}<i class="bi {{ pt.title.icon }} me-1"></i>{% endif %}
+          {{ pt.title.name }} — <strong class="ms-1">{{ pt.player.display_name }}</strong>
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Season stats row -->
+{% set max_points = ratings|map(attribute='total_points')|max if ratings else 0 %}
+{% set max_wr = ratings|map(attribute='win_rate')|max if ratings else 0 %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value">{{ season.games|length }}</div>
+      <div class="stat-label">Игр сыграно</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value">{{ ratings|length }}</div>
+      <div class="stat-label">Участников</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value text-success">
+        {% if ratings %}{{ max_points }}{% else %}—{% endif %}
+      </div>
+      <div class="stat-label">Макс. очков</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value text-info">
+        {% if ratings %}{{ (max_wr * 100)|round(1) }}%{% else %}—{% endif %}
+      </div>
+      <div class="stat-label">Лучший винрейт</div>
+    </div>
+  </div>
+</div>
+
+<!-- Season leaderboard -->
+<div class="card mb-4">
+  <div class="card-header fw-semibold">🏅 Рейтинг сезона</div>
+  <div class="card-body p-0">
+    {% if ratings %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th class="ps-4">#</th>
+            <th>Игрок</th>
+            <th class="text-center">Игр</th>
+            <th class="text-center">Побед</th>
+            <th class="text-center">WR%</th>
+            <th class="text-center">Очки</th>
+            <th class="text-center">GG</th>
+            <th class="text-center">ELO</th>
+            <th class="text-end pe-4">Рейтинг сезона</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in ratings %}
+          <tr class="{% if season.winner_player_id == r.player_id %}winner-row{% endif %}
+                     {% if season.status.value == 'waiting_tiebreak' and loop.index == 1 %}tiebreak-row{% endif %}">
+            <td class="ps-4">
+              {% if season.winner_player_id == r.player_id %}🏆
+              {% elif r.rank == 1 and not season.winner_player_id %}🥇
+              {% elif r.rank == 2 %}🥈
+              {% elif r.rank == 3 %}🥉
+              {% else %}<span class="text-muted">{{ r.rank }}</span>{% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}"
+                 class="text-decoration-none fw-semibold">{{ r.display_name }}</a>
+            </td>
+            <td class="text-center text-muted">{{ r.games_played }}</td>
+            <td class="text-center text-muted">{{ r.games_won }}</td>
+            <td class="text-center">
+              <div class="d-flex align-items-center justify-content-center gap-2">
+                <div class="progress flex-grow-1" style="height:5px;max-width:50px">
+                  <div class="progress-bar bg-success" style="width:{{ (r.win_rate * 100)|round(1) }}%"></div>
+                </div>
+                <span class="text-muted small">{{ (r.win_rate * 100)|round(1) }}%</span>
+              </div>
+            </td>
+            <td class="text-center text-muted">{{ r.total_points }}</td>
+            <td class="text-center {% if r.gg_total > 0 %}text-warning{% elif r.gg_total < 0 %}text-danger{% else %}text-muted{% endif %}">
+              {% if r.gg_total != 0 %}{{ '+' if r.gg_total > 0 else '' }}{{ r.gg_total }}{% else %}—{% endif %}
+            </td>
+            <td class="text-center">
+              <span class="{% if r.elo > 1000 %}text-success{% elif r.elo < 1000 %}text-danger{% else %}text-muted{% endif %} small fw-medium">
+                {{ r.elo|round|int }}
+              </span>
+            </td>
+            <td class="text-end pe-4 fw-bold text-success">{{ r.season_rating }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-bar-chart fs-1 d-block mb-2 opacity-25"></i>
+      В этом сезоне ещё нет завершённых игр
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- GG Panel (admin only) -->
+{% if current_user.is_authenticated and current_user.is_admin and season.status.value != 'finished' %}
+<div class="card mb-4">
+  <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+    <span>⭐ GG-бонусы сезона</span>
+    <button class="btn btn-sm btn-outline-warning" type="button"
+            data-bs-toggle="collapse" data-bs-target="#ggPanel">
+      <i class="bi bi-plus-lg me-1"></i>Добавить
+    </button>
+  </div>
+  <div class="collapse" id="ggPanel">
+    <div class="card-body border-bottom">
+      <form method="POST" action="{{ url_for('seasons.add_gg', season_id=season.id) }}"
+            class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label small fw-medium">Игрок</label>
+          <select name="player_id" class="form-select form-select-sm" required>
+            <option value="">— выберите —</option>
+            {% for r in ratings %}
+            <option value="{{ r.player_id }}">{{ r.display_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small fw-medium">Значение</label>
+          <input type="number" name="value" class="form-control form-control-sm"
+                 step="0.01" min="-50" max="50" placeholder="напр. 5.0" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-medium">Причина (≥10 символов)</label>
+          <input type="text" name="reason" class="form-control form-control-sm"
+                 minlength="10" placeholder="Отличная игра в финале" required>
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-warning btn-sm w-100">Начислить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- Active GG entries -->
+  {% if gg_entries %}
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle small">
+      <thead>
+        <tr>
+          <th class="ps-3">Игрок</th>
+          <th>Причина</th>
+          <th class="text-center">Значение</th>
+          <th class="text-center">Дата</th>
+          <th class="pe-3"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for gg in gg_entries %}
+        <tr class="{% if gg.revoked %}opacity-50{% endif %}">
+          <td class="ps-3">{{ gg.player.display_name if gg.player else '?' }}</td>
+          <td class="text-muted">{{ gg.reason }}</td>
+          <td class="text-center fw-semibold {% if gg.value >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ '+' if gg.value >= 0 else '' }}{{ gg.value }}
+          </td>
+          <td class="text-center text-muted">{{ gg.created_at.strftime('%d.%m.%Y') }}</td>
+          <td class="pe-3 text-end">
+            {% if not gg.revoked %}
+            <form method="POST" action="{{ url_for('seasons.revoke_gg', gg_id=gg.id) }}"
+                  onsubmit="return confirm('Отозвать GG-бонус?')">
+              <button class="btn btn-outline-danger btn-sm py-0 px-2">✕</button>
+            </form>
+            {% else %}
+            <span class="badge bg-secondary-subtle text-secondary border">отозван</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-center text-muted small py-3">GG-бонусов в этом сезоне ещё нет</div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Recent games -->
+{% if recent_games %}
+<div class="card">
+  <div class="card-header fw-semibold">🎮 Игры сезона</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle small">
+        <thead>
+          <tr>
+            <th class="ps-4">Игра</th>
+            <th>Дата</th>
+            <th class="text-center">Победитель</th>
+            <th class="text-end pe-4">Турнир</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for game in recent_games %}
+          <tr>
+            <td class="ps-4">
+              <a href="{{ url_for('games.game_detail', game_id=game.id) }}"
+                 class="text-decoration-none">#{{ game.id }}</a>
+            </td>
+            <td class="text-muted">{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            <td class="text-center">
+              {% if game.win_side.value == 'mafia' %}<span class="badge bg-danger">🔫 Мафия</span>
+              {% elif game.win_side.value == 'city' %}<span class="badge bg-success">🏙 Город</span>
+              {% else %}<span class="badge bg-secondary">—</span>{% endif %}
+            </td>
+            <td class="text-end pe-4 text-muted">
+              {% if game.tournament %}
+              <a href="{{ url_for('tournaments.tournament_detail', tournament_id=game.tournament_id) }}"
+                 class="text-decoration-none small">{{ game.tournament.name }}</a>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% block head %}
+<style>
+.winner-row { background: rgba(251,191,36,.06) !important; }
+.winner-row td:first-child { border-left: 3px solid #fbbf24; }
+.tiebreak-row { background: rgba(251,191,36,.04) !important; }
+</style>
+{% endblock %}
+{% endblock %}

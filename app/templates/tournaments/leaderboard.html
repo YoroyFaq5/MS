@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Рейтинг — {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('tournaments.tournament_detail', tournament_id=tournament.id) }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  <div>
+    <h2 class="mb-0 fw-bold">🏆 Рейтинг турнира</h2>
+    <p class="text-muted small mb-0">{{ tournament.name }}</p>
+  </div>
+  {% if tournament.has_stages %}
+  <a href="{{ url_for('tournaments.final_view', tournament_id=tournament.id) }}"
+     class="btn btn-warning text-dark ms-auto">🏆 Финал →</a>
+  {% endif %}
+</div>
+
+{% if team_ratings %}
+<!-- TEAM rating (command tournament) -->
+<h5 class="fw-semibold mb-3">🤝 Командный зачёт</h5>
+<div class="row g-3 mb-5">
+  {% for tr in team_ratings %}
+  <div class="col-md-4">
+    <div class="card text-center p-3">
+      {% if tr.rank == 1 %}
+      <div class="fs-2 mb-1">🥇</div>
+      {% elif tr.rank == 2 %}
+      <div class="fs-2 mb-1">🥈</div>
+      {% elif tr.rank == 3 %}
+      <div class="fs-2 mb-1">🥉</div>
+      {% else %}
+      <div class="fw-bold text-muted mb-1">#{{ tr.rank }}</div>
+      {% endif %}
+      {% if tr.color %}
+      <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+        <div class="rounded-circle" style="width:12px;height:12px;background:{{ tr.color }}"></div>
+        <span class="fw-bold">{{ tr.team_name }}</span>
+      </div>
+      {% else %}
+      <div class="fw-bold mb-1">{{ tr.team_name }}</div>
+      {% endif %}
+      <div class="text-muted small">{{ tr.member_count }} игроков · {{ tr.games_played }} игр</div>
+      <div class="fs-4 fw-bold text-success mt-1">{{ tr.total_score }}</div>
+      <div class="text-muted small">{{ tr.win_rate }}% побед</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<h5 class="fw-semibold mb-3">👤 Индивидуальный зачёт</h5>
+{% endif %}
+
+<!-- Podium (top 3) -->
+{% if player_ratings|length >= 3 %}
+<div class="row g-3 justify-content-center mb-5">
+  <div class="col-4 col-md-3 order-1 order-md-0">
+    <div class="card text-center podium podium-2 h-100 py-3">
+      <div class="fs-2 mb-1">🥈</div>
+      <div class="fw-bold">{{ player_ratings[1].display_name }}</div>
+      <div class="text-muted small">{{ player_ratings[1].games_played }} игр</div>
+      <div class="fs-5 fw-bold text-secondary mt-1">{{ player_ratings[1].total_score }}</div>
+      {% if player_ratings[1].player_id in final_ids %}
+      <div class="mt-1"><span class="badge bg-warning text-dark small">🏆 Финал</span></div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-4 col-md-3 order-0 order-md-1">
+    <div class="card text-center podium podium-1 h-100 py-4">
+      <div class="fs-1 mb-1">🥇</div>
+      <div class="fw-bold fs-5">{{ player_ratings[0].display_name }}</div>
+      <div class="text-muted small">{{ player_ratings[0].games_played }} игр</div>
+      <div class="fs-4 fw-bold text-warning mt-1">{{ player_ratings[0].total_score }}</div>
+      {% if player_ratings[0].player_id in final_ids %}
+      <div class="mt-1"><span class="badge bg-warning text-dark small">🏆 Финал</span></div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-4 col-md-3 order-2">
+    <div class="card text-center podium podium-3 h-100 py-3">
+      <div class="fs-2 mb-1">🥉</div>
+      <div class="fw-bold">{{ player_ratings[2].display_name }}</div>
+      <div class="text-muted small">{{ player_ratings[2].games_played }} игр</div>
+      <div class="fs-5 fw-bold mt-1" style="color:#cd7f32">{{ player_ratings[2].total_score }}</div>
+      {% if player_ratings[2].player_id in final_ids %}
+      <div class="mt-1"><span class="badge bg-warning text-dark small">🏆 Финал</span></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Full table -->
+<div class="card">
+  <div class="card-body p-0">
+    {% if player_ratings %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th class="ps-4">#</th>
+            <th>Игрок</th>
+            <th class="text-center">Игр</th>
+            <th class="text-center">Победы</th>
+            <th class="text-center">Винрейт</th>
+            <th class="text-center">Ср. очки</th>
+            <th class="text-center">ELO</th>
+            <th class="text-end pe-4">Очки</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in player_ratings %}
+          <tr class="{% if r.player_id in final_ids %}finalist-row{% endif %}">
+            <td class="ps-4">
+              {% if r.rank == 1 %}<span class="badge bg-warning text-dark">🥇</span>
+              {% elif r.rank == 2 %}<span class="badge bg-secondary">🥈</span>
+              {% elif r.rank == 3 %}<span class="badge" style="background:#cd7f32">🥉</span>
+              {% else %}<span class="text-muted">{{ r.rank }}</span>{% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}"
+                 class="text-decoration-none fw-semibold">{{ r.display_name }}</a>
+              {% if r.player_id in final_ids %}
+              <span class="badge bg-warning text-dark ms-1 small">🏆</span>
+              {% endif %}
+              {% set title = equipped_titles.get(r.player_id) %}
+              {% if title and title.title.icon %}
+              <span class="badge bg-warning-subtle text-warning border border-warning-subtle ms-1">
+                <i class="bi {{ title.title.icon }}"></i>
+              </span>
+              {% endif %}
+            </td>
+            <td class="text-center text-muted">{{ r.games_played }}</td>
+            <td class="text-center text-muted">{{ r.games_won }}</td>
+            <td class="text-center">
+              <div class="d-flex align-items-center justify-content-center gap-2">
+                <div class="progress flex-grow-1" style="height:5px;max-width:50px">
+                  <div class="progress-bar bg-success" style="width:{{ r.win_rate }}%"></div>
+                </div>
+                <span class="text-muted small">{{ r.win_rate }}%</span>
+              </div>
+            </td>
+            <td class="text-center text-muted">{{ r.avg_score }}</td>
+            <td class="text-center">
+              <span class="{% if r.elo > 1000 %}text-success{% elif r.elo < 1000 %}text-danger{% else %}text-muted{% endif %} small fw-medium">
+                {{ r.elo|round|int }}
+              </span>
+            </td>
+            <td class="text-end pe-4 fw-bold text-success">{{ r.total_score }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-bar-chart fs-1 d-block mb-2 opacity-25"></i>
+      Рейтинг появится после завершения первых игр
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% block head %}
+<style>
+.finalist-row { background: rgba(251,191,36,.04) !important; }
+.finalist-row td:first-child { border-left: 3px solid #fbbf24; }
+</style>
+{% endblock %}
+{% endblock %}

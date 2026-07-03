@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Достижения — {{ player.display_name }}{% endblock %}
+
+{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark'} %}
+{% set CATEGORY_LABELS = {'games': 'Игры', 'wins': 'Победы', 'rating': 'Рейтинг', 'tournaments': 'Турниры', 'seasons': 'Сезоны', 'fantasy': 'Fantasy', 'economy': 'Экономика', 'social': 'Социальные', 'special': 'Специальные'} %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold">🏆 Достижения — {{ player.display_name }}</h2>
+    <a href="{{ url_for('profile.view_profile', player_id=player_id) }}" class="text-muted small">← К профилю</a>
+  </div>
+  <div class="stat-card card px-3 py-2 text-center">
+    <div class="fw-bold fs-5">{{ unlocked_count }}/{{ total_count }}</div>
+    <div class="text-muted small">{{ completion_pct }}% выполнено</div>
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for item in items %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100 rarity-{{ item.rarity }} {% if not item.unlocked %}achievement-locked{% endif %}">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h6 class="fw-semibold mb-0">
+            {% if item.icon %}<i class="bi {{ item.icon }} me-1"></i>{% endif %}{{ item.name }}
+          </h6>
+          <span class="badge {{ RARITY_BADGE.get(item.rarity, 'bg-secondary') }}">{{ item.rarity }}</span>
+        </div>
+        <div class="text-muted small mb-2">{{ CATEGORY_LABELS.get(item.category, item.category) }}</div>
+        {% if item.description %}
+        <p class="text-muted small mb-3">{{ item.description }}</p>
+        {% endif %}
+
+        {% if item.unlocked %}
+          <div class="text-success small mb-2">
+            <i class="bi bi-check-circle-fill me-1"></i>Получено
+            {% if item.unlocked_at %}{{ item.unlocked_at[:10] }}{% endif %}
+          </div>
+          {% if is_own %}
+            {% if item.pinned %}
+            <form method="POST" action="{{ url_for('profile.unpin_achievement', player_id=player_id, achievement_id=item.id) }}">
+              <button type="submit" class="btn btn-sm btn-outline-warning w-100">
+                <i class="bi bi-pin-angle-fill me-1"></i>Открепить
+              </button>
+            </form>
+            {% else %}
+            <form method="POST" action="{{ url_for('profile.pin_achievement', player_id=player_id, achievement_id=item.id) }}">
+              <button type="submit" class="btn btn-sm btn-outline-secondary w-100">
+                <i class="bi bi-pin-angle me-1"></i>Закрепить
+              </button>
+            </form>
+            {% endif %}
+          {% endif %}
+        {% else %}
+          <div class="text-muted small"><i class="bi bi-lock-fill me-1"></i>Не получено</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Этапы — {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('tournaments.tournament_detail', tournament_id=tournament.id) }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  <div>
+    <h2 class="mb-0 fw-bold">📋 Этапы турнира</h2>
+    <p class="text-muted small mb-0">{{ tournament.name }}</p>
+  </div>
+</div>
+
+<!-- Stage pipeline visualization -->
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      {% for stage in stages %}
+      <div class="stage-pill
+        {% if stage.status == 'active' %}stage-pill--active
+        {% elif stage.status == 'finished' %}stage-pill--done
+        {% else %}stage-pill--pending{% endif %}">
+        <span class="stage-pill__icon">
+          {% if stage.type == 'final' %}🏆
+          {% elif stage.type == 'group' %}📊
+          {% else %}⚔️{% endif %}
+        </span>
+        <span class="stage-pill__name">{{ stage.name }}</span>
+        <span class="stage-pill__badge">
+          {% if stage.status == 'active' %}LIVE
+          {% elif stage.status == 'finished' %}DONE
+          {% else %}SOON{% endif %}
+        </span>
+      </div>
+      {% if not loop.last %}
+      <i class="bi bi-arrow-right text-muted"></i>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Each stage detail -->
+{% for stage in stages %}
+<div class="card mb-4 {% if stage.status == 'active' %}border-warning{% endif %}">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-3">
+      <span class="fw-bold">
+        {% if stage.type == 'final' %}🏆{% elif stage.type == 'group' %}📊{% else %}⚔️{% endif %}
+        {{ stage.name }}
+      </span>
+      <span class="badge
+        {% if stage.status == 'active' %}bg-success
+        {% elif stage.status == 'finished' %}bg-secondary
+        {% else %}bg-warning text-dark{% endif %}">
+        {{ stage.status|upper }}
+      </span>
+      <span class="text-muted small">{{ stage.games|length }} игр</span>
+    </div>
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    <div class="d-flex gap-2">
+      {% if stage.status == 'pending' and tournament.status == 'active' %}
+      <form method="POST" action="{{ url_for('tournaments.activate_stage', stage_id=stage.id) }}">
+        <button class="btn btn-sm btn-success">▶ Активировать</button>
+      </form>
+      {% endif %}
+      {% if stage.status == 'active' %}
+        {% if stage.type != 'final' %}
+        <form method="POST" action="{{ url_for('tournaments.run_cutoff', stage_id=stage.id) }}"
+              onsubmit="return confirm('Запустить cutoff? Топ-{{ tournament.cutoff_size }} игроков пройдут в финал.')">
+          <button class="btn btn-sm btn-warning text-dark">✂ Cutoff → Финал</button>
+        </form>
+        {% endif %}
+        <form method="POST" action="{{ url_for('tournaments.finish_stage', stage_id=stage.id) }}"
+              onsubmit="return confirm('Завершить этап «{{ stage.name }}»?')">
+          <button class="btn btn-sm btn-outline-danger">⬛ Завершить</button>
+        </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card-body p-0">
+    <!-- Stage rating table -->
+    {% set s_ratings = stage_ratings.get(stage.id, []) %}
+    {% if s_ratings %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle small">
+        <thead>
+          <tr>
+            <th class="ps-4">#</th>
+            <th>Игрок</th>
+            <th class="text-center">Игр</th>
+            <th class="text-center">Побед</th>
+            <th class="text-center">Ср. очки</th>
+            <th class="text-end pe-4">Очки</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in s_ratings %}
+          <tr class="{% if loop.index <= tournament.cutoff_size and stage.type != 'final' %}cutoff-zone{% endif %}">
+            <td class="ps-4">
+              {% if r.rank == 1 %}🥇
+              {% elif r.rank == 2 %}🥈
+              {% elif r.rank == 3 %}🥉
+              {% else %}<span class="text-muted">{{ r.rank }}</span>{% endif %}
+            </td>
+            <td class="fw-medium">{{ r.display_name }}</td>
+            <td class="text-center text-muted">{{ r.games_played }}</td>
+            <td class="text-center text-muted">{{ r.games_won }}</td>
+            <td class="text-center text-muted">{{ r.avg_score }}</td>
+            <td class="text-end pe-4 fw-bold text-success">{{ r.total_score }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if stage.type != 'final' and s_ratings|length > tournament.cutoff_size %}
+    <div class="px-4 py-2 text-muted small border-top">
+      <i class="bi bi-scissors me-1 text-warning"></i>
+      Cutoff line — первые {{ tournament.cutoff_size }} игроков проходят в финал
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="text-center text-muted py-4">Нет данных об играх в этом этапе</div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+{% if tournament.status == 'active' and current_user.is_authenticated and current_user.is_admin %}
+<div class="card">
+  <div class="card-header fw-semibold">➕ Добавить этап</div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('tournaments.add_stage', tournament_id=tournament.id) }}"
+          class="row g-3">
+      <div class="col-md-5">
+        <input type="text" name="name" class="form-control" placeholder="Название этапа" required>
+      </div>
+      <div class="col-md-4">
+        <select name="stage_type" class="form-select">
+          <option value="main">⚔️ Основной</option>
+          <option value="group">📊 Групповой</option>
+          <option value="final">🏆 Финальный</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-danger w-100">Добавить</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% block head %}
+<style>
+.stage-pill {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 99px;
+  font-size: .8rem; font-weight: 600; border: 1px solid;
+}
+.stage-pill--active { background: rgba(34,197,94,.12); border-color: #22c55e; color: #22c55e; }
+.stage-pill--done   { background: rgba(100,116,139,.1); border-color: #64748b; color: #64748b; }
+.stage-pill--pending{ background: rgba(251,191,36,.08); border-color: #fbbf24; color: #fbbf24; }
+.stage-pill__badge  { font-size:.65rem; opacity:.7; }
+.cutoff-zone        { background: rgba(251,191,36,.04); }
+.cutoff-zone td:first-child { border-left: 3px solid #fbbf24; }
+</style>
+{% endblock %}
+{% endblock %}

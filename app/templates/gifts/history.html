@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}История подарков{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2"></i>История передач</h2>
+    <p class="text-muted small mb-0">Отправленные и полученные подарки</p>
+  </div>
+  <a href="{{ url_for('inventory.list_inventory') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-backpack4 me-1"></i>Инвентарь
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th class="ps-4">Дата</th>
+            <th>Предмет</th>
+            <th>Отправитель</th>
+            <th>Получатель</th>
+            <th class="pe-4">Сообщение</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transfers %}
+          <tr>
+            <td class="ps-4 text-muted small">{{ t.transferred_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            <td>{{ t.shop_item.name if t.shop_item else '—' }}</td>
+            <td>
+              <a href="{{ url_for('profile.view_profile', player_id=t.from_player_id) }}"
+                 class="{% if t.from_player_id == my_player_id %}fw-semibold{% endif %}">{{ t.from_player.display_name }}</a>
+            </td>
+            <td>
+              <a href="{{ url_for('profile.view_profile', player_id=t.to_player_id) }}"
+                 class="{% if t.to_player_id == my_player_id %}fw-semibold{% endif %}">{{ t.to_player.display_name }}</a>
+            </td>
+            <td class="pe-4 text-muted small fst-italic">{{ t.message or '' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-4">Передач пока не было</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

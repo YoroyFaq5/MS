@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Fantasy{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h2 class="fw-bold mb-0">🎯 Fantasy Draft</h2>
+  <p class="text-muted small">Собери команду и получай очки за результаты турниров</p>
+</div>
+
+{% if not current_user.is_authenticated %}
+<div class="alert alert-secondary d-flex align-items-center gap-3">
+  <i class="bi bi-lock fs-4"></i>
+  <div>
+    <strong>Войдите в аккаунт</strong>, чтобы создавать драфты и участвовать в Fantasy.
+    <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-danger ms-3">Войти</a>
+  </div>
+</div>
+{% endif %}
+
+{% if tournaments %}
+<div class="row g-3">
+  {% for t in tournaments %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <h6 class="fw-bold mb-0">{{ t.name }}</h6>
+          <span class="badge
+            {% if t.status == 'active' %}bg-success
+            {% elif t.status == 'finished' %}bg-secondary
+            {% else %}bg-warning text-dark{% endif %}">
+            {{ t.status }}
+          </span>
+        </div>
+
+        {% if t.id in user_drafts %}
+        {% set draft = user_drafts[t.id] %}
+        <div class="mb-3 p-2 rounded bg-body-secondary">
+          <div class="small text-muted mb-1">Ваш драфт</div>
+          <div class="d-flex justify-content-between">
+            <span class="fw-semibold">{{ draft.pick_count }} игроков</span>
+            <span class="badge
+              {% if draft.status.value == 'open' %}bg-success
+              {% elif draft.status.value == 'locked' %}bg-warning text-dark
+              {% else %}bg-info text-dark{% endif %}">
+              {{ draft.status.value }}
+            </span>
+          </div>
+          {% if draft.status.value == 'scored' %}
+          <div class="fw-bold text-warning mt-1">{{ draft.total_points }} очков</div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <a href="{{ url_for('fantasy.tournament_fantasy', tournament_id=t.id) }}"
+           class="btn btn-sm btn-outline-secondary w-100">
+          {% if t.id in user_drafts %}Мой драфт →{% else %}Открыть →{% endif %}
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-trophy fs-1 d-block mb-3 opacity-25"></i>
+  <p>Турниров пока нет. Fantasy появится когда администратор создаст первый турнир.</p>
+</div>
+{% endif %}
+{% endblock %}

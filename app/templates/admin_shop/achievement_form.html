@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{% if achievement %}Редактировать достижение{% else %}Новое достижение{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="mb-4">
+      <h2 class="fw-bold mb-0">
+        {% if achievement %}✏️ Редактировать достижение{% else %}➕ Новое достижение{% endif %}
+      </h2>
+      <a href="{{ url_for('admin_shop.list_achievements') }}" class="text-muted small">← К списку достижений</a>
+    </div>
+
+    <div class="card">
+      <div class="card-body p-4">
+        <form method="POST">
+          {% if not achievement %}
+          <div class="mb-3">
+            <label class="form-label fw-medium">Код <span class="text-danger">*</span></label>
+            <input type="text" name="code" class="form-control" placeholder="games_played_10" required>
+            <div class="form-text">
+              Уникальный идентификатор. Чтобы достижение разблокировалось автоматически, добавьте
+              соответствующее правило с этим же кодом в app/services/achievement_rules.py.
+            </div>
+          </div>
+          {% else %}
+          <div class="mb-3">
+            <label class="form-label fw-medium">Код</label>
+            <input type="text" class="form-control" value="{{ achievement.code }}" disabled>
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label fw-medium">Название <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" value="{{ achievement.name if achievement else '' }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-medium">Описание</label>
+            <textarea name="description" class="form-control" rows="2">{{ achievement.description if achievement else '' }}</textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-medium">Иконка (bootstrap-icon класс)</label>
+            <input type="text" name="icon" class="form-control" value="{{ achievement.icon if achievement else '' }}" placeholder="bi-trophy-fill">
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-4">
+              <label class="form-label fw-medium">Категория</label>
+              <select name="category" class="form-select">
+                {% for cat in categories %}
+                <option value="{{ cat.value }}" {% if achievement and achievement.category == cat %}selected{% endif %}>{{ cat.value }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-4">
+              <label class="form-label fw-medium">Редкость</label>
+              <select name="rarity" class="form-select">
+                {% for r in rarities %}
+                <option value="{{ r.value }}" {% if achievement and achievement.rarity == r %}selected{% endif %}>{{ r.value }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-4">
+              <label class="form-label fw-medium">Триггер</label>
+              <select name="trigger" class="form-select">
+                {% for t in triggers %}
+                <option value="{{ t.value }}" {% if achievement and achievement.trigger == t %}selected{% endif %}>{{ t.value }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="form-check mb-2">
+            <input type="checkbox" name="is_hidden" class="form-check-input" id="isHidden"
+                   {% if achievement and achievement.is_hidden %}checked{% endif %}>
+            <label class="form-check-label small" for="isHidden">
+              Скрытое (показывать «???» до получения)
+            </label>
+          </div>
+
+          {% if achievement %}
+          <div class="form-check mb-4">
+            <input type="checkbox" name="is_active" class="form-check-input" id="isActive"
+                   {% if achievement.is_active %}checked{% endif %}>
+            <label class="form-check-label small" for="isActive">Активно</label>
+          </div>
+          {% endif %}
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-danger px-4">
+              <i class="bi bi-check-lg me-1"></i>{% if achievement %}Сохранить{% else %}Создать{% endif %}
+            </button>
+            <a href="{{ url_for('admin_shop.list_achievements') }}" class="btn btn-outline-secondary">Отмена</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

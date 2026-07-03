@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Инвентарь{% endblock %}
+
+{% block content %}
+{% set CATEGORY_LABELS = {'profile_customization': '🖼️ Кастомизация профиля', 'nickname': '✨ Никнейм', 'physical': '📦 Физические товары'} %}
+{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark'} %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold">🎒 Инвентарь</h2>
+    <p class="text-muted small mb-0">Купленные предметы — экипируйте, чтобы применить оформление профиля</p>
+  </div>
+  <a href="{{ url_for('shop.list_items') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-shop me-1"></i>В магазин
+  </a>
+</div>
+
+{% if grouped %}
+  {% for cat in categories %}
+    {% set cat_items = grouped.get(cat.value) %}
+    {% if cat_items %}
+    <h5 class="fw-semibold mt-4 mb-3">{{ CATEGORY_LABELS.get(cat.value, cat.value) }}</h5>
+    <div class="row g-3 mb-3">
+      {% for inv in cat_items %}
+      <div class="col-md-6 col-xl-4">
+        <div class="card h-100 rarity-{{ inv.item.rarity.value }} position-relative">
+          {% if inv.is_equipped %}
+          <span class="badge bg-success equip-slot-badge"><i class="bi bi-check-lg"></i> Экипировано</span>
+          {% endif %}
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <h6 class="fw-semibold mb-0">{{ inv.item.name }}</h6>
+              <span class="badge {{ RARITY_BADGE.get(inv.item.rarity.value, 'bg-secondary') }}">
+                {{ inv.item.rarity.value }}
+              </span>
+            </div>
+            <div class="text-muted small mb-3">слот «{{ inv.item.subcategory }}»</div>
+
+            {% if inv.item.category.value == 'physical' %}
+            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+              Физический товар — выдаётся вручную
+            </span>
+            {% elif inv.is_equipped %}
+            <form method="POST" action="{{ url_for('inventory.unequip', inventory_item_id=inv.id) }}">
+              <button type="submit" class="btn btn-sm btn-outline-danger w-100">Снять</button>
+            </form>
+            {% else %}
+            <form method="POST" action="{{ url_for('inventory.equip', inventory_item_id=inv.id) }}">
+              <button type="submit" class="btn btn-sm btn-danger w-100">Экипировать</button>
+            </form>
+            {% endif %}
+
+            {% if not inv.is_equipped and inv.item.is_transferable %}
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-2"
+                    data-bs-toggle="collapse" data-bs-target="#gift-{{ inv.id }}">
+              <i class="bi bi-gift me-1"></i>Подарить
+            </button>
+            <div class="collapse mt-2" id="gift-{{ inv.id }}">
+              <form method="POST" action="{{ url_for('gifts.send') }}" class="d-flex flex-column gap-1">
+                <input type="hidden" name="inventory_item_id" value="{{ inv.id }}">
+                <select name="to_player_id" class="form-select form-select-sm" required>
+                  <option value="">— получатель —</option>
+                  {% for p in other_players %}
+                  <option value="{{ p.id }}">{{ p.display_name }}</option>
+                  {% endfor %}
+                </select>
+                {% if inv.item.giftable_message %}
+                <input type="text" name="message" class="form-control form-control-sm" placeholder="сообщение (необязательно)" maxlength="255">
+                {% endif %}
+                <button type="submit" class="btn btn-sm btn-secondary">Отправить подарок</button>
+              </form>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endfor %}
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-backpack4 fs-1 d-block mb-2 opacity-25"></i>
+    Инвентарь пуст — загляните в <a href="{{ url_for('shop.list_items') }}">магазин</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

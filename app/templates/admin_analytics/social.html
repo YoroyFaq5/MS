@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Социальная аналитика{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold"><i class="bi bi-people me-2"></i>Социальная аналитика клуба</h2>
+    <p class="text-muted small mb-0">Клубные закономерности — не привязано к конкретному игроку</p>
+  </div>
+  <a href="{{ url_for('admin_analytics.gifts') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-gift me-1"></i>История подарков (все)
+  </a>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-people-fill me-2"></i>Самые частые пары игроков</div>
+      <div class="card-body p-0">
+        {% if rivalries %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead><tr><th class="ps-4">Игрок A</th><th>Игрок B</th><th class="text-end pe-4">Игр вместе</th></tr></thead>
+            <tbody>
+              {% for r in rivalries %}
+              <tr>
+                <td class="ps-4"><a href="{{ url_for('profile.view_profile', player_id=r.player_a_id) }}">{{ r.player_a_name }}</a></td>
+                <td><a href="{{ url_for('profile.view_profile', player_id=r.player_b_id) }}">{{ r.player_b_name }}</a></td>
+                <td class="text-end pe-4 fw-semibold">{{ r.games_together }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">Недостаточно данных</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-gift-fill me-2"></i>Самые дарёные предметы</div>
+      <div class="card-body p-0">
+        {% if most_gifted %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead><tr><th class="ps-4">Предмет</th><th class="text-end pe-4">Раз подарено</th></tr></thead>
+            <tbody>
+              {% for g in most_gifted %}
+              <tr>
+                <td class="ps-4">{{ g.name }}</td>
+                <td class="text-end pe-4 fw-semibold">{{ g.gift_count }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">Подарков пока не было</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

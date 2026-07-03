@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Управление балансами{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold">💰 Управление балансами</h2>
+    <p class="text-muted small mb-0">Корректировка монет игроков</p>
+  </div>
+  <a href="{{ url_for('auth.admin_users') }}" class="btn btn-outline-secondary btn-sm">← Пользователи</a>
+</div>
+
+<div class="row g-4">
+
+  <!-- ── Adjustment form ──────────────────────────────────────── -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header fw-semibold">⚙️ Корректировка баланса</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('auth.admin_economy_adjust') }}">
+
+          <div class="mb-3">
+            <label class="form-label fw-medium">Игрок</label>
+            <select name="player_id" class="form-select" required id="playerSelect">
+              <option value="">— выберите —</option>
+              {% for p in players %}
+              <option value="{{ p.id }}" data-coins="{{ (p.coins or 0) | round(2) }}">
+                {{ p.display_name }} — {{ (p.coins or 0) | int }} 🪙
+              </option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              Текущий баланс: <strong id="currentBalance">—</strong> монет
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-medium">Сумма</label>
+            <div class="input-group">
+              <input type="number" name="amount" class="form-control"
+                     step="0.01" placeholder="например: 100 или -50" required>
+              <span class="input-group-text">🪙</span>
+            </div>
+            <div class="form-text">Положительное — начислить, отрицательное — списать</div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-medium">Причина <span class="text-danger">*</span></label>
+            <input type="text" name="reason" class="form-control"
+                   placeholder="Минимум 10 символов" minlength="10" required>
+          </div>
+
+          <button type="submit" class="btn btn-danger w-100"
+                  onclick="return confirm('Применить корректировку баланса?')">
+            <i class="bi bi-pencil-square me-1"></i>Применить
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Fantasy settings -->
+    <div class="card mt-4">
+      <div class="card-header fw-semibold">🎯 Настройки Fantasy Draft</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('auth.admin_economy_fantasy_settings') }}">
+          <div class="mb-3">
+            <label class="form-label fw-medium">Стоимость участия</label>
+            <div class="input-group">
+              <input type="number" name="fantasy_entry_cost" class="form-control"
+                     step="1" min="1" value="{{ settings.fantasy_entry_cost | int }}" required>
+              <span class="input-group-text">🪙</span>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">Доля банка за 🥇 1-е место</label>
+            <div class="input-group">
+              <input type="number" name="fantasy_first_place_share" class="form-control"
+                     step="1" min="0" max="100"
+                     value="{{ (settings.fantasy_first_place_share * 100) | round | int }}" required>
+              <span class="input-group-text">%</span>
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="form-label fw-medium">Доля банка за 🥈 2-е место</label>
+            <div class="input-group">
+              <input type="number" name="fantasy_second_place_share" class="form-control"
+                     step="1" min="0" max="100"
+                     value="{{ (settings.fantasy_second_place_share * 100) | round | int }}" required>
+              <span class="input-group-text">%</span>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-outline-danger w-100">
+            <i class="bi bi-check-lg me-1"></i>Сохранить настройки
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Balance overview -->
+    <div class="card mt-4">
+      <div class="card-header fw-semibold">📊 Топ балансов</div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle small">
+          <thead>
+            <tr>
+              <th class="ps-3">Игрок</th>
+              <th class="text-end pe-3">Монет</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in players | sort(attribute='coins', reverse=True) | list %}
+            {% if loop.index <= 10 %}
+            <tr>
+              <td class="ps-3">{{ p.display_name }}</td>
+              <td class="text-end pe-3 fw-semibold text-warning">
+                {{ (p.coins or 0) | int }}
+              </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Recent transactions ──────────────────────────────────── -->
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+        <span>📋 Последние транзакции</span>
+        <span class="text-muted small">{{ recent_txs|length }} записей</span>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_txs %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle small">
+            <thead>
+              <tr>
+                <th class="ps-4">Дата</th>
+                <th>Игрок</th>
+                <th>Причина</th>
+                <th class="text-center">Тип</th>
+                <th class="text-end">Сумма</th>
+                <th class="text-end pe-4">Баланс после</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for tx in recent_txs %}
+              <tr>
+                <td class="ps-4 text-muted">
+                  {{ tx.created_at.strftime('%d.%m %H:%M') }}
+                </td>
+                <td class="fw-medium">
+                  {{ tx.player.display_name if tx.player else '—' }}
+                </td>
+                <td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                  {{ tx.reason }}
+                </td>
+                <td class="text-center">
+                  {% set src = tx.source_type.value %}
+                  {% if src == 'game_reward' %}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">🎮 Игра</span>
+                  {% elif src == 'tournament_reward' %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle">🏆 Турнир</span>
+                  {% elif src == 'season_reward' %}
+                    <span class="badge bg-info-subtle text-info border border-info-subtle">📅 Сезон</span>
+                  {% elif src == 'fantasy_reward' %}
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">🎯 Fantasy</span>
+                  {% elif src == 'purchase' %}
+                    <span class="badge bg-dark-subtle text-dark border border-dark-subtle">🎯 Fantasy взнос</span>
+                  {% elif src == 'admin_adjustment' %}
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">⚙️ Админ</span>
+                  {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">{{ src }}</span>
+                  {% endif %}
+                </td>
+                <td class="text-end fw-semibold {% if tx.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
+                  {{ '+' if tx.amount >= 0 else '' }}{{ tx.amount }}
+                </td>
+                <td class="text-end pe-4 text-muted">{{ tx.balance_after }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-coin fs-1 d-block mb-2 opacity-25"></i>
+          Транзакций пока нет
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Show current balance when player selected
+document.getElementById('playerSelect').addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  const coins = opt.dataset.coins || '—';
+  document.getElementById('currentBalance').textContent =
+    coins !== '—' ? parseFloat(coins).toFixed(0) : '—';
+});
+</script>
+{% endblock %}

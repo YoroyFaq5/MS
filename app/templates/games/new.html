@@ -1,0 +1,469 @@
+{% extends "base.html" %}
+{% block title %}Новая игра{% endblock %}
+
+{% block head %}
+<style>
+.seat-row { transition: background 0.15s; }
+.seat-row:hover { background: rgba(255,255,255,0.03); }
+.seat-num {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: .9rem; flex-shrink: 0;
+}
+.tournament-block {
+  border: 1px solid rgba(251,191,36,.3);
+  border-radius: 12px;
+  background: rgba(251,191,36,.04);
+}
+.player-seat-picker { min-width: 0; }
+.player-search-results {
+  z-index: 20;
+  max-height: 240px;
+  overflow-y: auto;
+  display: none;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('games.list_games') }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  <div>
+    <h2 class="mb-0 fw-bold">➕ Новая игра</h2>
+    <p class="text-muted small mb-0">Распределите 10 игроков по ролям</p>
+  </div>
+</div>
+
+{% if players|length < 10 %}
+<div class="alert alert-danger d-flex align-items-center gap-2">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  Нужно минимум 10 активных игроков. Сейчас: {{ players|length }}.
+  <a href="{{ url_for('players.add_player') }}" class="btn btn-sm btn-danger ms-auto">Добавить игрока</a>
+</div>
+{% else %}
+<form method="POST" id="gameForm">
+
+  <!-- ── Привязка к турниру ─────────────────────────────────────── -->
+  {% if tournaments %}
+  <div class="tournament-block p-4 mb-4">
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="fw-semibold">🏆 Привязать к турниру</span>
+      <span class="text-muted small">(необязательно)</span>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label small fw-medium text-muted">ТУРНИР</label>
+        <select name="tournament_id" id="tournamentSelect" class="form-select">
+          <option value="">— Без турнира (обычная игра) —</option>
+          {% for t in tournaments %}
+          <option value="{{ t.id }}"
+            {% if preselect_tournament == t.id %}selected{% endif %}
+            data-ranked="{{ 'true' if t.is_ranked else 'false' }}"
+            data-status="{{ t.status }}">
+            {{ t.name }}
+            {% if t.status == 'active' %}🟢{% else %}⏳{% endif %}
+            {% if not t.is_ranked %}· нерейтинговый{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6" id="stageBlock" style="display:none">
+        <label class="form-label small fw-medium text-muted">ЭТАП</label>
+        <select name="stage_id" id="stageSelect" class="form-select">
+          <option value="">— Без этапа —</option>
+        </select>
+        <div class="form-text" id="stageHint"></div>
+      </div>
+    </div>
+    <div id="rankedBadge" class="mt-2" style="display:none"></div>
+  </div>
+  {% endif %}
+
+  <!-- ── Рассадка ───────────────────────────────────────────────── -->
+  <div class="card mb-4">
+    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+      <span>🪑 Рассадка игроков</span>
+      <span id="participantHint" class="badge bg-warning-subtle text-warning border border-warning-subtle small d-none">
+        <i class="bi bi-funnel me-1"></i>Только участники турнира
+      </span>
+    </div>
+    <div class="card-body">
+      <div class="d-flex flex-wrap gap-2 mb-4 p-3 bg-body-secondary rounded">
+        <span class="badge bg-secondary px-3 py-2">👤 Мирный × 6</span>
+        <span class="badge bg-danger px-3 py-2">🔫 Мафия × 2</span>
+        <span class="badge bg-dark border border-secondary px-3 py-2">🎩 Дон × 1</span>
+        <span class="badge bg-info text-dark px-3 py-2">🔍 Шериф × 1</span>
+      </div>
+      <div id="seatRows">
+        {% for seat in range(1, 11) %}
+        <div class="seat-row d-flex align-items-start gap-3 py-2 px-2 rounded mb-1">
+          <div class="seat-num bg-body-secondary text-muted mt-1">{{ seat }}</div>
+          <div class="player-seat-picker flex-grow-1 position-relative" data-seat="{{ seat }}">
+            <input type="hidden" name="player_{{ seat }}" class="player-hidden" required>
+            <input type="text" class="form-control player-search-input" placeholder="Ник игрока…" autocomplete="off">
+            <div class="player-search-results list-group position-absolute w-100 shadow-sm"></div>
+            <div class="player-seat-feedback small mt-1"></div>
+          </div>
+          <select name="role_{{ seat }}" class="form-select role-select" style="max-width:180px" required>
+            <option value="">— Роль —</option>
+            <option value="civilian">👤 Мирный</option>
+            <option value="mafia">🔫 Мафия</option>
+            <option value="don">🎩 Дон</option>
+            <option value="sheriff">🔍 Шериф</option>
+          </select>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <label class="form-label fw-medium">📝 Заметки (необязательно)</label>
+      <textarea name="notes" class="form-control" rows="2" placeholder="Любые заметки об игре..."></textarea>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 flex-wrap">
+    <button type="submit" class="btn btn-danger btn-lg px-5">
+      <i class="bi bi-play-fill me-1"></i>Создать игру
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-lg" onclick="autoAssignRoles()">
+      🎲 Случайные роли
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-lg" onclick="shuffleSeating()">
+      🔀 Случайная рассадка
+    </button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Team data from server ─────────────────────────────────────
+// teamMembership: { tournamentId: { playerId: teamId } }
+// teamNames:      { teamId: "Название" }
+const teamMembership = {{ team_membership | tojson }};
+const teamNames      = {{ team_names | tojson }};
+
+// tournamentId → [playerId, ...] (пусто = без ограничения)
+const tournamentParticipants = {{ tournament_participants | tojson }};
+
+const tournamentSelect = document.getElementById('tournamentSelect');
+
+function getAllowedParticipantIds() {
+  const tid = parseInt(tournamentSelect?.value) || null;
+  if (tid && tournamentParticipants[tid] && tournamentParticipants[tid].length > 0) {
+    return new Set(tournamentParticipants[tid]);
+  }
+  return null;
+}
+
+function getBlockedTeammates(excludePicker) {
+  const tid = parseInt(tournamentSelect?.value) || null;
+  const membership = tid ? (teamMembership[tid] || {}) : {};
+  const chosenIds = getAllChosen()
+    .filter(c => c.picker !== excludePicker && c.id)
+    .map(c => c.id);
+  const usedTeams = new Set(chosenIds.map(pid => membership[pid]).filter(Boolean));
+  const blocked = new Set();
+  Object.entries(membership).forEach(([pid, teamId]) => {
+    if (usedTeams.has(teamId)) blocked.add(parseInt(pid));
+  });
+  return blocked;
+}
+
+// ── Поиск игрока по нику (замена <select> на живой поиск) ──────
+function seatEls(picker) {
+  return {
+    hidden: picker.querySelector('.player-hidden'),
+    input: picker.querySelector('.player-search-input'),
+    results: picker.querySelector('.player-search-results'),
+    feedback: picker.querySelector('.player-seat-feedback'),
+  };
+}
+
+function getAllChosen() {
+  return Array.from(document.querySelectorAll('.player-seat-picker')).map(picker => {
+    const { hidden, input } = seatEls(picker);
+    return { picker, id: parseInt(hidden.value) || null, name: input.value };
+  });
+}
+
+function closeResults(picker) {
+  seatEls(picker).results.style.display = 'none';
+}
+
+function selectPlayerForSeat(picker, id, displayName) {
+  const { hidden, input, results, feedback } = seatEls(picker);
+  hidden.value = id;
+  input.value = displayName;
+  results.style.display = 'none';
+  feedback.innerHTML = '';
+  updatePlayerOptions();
+}
+
+const searchDebounceTimers = {};
+
+async function searchPlayers(picker, query) {
+  const { results } = seatEls(picker);
+  if (!query || !query.trim()) {
+    results.style.display = 'none';
+    return;
+  }
+
+  let items = [];
+  try {
+    const resp = await fetch('/api/players/search?q=' + encodeURIComponent(query));
+    const body = await resp.json();
+    items = body.data || [];
+  } catch (e) {
+    // сеть недоступна — просто не покажем подсказки, форма всё равно валидна без выбора
+  }
+
+  const allowed = getAllowedParticipantIds();
+  const blockedByTeam = getBlockedTeammates(picker);
+  const chosenElsewhere = new Set(
+    getAllChosen().filter(c => c.picker !== picker && c.id).map(c => c.id)
+  );
+  items = items.filter(p =>
+    (allowed === null || allowed.has(p.id)) &&
+    !blockedByTeam.has(p.id) &&
+    !chosenElsewhere.has(p.id)
+  );
+
+  results.innerHTML = '';
+  items.forEach(p => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'list-group-item list-group-item-action py-1';
+    el.textContent = p.display_name;
+    el.addEventListener('mousedown', (e) => { e.preventDefault(); selectPlayerForSeat(picker, p.id, p.display_name); });
+    results.appendChild(el);
+  });
+
+  const createBtn = document.createElement('button');
+  createBtn.type = 'button';
+  createBtn.className = 'list-group-item list-group-item-action py-1 text-danger';
+  createBtn.textContent = `➕ Создать игрока «${query.trim()}»`;
+  createBtn.addEventListener('mousedown', (e) => { e.preventDefault(); quickCreatePlayer(picker, query.trim()); });
+  results.appendChild(createBtn);
+
+  results.style.display = 'block';
+}
+
+async function quickCreatePlayer(picker, nickname, force = false) {
+  const { feedback, results } = seatEls(picker);
+  results.style.display = 'none';
+  try {
+    const resp = await fetch('/api/players/quick-create', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({nickname, force}),
+    });
+    const body = await resp.json();
+    if (body.status === 'ok') {
+      selectPlayerForSeat(picker, body.data.id, body.data.display_name);
+    } else if (body.status === 'duplicate_warning') {
+      renderDuplicateWarning(picker, nickname, body.data, body.message);
+    } else {
+      feedback.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>${body.message}</span>`;
+    }
+  } catch (e) {
+    feedback.innerHTML = '<span class="text-danger">Ошибка сети — попробуйте ещё раз.</span>';
+  }
+}
+
+function renderDuplicateWarning(picker, nickname, similarPlayers, message) {
+  const { feedback } = seatEls(picker);
+  const buttonsHtml = similarPlayers.map(p =>
+    `<button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1 pick-existing" data-id="${p.id}" data-name="${p.display_name}">${p.display_name}</button>`
+  ).join('');
+  feedback.innerHTML = `
+    <div class="alert alert-warning py-2 px-3 mb-1">
+      <div class="mb-2"><i class="bi bi-exclamation-triangle me-1"></i>${message}</div>
+      <div class="mb-2">${buttonsHtml}</div>
+      <button type="button" class="btn btn-sm btn-danger create-anyway">Это другой игрок — создать «${nickname}»</button>
+    </div>`;
+  feedback.querySelectorAll('.pick-existing').forEach(btn => {
+    btn.addEventListener('click', () => selectPlayerForSeat(picker, btn.dataset.id, btn.dataset.name));
+  });
+  feedback.querySelector('.create-anyway').addEventListener('click', () => quickCreatePlayer(picker, nickname, true));
+}
+
+// ── Валидация уже выбранных мест (дубли / конфликт команды) ────
+function updatePlayerOptions() {
+  const chosen = getAllChosen();
+  const tid = parseInt(tournamentSelect?.value) || null;
+  const membership = tid ? (teamMembership[tid] || {}) : {};
+
+  chosen.forEach(c => {
+    const { feedback } = seatEls(c.picker);
+    if (feedback.querySelector('.alert')) return;  // не затираем предупреждение о дубле-транслите
+    if (!c.id) { feedback.innerHTML = ''; return; }
+
+    const isDuplicate = chosen.filter(o => o.id === c.id).length > 1;
+    const myTeam = membership[c.id];
+    const isTeamConflict = myTeam && chosen.some(o => o.picker !== c.picker && o.id && membership[o.id] === myTeam);
+
+    if (isDuplicate) {
+      feedback.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>Этот игрок уже выбран на другом месте</span>';
+    } else if (isTeamConflict) {
+      feedback.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>Товарищ по команде «${teamNames[myTeam] || ''}» уже выбран</span>`;
+    } else {
+      feedback.innerHTML = '';
+    }
+  });
+}
+
+document.querySelectorAll('.player-seat-picker').forEach(picker => {
+  const seat = picker.dataset.seat;
+  const { input } = seatEls(picker);
+
+  input.addEventListener('input', () => {
+    seatEls(picker).hidden.value = '';  // сброс выбора при редактировании текста
+    clearTimeout(searchDebounceTimers[seat]);
+    searchDebounceTimers[seat] = setTimeout(() => searchPlayers(picker, input.value), 250);
+  });
+  input.addEventListener('focus', () => {
+    if (input.value.trim()) searchPlayers(picker, input.value);
+  });
+  input.addEventListener('blur', () => {
+    setTimeout(() => closeResults(picker), 200);  // даём клику по результату отработать
+  });
+});
+
+// ── Случайная рассадка (перемешать уже выбранных игроков по местам) ──
+function shuffleSeating() {
+  const seats = Array.from(document.querySelectorAll('.player-seat-picker'));
+  const filled = seats.filter(s => seatEls(s).hidden.value);
+  if (filled.length < 2) return;
+
+  const values = filled.map(s => {
+    const { hidden, input } = seatEls(s);
+    return { id: hidden.value, name: input.value };
+  });
+  for (let i = values.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [values[i], values[j]] = [values[j], values[i]];
+  }
+  filled.forEach((s, i) => {
+    const { hidden, input } = seatEls(s);
+    hidden.value = values[i].id;
+    input.value = values[i].name;
+  });
+  updatePlayerOptions();
+}
+
+// ── Random roles ──────────────────────────────────────────────
+function autoAssignRoles() {
+  const roles = ['civilian','civilian','civilian','civilian','civilian','civilian',
+                 'mafia','mafia','don','sheriff'];
+  const shuffled = roles.sort(() => Math.random() - 0.5);
+  document.querySelectorAll('.role-select').forEach((sel, i) => {
+    sel.value = shuffled[i];
+  });
+}
+
+// ── Tournament → Stage cascade ────────────────────────────────
+const tournamentStages = {
+  {% if tournaments %}
+  {% for t in tournaments %}
+  {{ t.id }}: [
+    {% for s in t.stages %}
+    { id: {{ s.id }}, name: {{ s.name|tojson }}, status: {{ s.status|tojson }}, type: {{ s.type.value|tojson }} },
+    {% endfor %}
+  ],
+  {% endfor %}
+  {% endif %}
+};
+
+const stageBlock = document.getElementById('stageBlock');
+const stageSelect = document.getElementById('stageSelect');
+const stageHint = document.getElementById('stageHint');
+const rankedBadge = document.getElementById('rankedBadge');
+
+function updateStages() {
+  if (!tournamentSelect) return;
+  const tid = parseInt(tournamentSelect.value);
+  const selectedOpt = tournamentSelect.options[tournamentSelect.selectedIndex];
+  const isRanked = selectedOpt?.dataset?.ranked === 'true';
+
+  if (!tid) {
+    stageBlock.style.display = 'none';
+    rankedBadge.style.display = 'none';
+    return;
+  }
+
+  // Show ranked badge
+  rankedBadge.style.display = 'block';
+  rankedBadge.innerHTML = isRanked
+    ? '<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-graph-up me-1"></i>Рейтинговая игра — войдёт в глобальный рейтинг</span>'
+    : '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle"><i class="bi bi-dash-circle me-1"></i>Нерейтинговая — не влияет на глобальный рейтинг</span>';
+
+  // Populate stages
+  const stages = tournamentStages[tid] || [];
+  stageSelect.innerHTML = '<option value="">— Без этапа —</option>';
+
+  if (stages.length === 0) {
+    stageBlock.style.display = 'none';
+    return;
+  }
+
+  stageBlock.style.display = 'block';
+  stages.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    const icon = s.type === 'final' ? '🏆' : s.type === 'group' ? '📊' : '⚔️';
+    const statusLabel = s.status === 'active' ? '🟢' : s.status === 'finished' ? '✅' : '⏳';
+    opt.textContent = `${icon} ${s.name} ${statusLabel}`;
+    opt.disabled = s.status !== 'active';
+
+    // Pre-select if passed in URL
+    {% if preselect_stage %}
+    if (s.id === {{ preselect_stage }}) opt.selected = true;
+    {% endif %}
+
+    stageSelect.appendChild(opt);
+  });
+
+  // Hint if no active stage
+  const activeStages = stages.filter(s => s.status === 'active');
+  stageHint.textContent = activeStages.length === 0
+    ? '⚠️ Нет активных этапов. Активируйте этап в управлении турниром.'
+    : '';
+}
+
+// ── Filter by tournament participants (сброс невалидных мест) ──
+function filterPlayersByTournament() {
+  const allowed = getAllowedParticipantIds();
+
+  document.querySelectorAll('.player-seat-picker').forEach(picker => {
+    const { hidden, input } = seatEls(picker);
+    const pid = parseInt(hidden.value) || null;
+    if (pid && allowed !== null && !allowed.has(pid)) {
+      hidden.value = '';
+      input.value = '';
+    }
+  });
+
+  const hint = document.getElementById('participantHint');
+  if (hint) hint.classList.toggle('d-none', allowed === null);
+
+  updatePlayerOptions();
+}
+
+if (tournamentSelect) {
+  tournamentSelect.addEventListener('change', () => {
+    filterPlayersByTournament();
+    updateStages();
+  });
+  // Trigger on load if pre-selected
+  {% if preselect_tournament %}
+  filterPlayersByTournament();
+  updateStages();
+  {% endif %}
+}
+</script>
+{% endblock %}

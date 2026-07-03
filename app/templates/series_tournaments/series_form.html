@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Новая серия — {{ series_tournament.tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="mb-4">
+      <a href="{{ url_for('series_tournaments.series_tournament_detail', series_tournament_id=series_tournament.id) }}"
+         class="text-muted small">← {{ series_tournament.tournament.name }}</a>
+      <h2 class="fw-bold mb-0 mt-1"><i class="bi bi-calendar-plus me-2"></i>Новая серия</h2>
+      <p class="text-muted small">Отдельный игровой вечер внутри турнира — со своим лидербордом</p>
+    </div>
+
+    <div class="card">
+      <div class="card-body p-4">
+        <form method="POST">
+          <div class="mb-3">
+            <label class="form-label fw-medium">Название <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control form-control-lg"
+                   placeholder="Серия 1 — 12 июля" required autofocus>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-medium">Дата игрового вечера</label>
+            <input type="date" name="series_date" class="form-control">
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-danger px-4">
+              <i class="bi bi-check-lg me-1"></i>Добавить серию
+            </button>
+            <a href="{{ url_for('series_tournaments.series_tournament_detail', series_tournament_id=series_tournament.id) }}"
+               class="btn btn-outline-secondary">Отмена</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}{{ player.display_name }} — {{ tournament.name }}{% endblock %}
+
+{% set SERIES_STATUS = {'pending': ('Ожидает', 'bg-secondary-subtle text-secondary border border-secondary-subtle'),
+                         'active': ('Активна', 'bg-success-subtle text-success border border-success-subtle'),
+                         'finished': ('Завершена', 'bg-info-subtle text-info border border-info-subtle')} %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center gap-3 mb-4">
+  <a href="{{ url_for('series_tournaments.series_tournament_detail', series_tournament_id=series_tournament.id) }}"
+     class="btn btn-outline-secondary btn-sm">← {{ tournament.name }}</a>
+  <div>
+    <h2 class="mb-0 fw-bold">{{ player.display_name }}</h2>
+    <p class="text-muted small mb-0">Статистика в серийном турнире «{{ tournament.name }}»</p>
+  </div>
+</div>
+
+{% if overall_entry %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-2">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value text-warning">#{{ overall_entry.rank }}</div>
+      <div class="stat-label">Место</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-2">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value">{{ overall_entry.series_played }}</div>
+      <div class="stat-label">Серий сыграно</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-2">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value text-success">{{ overall_entry.games_won }}/{{ overall_entry.games_played }}</div>
+      <div class="stat-label">Победы/игры</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-2">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value text-info">{{ overall_entry.win_rate }}%</div>
+      <div class="stat-label">Винрейт</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-2">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value">{{ overall_entry.bonus_points }}</div>
+      <div class="stat-label">Бонус. баллы</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-2">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value text-success">{{ overall_entry.total_score }}</div>
+      <div class="stat-label">Всего очков</div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-secondary mb-4">
+  <i class="bi bi-info-circle me-2"></i>Этот игрок ещё не сыграл ни одной завершённой игры в турнире.
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header fw-semibold"><i class="bi bi-calendar-range me-2"></i>По сериям</div>
+  <div class="card-body p-0">
+    {% if breakdown %}
+    <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th class="ps-4">Серия</th>
+          <th class="text-center">Статус</th>
+          <th class="text-center">Игр</th>
+          <th class="text-center">Побед</th>
+          <th class="text-center">WR</th>
+          <th class="text-end pe-4">Очки</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in breakdown %}
+        <tr>
+          <td class="ps-4">
+            <a href="{{ url_for('series_tournaments.series_detail', series_tournament_id=series_tournament.id, series_id=row.series.id) }}"
+               class="text-decoration-none fw-medium">{{ row.series.name }}</a>
+          </td>
+          <td class="text-center">
+            <span class="badge {{ SERIES_STATUS.get(row.series.status.value, ('?', 'bg-secondary'))[1] }}">
+              {{ SERIES_STATUS.get(row.series.status.value, ('?', ''))[0] }}
+            </span>
+          </td>
+          {% if row.entry %}
+          <td class="text-center text-muted">{{ row.entry.games_played }}</td>
+          <td class="text-center text-muted">{{ row.entry.games_won }}</td>
+          <td class="text-center text-muted">{{ row.entry.win_rate }}%</td>
+          <td class="text-end pe-4 fw-semibold text-success">{{ row.entry.total_score }}</td>
+          {% else %}
+          <td class="text-center text-muted" colspan="4">не участвовал</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-4">Серий пока нет</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

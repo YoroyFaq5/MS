@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}{{ tournament.name }}{% endblock %}
+
+{% set STATUS_LABELS = {'pending': ('⏳ Идёт', 'bg-warning text-dark'), 'active': ('🟢 Активен', 'bg-success'), 'finished': ('✅ Завершён', 'bg-secondary')} %}
+{% set SERIES_STATUS = {'pending': ('Ожидает', 'bg-secondary-subtle text-secondary border border-secondary-subtle'),
+                         'active': ('Активна', 'bg-success-subtle text-success border border-success-subtle'),
+                         'finished': ('Завершена', 'bg-info-subtle text-info border border-info-subtle'),
+                         'cancelled': ('Отменена', 'bg-danger-subtle text-danger border border-danger-subtle')} %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-start gap-3 mb-4">
+  <a href="{{ url_for('series_tournaments.list_series_tournaments') }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  <div class="flex-grow-1">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <h2 class="mb-0 fw-bold"><i class="bi bi-collection-play me-2"></i>{{ tournament.name }}</h2>
+      <span class="badge fs-6 {{ STATUS_LABELS.get(tournament.status, ('?', 'bg-secondary'))[1] }}">
+        {{ STATUS_LABELS.get(tournament.status, ('?', ''))[0] }}
+      </span>
+    </div>
+    {% if tournament.description %}
+    <p class="text-muted small mt-2 mb-0">{{ tournament.description }}</p>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('series_tournaments.leaderboard', series_tournament_id=series_tournament.id) }}"
+       class="btn btn-outline-warning"><i class="bi bi-trophy me-1"></i>Общий рейтинг</a>
+    {% if tournament.status != 'finished' and current_user.is_authenticated and current_user.is_admin %}
+    <form method="POST" action="{{ url_for('tournaments.finish_tournament', tournament_id=tournament.id) }}"
+          onsubmit="return confirm('Завершить весь серийный турнир? Начислятся монеты/fantasy-очки и достижения.')">
+      <button class="btn btn-warning text-dark"><i class="bi bi-flag-fill me-1"></i>Завершить турнир</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value">{{ series_list|length }}</div>
+      <div class="stat-label">Серий</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value">{{ tournament.participants|length }}</div>
+      <div class="stat-label">Участников</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value text-success">{{ tournament.games|selectattr('is_finished')|list|length }}</div>
+      <div class="stat-label">Игр сыграно</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value">{{ 'Да' if tournament.is_ranked else 'Нет' }}</div>
+      <div class="stat-label">Рейтинговый</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Серии -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-calendar-range me-2"></i>Серии</span>
+        {% if tournament.status != 'finished' and current_user.is_authenticated and current_user.is_admin %}
+        <a href="{{ url_for('series_tournaments.new_series', series_tournament_id=series_tournament.id) }}"
+           class="btn btn-sm btn-danger"><i class="bi bi-plus-lg me-1"></i>Новая серия</a>
+        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        {% if series_list %}
+        <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th class="ps-3">Серия</th>
+              <th>Дата</th>
+              <th class="text-center">Игр</th>
+              <th class="text-center pe-3">Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in series_list %}
+            <tr>
+              <td class="ps-3">
+                <a href="{{ url_for('series_tournaments.series_detail', series_tournament_id=series_tournament.id, series_id=s.id) }}"
+                   class="text-decoration-none fw-medium">{{ s.name }}</a>
+              </td>
+              <td class="text-muted small">{{ s.series_date.strftime('%d.%m.%Y') if s.series_date else '—' }}</td>
+              <td class="text-center text-muted">{{ s.stage.games|length if s.stage else 0 }}</td>
+              <td class="text-center pe-3">
+                <span class="badge {{ SERIES_STATUS.get(s.status.value, ('?', 'bg-secondary'))[1] }}">
+                  {{ SERIES_STATUS.get(s.status.value, ('?', ''))[0] }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">Серий пока нет</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Участники + топ рейтинга -->
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-people me-2"></i>Участники ({{ tournament.participants|length }})</div>
+      <div class="card-body p-0" style="max-height:220px; overflow-y:auto">
+        {% if tournament.participants %}
+        <div class="d-flex flex-wrap gap-2 p-3">
+          {% for p in tournament.participants %}
+          <span class="badge bg-body-secondary text-body border">{{ p.player.display_name if p.player else '—' }}</span>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">Участников нет</div>
+        {% endif %}
+      </div>
+      {% if tournament.status != 'finished' and available_players and current_user.is_authenticated and current_user.is_admin %}
+      <div class="card-footer">
+        <form method="POST" action="{{ url_for('tournaments.add_participant', tournament_id=tournament.id) }}"
+              class="d-flex gap-2">
+          <select name="player_id" class="form-select form-select-sm" required>
+            <option value="">— Добавить игрока —</option>
+            {% for p in available_players %}
+            <option value="{{ p.id }}">{{ p.display_name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-sm btn-danger text-nowrap"><i class="bi bi-person-plus"></i></button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-bar-chart me-2"></i>Топ общего рейтинга</span>
+        <a href="{{ url_for('series_tournaments.leaderboard', series_tournament_id=series_tournament.id) }}"
+           class="btn btn-sm btn-outline-secondary">Все →</a>
+      </div>
+      <div class="card-body p-0">
+        {% if overall_top %}
+        <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th class="ps-3">#</th><th>Игрок</th><th class="text-center">Серий</th><th class="text-end pe-3">Очки</th></tr></thead>
+          <tbody>
+            {% for e in overall_top %}
+            <tr>
+              <td class="ps-3 text-muted">{{ e.rank }}</td>
+              <td>
+                <a href="{{ url_for('series_tournaments.player_stats', series_tournament_id=series_tournament.id, player_id=e.player_id) }}"
+                   class="text-decoration-none fw-medium">{{ e.display_name }}</a>
+              </td>
+              <td class="text-center text-muted">{{ e.series_played }}</td>
+              <td class="text-end pe-3 fw-semibold text-success">{{ e.total_score }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">Рейтинг появится после первых игр</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

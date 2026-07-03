@@ -1,0 +1,473 @@
+{% extends "base.html" %}
+{% block title %}Статистика — {{ player.display_name }}{% endblock %}
+
+{% set ROLE_LABELS = {'civilian': '👤 Мирный', 'mafia': '🔫 Мафия', 'don': '🎩 Дон', 'sheriff': '🔍 Шериф'} %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold">📊 Статистика — {{ player.display_name }}</h2>
+    <a href="{{ url_for('profile.view_profile', player_id=player_id) }}" class="text-muted small">← К профилю</a>
+  </div>
+</div>
+
+{% if not stats or stats.total_games == 0 %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-bar-chart fs-1 d-block mb-2 opacity-25"></i>
+    Статистика появится после первых завершённых игр
+  </div>
+</div>
+{% else %}
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <div class="stat-value">{{ stats.avg_score }}</div>
+      <div class="stat-label">Ср. баллы за игру</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <div class="stat-value text-success">{{ stats.best_score }}</div>
+      <div class="stat-label">Лучший результат</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <div class="stat-value text-danger">{{ stats.worst_score }}</div>
+      <div class="stat-label">Худший результат</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <div class="stat-value {% if stats.current_streak_signed > 0 %}text-success{% elif stats.current_streak_signed < 0 %}text-danger{% endif %}">
+        {{ stats.current_streak_signed }}
+      </div>
+      <div class="stat-label">Текущая серия</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <div class="stat-value text-success">{{ stats.longest_streak }}</div>
+      <div class="stat-label">Лучшая серия побед</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <div class="stat-value text-danger">{{ stats.longest_loss_streak }}</div>
+      <div class="stat-label">Худшая серия поражений</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <div class="stat-value">{{ stats.tournament_count }}</div>
+      <div class="stat-label">Турниров</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <div class="stat-value">{{ stats.season_wins }}</div>
+      <div class="stat-label">Побед в сезонах</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Role analytics -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">🎭 Игровая аналитика по ролям</div>
+      <div class="card-body">
+        {% if role_stats %}
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          {% if role_stats.favorite_role %}
+          <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+            Любимая: {{ ROLE_LABELS.get(role_stats.favorite_role.role, role_stats.favorite_role.role) }}
+          </span>
+          {% endif %}
+          {% if role_stats.best_role %}
+          <span class="badge bg-success-subtle text-success border border-success-subtle">
+            Лучшая: {{ ROLE_LABELS.get(role_stats.best_role.role, role_stats.best_role.role) }} ({{ role_stats.best_role.win_rate }}%)
+          </span>
+          {% endif %}
+          {% if role_stats.worst_role %}
+          <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+            Худшая: {{ ROLE_LABELS.get(role_stats.worst_role.role, role_stats.worst_role.role) }} ({{ role_stats.worst_role.win_rate }}%)
+          </span>
+          {% endif %}
+        </div>
+        <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Роль</th><th class="text-end">Игр</th><th class="text-end">Побед</th><th class="text-end">WR</th></tr></thead>
+          <tbody>
+          {% for r in role_stats.role_breakdown %}
+            <tr>
+              <td>{{ ROLE_LABELS.get(r.role, r.role) }}</td>
+              <td class="text-end">{{ r.games }}</td>
+              <td class="text-end">{{ r.wins }}</td>
+              <td class="text-end">
+                <div class="progress" style="height:6px;width:60px;display:inline-block;vertical-align:middle;margin-right:6px;">
+                  <div class="progress-bar bg-info" style="width:{{ r.win_rate }}%"></div>
+                </div>
+                {{ r.win_rate }}%
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Partners -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">🤝 Напарники</div>
+      <div class="card-body">
+        {% if partner_stats %}
+        <dl class="mb-0 small" style="display:grid;grid-template-columns:1fr auto;gap:.5rem 1rem">
+          <dt class="text-muted">Лучший напарник</dt>
+          <dd class="mb-0 text-end">
+            {% if partner_stats.best_partner %}{{ partner_stats.best_partner.display_name }} ({{ partner_stats.best_partner.wins_as_ally }} побед){% else %}—{% endif %}
+          </dd>
+          <dt class="text-muted">Худший напарник</dt>
+          <dd class="mb-0 text-end">
+            {% if partner_stats.worst_partner %}{{ partner_stats.worst_partner.display_name }} ({{ partner_stats.worst_partner.losses_as_ally }} поражений){% else %}—{% endif %}
+          </dd>
+          <dt class="text-muted">Самый частый союзник</dt>
+          <dd class="mb-0 text-end">
+            {% if partner_stats.most_frequent_ally %}{{ partner_stats.most_frequent_ally.display_name }} ({{ partner_stats.most_frequent_ally.times_ally }} игр){% else %}—{% endif %}
+          </dd>
+          <dt class="text-muted">Самый частый соперник</dt>
+          <dd class="mb-0 text-end">
+            {% if partner_stats.most_frequent_opponent %}{{ partner_stats.most_frequent_opponent.display_name }} ({{ partner_stats.most_frequent_opponent.times_opponent }} игр){% else %}—{% endif %}
+          </dd>
+          <dt class="text-muted">Лучший WR против</dt>
+          <dd class="mb-0 text-end">
+            {% if partner_stats.best_wr_opponent %}{{ partner_stats.best_wr_opponent.display_name }} ({{ partner_stats.best_wr_opponent.win_rate_vs }}%){% else %}—{% endif %}
+          </dd>
+          <dt class="text-muted">Худший WR против</dt>
+          <dd class="mb-0 text-end">
+            {% if partner_stats.worst_wr_opponent %}{{ partner_stats.worst_wr_opponent.display_name }} ({{ partner_stats.worst_wr_opponent.win_rate_vs }}%){% else %}—{% endif %}
+          </dd>
+        </dl>
+        <div class="text-muted small mt-2">Минимум {{ partner_stats.min_shared_games }} совместных игр для рейтинга WR</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Rivalry / Social -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header fw-semibold">⚔️ Соперничество</div>
+      <div class="card-body">
+        {% if rivalry_stats %}
+        <div class="row g-3">
+          <div class="col-6 col-lg-3">
+            <div class="stat-card card p-3 text-center h-100">
+              <div class="stat-label mb-1">Немезида</div>
+              {% if rivalry_stats.nemesis %}
+              <div class="fw-bold">{{ rivalry_stats.nemesis.display_name }}</div>
+              <div class="text-danger small">{{ rivalry_stats.nemesis.win_rate_vs }}% WR против</div>
+              {% else %}<div class="text-muted small">—</div>{% endif %}
+            </div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="stat-card card p-3 text-center h-100">
+              <div class="stat-label mb-1">Любимая жертва</div>
+              {% if rivalry_stats.favorite_victim %}
+              <div class="fw-bold">{{ rivalry_stats.favorite_victim.display_name }}</div>
+              <div class="text-success small">{{ rivalry_stats.favorite_victim.win_rate_vs }}% WR против</div>
+              {% else %}<div class="text-muted small">—</div>{% endif %}
+            </div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="stat-card card p-3 text-center h-100">
+              <div class="stat-label mb-1">Лучший тиммейт (WR)</div>
+              {% if rivalry_stats.best_teammate_wr %}
+              <div class="fw-bold">{{ rivalry_stats.best_teammate_wr.display_name }}</div>
+              <div class="text-success small">{{ rivalry_stats.best_teammate_wr.win_rate_ally }}% WR вместе</div>
+              {% else %}<div class="text-muted small">—</div>{% endif %}
+            </div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="stat-card card p-3 text-center h-100">
+              <div class="stat-label mb-1">Худший тиммейт (WR)</div>
+              {% if rivalry_stats.worst_teammate_wr %}
+              <div class="fw-bold">{{ rivalry_stats.worst_teammate_wr.display_name }}</div>
+              <div class="text-danger small">{{ rivalry_stats.worst_teammate_wr.win_rate_ally }}% WR вместе</div>
+              {% else %}<div class="text-muted small">—</div>{% endif %}
+            </div>
+          </div>
+        </div>
+
+        {% if rivalry_stats.mafia_duo or rivalry_stats.sheriff_vs_don %}
+        <div class="row g-3 mt-1">
+          {% if rivalry_stats.mafia_duo %}
+          <div class="col-md-6">
+            <div class="card bg-body-secondary p-3">
+              <div class="text-muted small mb-1">🔫 Дуэт мафии</div>
+              <div class="fw-bold">{{ rivalry_stats.mafia_duo.display_name }}</div>
+              <div class="small text-muted">
+                {{ rivalry_stats.mafia_duo.mafia_duo_games }} игр вместе за мафию · WR {{ rivalry_stats.mafia_duo.duo_win_rate }}%
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          {% if rivalry_stats.sheriff_vs_don %}
+          <div class="col-md-6">
+            <div class="card bg-body-secondary p-3">
+              <div class="text-muted small mb-1">
+                🔍 Шериф vs 🎩 Дон
+                {% if rivalry_stats.sheriff_vs_don.as_role == 'sheriff' %}(вы — шериф){% else %}(вы — дон){% endif %}
+              </div>
+              <div class="fw-bold">{{ rivalry_stats.sheriff_vs_don.opponent }}</div>
+              <div class="small text-muted">
+                {{ rivalry_stats.sheriff_vs_don.games }} игр · WR {{ rivalry_stats.sheriff_vs_don.win_rate }}%
+              </div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="text-muted small mt-3">Минимум {{ rivalry_stats.min_shared_games }} совместных игр для рейтинга WR</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Tournaments -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">🏆 Турниры</div>
+      <div class="card-body">
+        {% if tournament_summary %}
+        <div class="row g-3 text-center">
+          <div class="col-3">
+            <div class="fw-bold fs-5">{{ tournament_summary.tournament_count }}</div>
+            <div class="text-muted small">Всего</div>
+          </div>
+          <div class="col-3">
+            <div class="fw-bold fs-5">{{ '#' ~ tournament_summary.best_result if tournament_summary.best_result else '—' }}</div>
+            <div class="text-muted small">Лучший результат</div>
+          </div>
+          <div class="col-3">
+            <div class="fw-bold fs-5">{{ tournament_summary.wins }}</div>
+            <div class="text-muted small">Победы</div>
+          </div>
+          <div class="col-3">
+            <div class="fw-bold fs-5">{{ tournament_summary.podiums }}</div>
+            <div class="text-muted small">Подиумы</div>
+          </div>
+        </div>
+        <div class="text-muted small mt-3">Финалов сыграно: {{ tournament_summary.finals_count }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Fantasy -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">🎯 Fantasy</div>
+      <div class="card-body">
+        {% if fantasy_summary %}
+        <div class="row g-3 text-center">
+          <div class="col-3">
+            <div class="fw-bold fs-5">{{ fantasy_summary.draft_count }}</div>
+            <div class="text-muted small">Драфтов</div>
+          </div>
+          <div class="col-3">
+            <div class="fw-bold fs-5">{{ fantasy_summary.best_draft_points }}</div>
+            <div class="text-muted small">Лучший драфт</div>
+          </div>
+          <div class="col-3">
+            <div class="fw-bold fs-5">{{ fantasy_summary.average_rank or '—' }}</div>
+            <div class="text-muted small">Ср. место</div>
+          </div>
+          <div class="col-3">
+            <div class="fw-bold fs-5">{{ fantasy_summary.total_points }}</div>
+            <div class="text-muted small">Всего очков</div>
+          </div>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-3 small">Нет привязанного аккаунта или Fantasy-драфтов</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="row g-4 mt-1">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-graph-up-arrow me-2"></i>ELO во времени</div>
+      <div class="card-body"><div class="chart-container"><canvas id="chartElo"></canvas></div></div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-activity me-2"></i>Серии побед/поражений</div>
+      <div class="card-body"><div class="chart-container"><canvas id="chartStreaks"></canvas></div></div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-palette2 me-2"></i>История ролей (последние игры)</div>
+      <div class="card-body"><div class="chart-container"><canvas id="chartRoles"></canvas></div></div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-bar-chart-steps me-2"></i>Эффективность по ролям</div>
+      <div class="card-body"><div class="chart-container"><canvas id="chartRolePerf"></canvas></div></div>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header fw-semibold"><i class="bi bi-coin me-2"></i>Экономика во времени</div>
+      <div class="card-body"><div class="chart-container"><canvas id="chartEconomy"></canvas></div></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if stats and stats.total_games > 0 %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+const CHART_DATA = {{ chart_data | tojson }};
+// Premium-палитра графиков: золото = позитив/бренд, вино = негатив,
+// серебро = нейтраль — та же семья цветов, что и у всего интерфейса
+// (main.css --ms-*), только чуть светлее/контрастнее специально для
+// отрисовки на canvas (тонкие линии/маленькие сегменты нуждаются в
+// более уверенном контрасте на тёмном фоне, чем текст/бордеры UI).
+const GOLD = '#D4B06A';
+const GOLD_DIM = 'rgba(212,176,106,.14)';
+const WINE = '#C1543A';
+const WINE_DIM = 'rgba(193,84,58,.55)';
+const SILVER = '#B0B0B0';
+const GRID_COLOR = 'rgba(199,165,82,.08)';
+const TEXT_COLOR = '#8A8A8A';
+Chart.defaults.color = TEXT_COLOR;
+Chart.defaults.borderColor = GRID_COLOR;
+Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+// Общие настройки — графики не должны диктовать ширину контейнера на
+// узких экранах (см. .chart-container в main.css, которая задаёт
+// фиксированную высоту вместо canvas[height]).
+const RESPONSIVE_BASE = { responsive: true, maintainAspectRatio: false };
+
+const ROLE_COLORS = {civilian: SILVER, sheriff: GOLD, mafia: WINE, don: '#5A4A2E'};
+
+// ELO
+if (CHART_DATA.elo.labels.length) {
+  new Chart(document.getElementById('chartElo'), {
+    type: 'line',
+    data: {
+      labels: CHART_DATA.elo.labels,
+      datasets: [{
+        label: 'ELO', data: CHART_DATA.elo.values,
+        borderColor: GOLD, backgroundColor: GOLD_DIM,
+        tension: .25, fill: true, pointRadius: 2,
+      }],
+    },
+    options: {...RESPONSIVE_BASE, plugins: {legend: {display: false}}, scales: {y: {beginAtZero: false}}},
+  });
+} else {
+  document.getElementById('chartElo').replaceWith(Object.assign(document.createElement('div'), {
+    className: 'text-center text-muted py-4 small', textContent: 'Нет данных ELO для рейтинговых игр',
+  }));
+}
+
+// Streaks (status-цвет: золото = победная серия, вино = серия поражений)
+new Chart(document.getElementById('chartStreaks'), {
+  type: 'bar',
+  data: {
+    labels: CHART_DATA.streaks.labels,
+    datasets: [{
+      label: 'Серия', data: CHART_DATA.streaks.values,
+      backgroundColor: CHART_DATA.streaks.values.map(v => v >= 0 ? GOLD : WINE),
+    }],
+  },
+  options: {...RESPONSIVE_BASE, plugins: {legend: {display: false}}},
+});
+
+// Role timeline — bar per game, colored by role, bordered by win/loss
+{
+  const games = CHART_DATA.roles.games;
+  new Chart(document.getElementById('chartRoles'), {
+    type: 'bar',
+    data: {
+      labels: games.map(g => g.date),
+      datasets: [{
+        label: 'Роль', data: games.map(() => 1),
+        backgroundColor: games.map(g => ROLE_COLORS[g.role] || SILVER),
+        borderColor: games.map(g => g.won ? GOLD : WINE),
+        borderWidth: 3,
+      }],
+    },
+    options: {
+      ...RESPONSIVE_BASE,
+      plugins: {
+        legend: {display: false},
+        tooltip: {callbacks: {label: (ctx) => {
+          const g = games[ctx.dataIndex];
+          return `${g.role_label} — ${g.won ? 'победа' : 'поражение'}`;
+        }}},
+      },
+      scales: {y: {display: false}},
+    },
+  });
+}
+
+// Role performance
+new Chart(document.getElementById('chartRolePerf'), {
+  type: 'bar',
+  data: {
+    labels: CHART_DATA.role_performance.labels,
+    datasets: [
+      {label: 'WR %', data: CHART_DATA.role_performance.winrate, backgroundColor: GOLD},
+      {label: 'Ср. баллы', data: CHART_DATA.role_performance.avg_score, backgroundColor: SILVER},
+    ],
+  },
+  options: {...RESPONSIVE_BASE, scales: {y: {beginAtZero: true}}},
+});
+
+// Economy
+if (CHART_DATA.economy.labels.length) {
+  new Chart(document.getElementById('chartEconomy'), {
+    data: {
+      labels: CHART_DATA.economy.labels,
+      datasets: [
+        {type: 'line', label: 'Баланс', data: CHART_DATA.economy.balance, borderColor: GOLD, yAxisID: 'y', tension: .2, pointRadius: 1},
+        {type: 'bar', label: 'Заработано', data: CHART_DATA.economy.earned, backgroundColor: GOLD_DIM, yAxisID: 'y1'},
+        {type: 'bar', label: 'Потрачено', data: CHART_DATA.economy.spent, backgroundColor: WINE_DIM, yAxisID: 'y1'},
+      ],
+    },
+    options: {
+      ...RESPONSIVE_BASE,
+      scales: {
+        y: {position: 'left', title: {display: true, text: 'Баланс'}},
+        y1: {position: 'right', grid: {drawOnChartArea: false}, title: {display: true, text: 'За операцию'}},
+      },
+    },
+  });
+} else {
+  document.getElementById('chartEconomy').replaceWith(Object.assign(document.createElement('div'), {
+    className: 'text-center text-muted py-4 small', textContent: 'Нет истории операций с монетами',
+  }));
+}
+</script>
+{% endif %}
+{% endblock %}

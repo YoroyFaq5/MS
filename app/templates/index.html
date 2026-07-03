@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Главная{% endblock %}
+
+{% block content %}
+<!-- Hero -->
+<div class="hero-section mb-5 text-center">
+  <div class="brand-monogram brand-monogram-lg mx-auto mb-3">MS</div>
+  <h1 class="display-5 fw-bold mb-1">MAFIA STYLE</h1>
+  <p class="text-uppercase brand-tagline mb-3">Kazan · Est 2010</p>
+  <p class="text-muted lead">Клуб мафии для тех, кто ценит игру ума</p>
+  <div class="d-flex gap-3 justify-content-center mt-4">
+    {% if current_user.is_admin %}
+    <a href="{{ url_for('games.new_game') }}" class="btn btn-danger btn-lg px-4">
+      <i class="bi bi-plus-circle me-2"></i>Новая игра
+    </a>
+    {% endif %}
+  </div>
+</div>
+<div class="row g-4">
+  <!-- Top Players -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-trophy-fill text-warning me-2"></i>Топ игроков</span>
+        <a href="{{ url_for('ratings.leaderboard') }}" class="btn btn-sm btn-outline-secondary">Все →</a>
+      </div>
+      <div class="card-body p-0">
+        {% if top_players %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead>
+              <tr>
+                <th class="ps-3">#</th>
+                <th>Игрок</th>
+                <th class="text-center">Игр</th>
+                <th class="text-end pe-3">Очки</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in top_players %}
+              <tr>
+                <td class="ps-3">
+                  {% if r.rank == 1 %}<span class="badge bg-warning text-dark">🥇</span>
+                  {% elif r.rank == 2 %}<span class="badge bg-secondary">🥈</span>
+                  {% elif r.rank == 3 %}<span class="badge" style="background:#cd7f32">🥉</span>
+                  {% else %}<span class="text-muted">{{ r.rank }}</span>{% endif %}
+                </td>
+                <td>
+                  <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}"
+                     class="text-decoration-none fw-medium">{{ r.display_name }}</a>
+                </td>
+                <td class="text-center text-muted">{{ r.games_played }}</td>
+                <td class="text-end pe-3 fw-semibold text-success">{{ r.total_score }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-bar-chart fs-1 d-block mb-2 opacity-25"></i>
+          Рейтинг появится после первой игры
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Games -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-clock-history text-info me-2"></i>Последние игры</span>
+        <a href="{{ url_for('games.list_games') }}" class="btn btn-sm btn-outline-secondary">Все →</a>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_games %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead>
+              <tr>
+                <th class="ps-3">Игра</th>
+                <th>Дата</th>
+                <th class="text-end pe-3">Победитель</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for game in recent_games %}
+              <tr>
+                <td class="ps-3">
+                  <a href="{{ url_for('games.game_detail', game_id=game.id) }}"
+                     class="text-decoration-none fw-medium">#{{ game.id }}</a>
+                </td>
+                <td class="text-muted small">{{ game.played_at.strftime('%d.%m.%Y') }}</td>
+                <td class="text-end pe-3">
+                  {% if game.win_side.value == 'mafia' %}
+                    <span class="badge bg-danger">🔫 Мафия</span>
+                  {% elif game.win_side.value == 'city' %}
+                    <span class="badge bg-success">🏙 Город</span>
+                  {% else %}
+                    <span class="badge bg-secondary">Ничья</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-controller fs-1 d-block mb-2 opacity-25"></i>
+          Игры пока не проводились
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% if club_titles %}
+<div class="card mt-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="fw-semibold"><i class="bi bi-patch-check text-warning me-2"></i>Титулы клуба</span>
+    <a href="{{ url_for('titles.nominations') }}" class="btn btn-sm btn-outline-secondary">Все номинации →</a>
+  </div>
+  <div class="card-body">
+    <div class="d-flex gap-2 flex-wrap">
+      {% for pt in club_titles %}
+      <a href="{{ url_for('profile.view_profile', player_id=pt.player_id) }}" class="text-decoration-none">
+        <span class="badge bg-body-secondary text-body border">
+          {% if pt.title.icon %}<i class="bi {{ pt.title.icon }} me-1"></i>{% endif %}
+          {{ pt.title.name }} — <strong class="ms-1">{{ pt.player.display_name }}</strong>
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-4 mt-1 justify-content-center">
+  <!-- Top Rich -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-coin text-warning me-2"></i>Топ богачей</span>
+        <a href="{{ url_for('auth.admin_economy') }}" class="btn btn-sm btn-outline-secondary">Все →</a>
+      </div>
+      <div class="card-body p-0">
+        {% if top_rich %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead>
+              <tr>
+                <th class="ps-3">#</th>
+                <th>Игрок</th>
+                <th class="text-end pe-3">Монет</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in top_rich %}
+              <tr>
+                <td class="ps-3">
+                  {% if loop.index == 1 %}<span class="badge bg-warning text-dark">🥇</span>
+                  {% elif loop.index == 2 %}<span class="badge bg-secondary">🥈</span>
+                  {% elif loop.index == 3 %}<span class="badge" style="background:#cd7f32">🥉</span>
+                  {% else %}<span class="text-muted">{{ loop.index }}</span>{% endif %}
+                </td>
+                <td>
+                  <a href="{{ url_for('profile.view_profile', player_id=p.id) }}"
+                     class="text-decoration-none fw-medium">{{ p.display_name }}</a>
+                </td>
+                <td class="text-end pe-3 fw-semibold text-warning">{{ (p.coins or 0) | int }} 🪙</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-coin fs-1 d-block mb-2 opacity-25"></i>
+          Пока ни у кого нет монет
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,756 @@
+"""
+ProfileService
+==============
+Extended player/user profile logic.
+All derived statistics, history, and profile mutations go here.
+No rating recalculation — delegates to RatingService.
+"""
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import List, Optional, Dict
+
+from app import db
+from app.models import Player, Game, GameSlot, Role, WinSide, Season, CoinTransaction, PlayerAchievement
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# DTOs
+# ---------------------------------------------------------------------------
+
+@dataclass
+class RoleBreakdown:
+    role: str
+    games: int
+    wins: int
+    total_score: float
+    win_rate: float
+
+    def to_dict(self) -> dict:
+        return {
+            "role": self.role,
+            "games": self.games,
+            "wins": self.wins,
+            "total_score": round(self.total_score, 2),
+            "win_rate": round(self.win_rate, 1),
+        }
+
+
+@dataclass
+class PlayerExtendedStats:
+    player_id: int
+    display_name: str
+    total_games: int = 0
+    total_wins: int = 0
+    win_rate: float = 0.0
+    total_score: float = 0.0
+    avg_score: float = 0.0
+    elo: float = 1000.0
+    coins: float = 0.0
+    best_score: float = 0.0
+    worst_score: float = 0.0
+    current_streak: int = 0   # consecutive wins (0 if last game was a loss)
+    longest_streak: int = 0   # longest win streak
+    longest_loss_streak: int = 0
+    current_streak_signed: int = 0  # positive = win streak, negative = loss streak
+    role_breakdown: List[RoleBreakdown] = field(default_factory=list)
+    monthly_games: Dict[str, int] = field(default_factory=dict)  # "YYYY-MM" → count
+    tournament_count: int = 0
+    season_wins: int = 0
+
+    def to_dict(self) -> dict:
+        return {
+            "player_id": self.player_id,
+            "display_name": self.display_name,
+            "total_games": self.total_games,
+            "total_wins": self.total_wins,
+            "win_rate": round(self.win_rate, 1),
+            "total_score": round(self.total_score, 2),
+            "avg_score": round(self.avg_score, 2),
+            "elo": round(self.elo, 1),
+            "coins": round(self.coins, 2),
+            "best_score": round(self.best_score, 2),
+            "worst_score": round(self.worst_score, 2),
+            "current_streak": self.current_streak,
+            "longest_streak": self.longest_streak,
+            "longest_loss_streak": self.longest_loss_streak,
+            "current_streak_signed": self.current_streak_signed,
+            "tournament_count": self.tournament_count,
+            "season_wins": self.season_wins,
+            "role_breakdown": [r.to_dict() for r in self.role_breakdown],
+            "monthly_games": self.monthly_games,
+        }
+
+
+@dataclass
+class ProfileResult:
+    ok: bool
+    message: str
+    data: Optional[object] = None
+
+    @classmethod
+    def success(cls, msg: str = "OK", data=None) -> "ProfileResult":
+        return cls(ok=True, message=msg, data=data)
+
+    @classmethod
+    def fail(cls, msg: str) -> "ProfileResult":
+        return cls(ok=False, message=msg)
+
+
+# ---------------------------------------------------------------------------
+# ProfileService
+# ---------------------------------------------------------------------------
+
+class ProfileService:
+
+    # ── Profile updates ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def update_profile(
+        player: Player,
+        nickname: Optional[str] = None,
+        bio: Optional[str] = None,
+        avatar_url: Optional[str] = None,
+    ) -> ProfileResult:
+        if nickname is not None:
+            nickname = nickname.strip() or None
+            # Check uniqueness
+            if nickname:
+                conflict = db.session.query(Player).filter(
+                    Player.nickname == nickname,
+                    Player.id != player.id,
+                ).first()
+                if conflict:
+                    return ProfileResult.fail(f"Никнейм «{nickname}» уже занят.")
+            player.nickname = nickname
+
+        if bio is not None:
+            bio = bio.strip()[:500]  # max 500 chars
+            player.bio = bio
+
+        if avatar_url is not None:
+            avatar_url = avatar_url.strip()[:512] or None
+            player.avatar_url = avatar_url
+
+        db.session.commit()
+        return ProfileResult.success("Профиль обновлён.", data=player)
+
+    # ── Extended stats ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def get_extended_stats(player_id: int) -> Optional[PlayerExtendedStats]:
+        player = db.session.get(Player, player_id)
+        if not player:
+            return None
+
+        slots = (
+            db.session.query(GameSlot)
+            .join(Game)
+            .filter(
+                GameSlot.player_id == player_id,
+                Game.is_finished == True,
+            )
+            .order_by(Game.played_at.asc())
+            .all()
+        )
+
+        stats = PlayerExtendedStats(
+            player_id=player.id,
+            display_name=player.display_name,
+            elo=player.elo,
+            coins=getattr(player, "coins", 0.0) or 0.0,
+        )
+
+        # Role breakdown accumulator
+        role_data: Dict[str, dict] = {}
+
+        win_streak = 0
+        max_win_streak = 0
+        loss_streak = 0
+        max_loss_streak = 0
+        stats.worst_score = None  # sentinel until first slot seen
+
+        for slot in slots:
+            game = slot.game
+            won = (
+                (slot.is_mafia_side and game.win_side == WinSide.MAFIA)
+                or (slot.is_city_side and game.win_side == WinSide.CITY)
+            )
+
+            stats.total_games += 1
+            stats.total_score += slot.total_score
+            stats.best_score = max(stats.best_score, slot.total_score)
+            stats.worst_score = slot.total_score if stats.worst_score is None else min(stats.worst_score, slot.total_score)
+
+            if won:
+                stats.total_wins += 1
+                win_streak += 1
+                max_win_streak = max(max_win_streak, win_streak)
+                loss_streak = 0
+            else:
+                loss_streak += 1
+                max_loss_streak = max(max_loss_streak, loss_streak)
+                win_streak = 0
+
+            # Role breakdown
+            rname = slot.role.value
+            if rname not in role_data:
+                role_data[rname] = {"games": 0, "wins": 0, "score": 0.0}
+            role_data[rname]["games"] += 1
+            role_data[rname]["score"] += slot.total_score
+            if won:
+                role_data[rname]["wins"] += 1
+
+            # Monthly activity
+            month_key = game.played_at.strftime("%Y-%m")
+            stats.monthly_games[month_key] = stats.monthly_games.get(month_key, 0) + 1
+
+        stats.current_streak = win_streak
+        stats.longest_streak = max_win_streak
+        stats.longest_loss_streak = max_loss_streak
+        stats.current_streak_signed = win_streak if win_streak > 0 else -loss_streak
+        stats.worst_score = stats.worst_score or 0.0
+
+        if stats.total_games > 0:
+            stats.win_rate = round(stats.total_wins / stats.total_games * 100, 1)
+            stats.avg_score = round(stats.total_score / stats.total_games, 2)
+
+        stats.role_breakdown = [
+            RoleBreakdown(
+                role=rname,
+                games=d["games"],
+                wins=d["wins"],
+                total_score=d["score"],
+                win_rate=round(d["wins"] / d["games"] * 100, 1) if d["games"] else 0.0,
+            )
+            for rname, d in role_data.items()
+        ]
+
+        # Tournament count
+        from app.models import TournamentParticipant
+        stats.tournament_count = db.session.query(TournamentParticipant).filter_by(
+            player_id=player_id
+        ).count()
+
+        # Season wins
+        stats.season_wins = db.session.query(Season).filter_by(
+            winner_player_id=player_id
+        ).count()
+
+        return stats
+
+    # ── Game history ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    def get_game_history(
+        player_id: int,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> List[GameSlot]:
+        return (
+            db.session.query(GameSlot)
+            .join(Game)
+            .filter(
+                GameSlot.player_id == player_id,
+                Game.is_finished == True,
+            )
+            .order_by(Game.played_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+    @staticmethod
+    def get_economy_history(player_id: int, limit: int = 30) -> List[CoinTransaction]:
+        return (
+            db.session.query(CoinTransaction)
+            .filter_by(player_id=player_id)
+            .order_by(CoinTransaction.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+
+    # ── Head-to-head ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    def head_to_head(player_id_a: int, player_id_b: int) -> dict:
+        """
+        Games where both players participated.
+        Returns win/loss/draw breakdown for player_a perspective.
+        """
+        # Games containing both players
+        games_a = {
+            s.game_id: s
+            for s in db.session.query(GameSlot)
+            .join(Game)
+            .filter(GameSlot.player_id == player_id_a, Game.is_finished == True)
+            .all()
+        }
+        games_b = {
+            s.game_id: s
+            for s in db.session.query(GameSlot)
+            .join(Game)
+            .filter(GameSlot.player_id == player_id_b, Game.is_finished == True)
+            .all()
+        }
+        shared = set(games_a) & set(games_b)
+
+        wins = losses = draws = 0
+        for gid in shared:
+            slot_a = games_a[gid]
+            game = slot_a.game
+            a_won = (
+                (slot_a.is_mafia_side and game.win_side == WinSide.MAFIA)
+                or (slot_a.is_city_side and game.win_side == WinSide.CITY)
+            )
+            slot_b = games_b[gid]
+            b_won = (
+                (slot_b.is_mafia_side and game.win_side == WinSide.MAFIA)
+                or (slot_b.is_city_side and game.win_side == WinSide.CITY)
+            )
+            if a_won and not b_won:
+                wins += 1
+            elif b_won and not a_won:
+                losses += 1
+            else:
+                draws += 1
+
+        return {
+            "player_a": player_id_a,
+            "player_b": player_id_b,
+            "shared_games": len(shared),
+            "wins": wins,
+            "losses": losses,
+            "draws": draws,
+        }
+
+    # ── New Profile page: cheap aggregator ──────────────────────────────────────
+
+    @staticmethod
+    def get_profile(player_id: int) -> Optional[dict]:
+        """
+        Cheap main-page read: Player row + one aggregate query for
+        games/wins + equipped customization + pinned achievements + global
+        rank. Deliberately does NOT run the full statistics slot-loop —
+        that lives behind get_statistics()/the /statistics sub-page.
+        """
+        player = db.session.get(Player, player_id)
+        if not player:
+            return None
+
+        from sqlalchemy import case, func
+        from app.services.shop_service import ShopService
+        from app.services.rating_service import RatingService
+
+        row = (
+            db.session.query(
+                func.count(GameSlot.id),
+                func.sum(
+                    case(
+                        (
+                            (
+                                GameSlot.role.in_([Role.MAFIA, Role.DON])
+                                & (Game.win_side == WinSide.MAFIA)
+                            )
+                            | (
+                                GameSlot.role.in_([Role.CIVILIAN, Role.SHERIFF])
+                                & (Game.win_side == WinSide.CITY)
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+            )
+            .join(Game)
+            .filter(GameSlot.player_id == player_id, Game.is_finished == True)
+            .one()
+        )
+        total_games = row[0] or 0
+        total_wins = row[1] or 0
+        win_rate = round(total_wins / total_games * 100, 1) if total_games else 0.0
+
+        equipped = ShopService.get_equipped(player_id)
+        customization = {
+            slot: {"inventory_item_id": inv.id, "item": inv.item.to_dict()}
+            for slot, inv in equipped.items()
+        }
+
+        pinned = (
+            db.session.query(PlayerAchievement)
+            .filter_by(player_id=player_id, pinned=True)
+            .order_by(PlayerAchievement.pinned_order)
+            .all()
+        )
+
+        rating = RatingService.get_player_rating(player_id)
+
+        from app.services.title_service import TitleService
+        equipped_title = TitleService.get_equipped_title(player_id)
+
+        return {
+            "player": player.to_dict(),
+            "bio": player.bio,
+            "avatar_url": player.avatar_url,
+            "coins": getattr(player, "coins", 0.0) or 0.0,
+            "total_games": total_games,
+            "total_wins": total_wins,
+            "win_rate": win_rate,
+            "elo": player.elo,
+            "global_rank": rating.rank if rating else None,
+            "customization": customization,
+            "pinned_achievements": [pa.to_dict() for pa in pinned],
+            "equipped_title": equipped_title.to_dict() if equipped_title else None,
+        }
+
+    # ── /statistics sub-page ─────────────────────────────────────────────────────
+
+    @staticmethod
+    def get_statistics(player_id: int) -> Optional[PlayerExtendedStats]:
+        """Thin wrapper — the full single-pass computation."""
+        return ProfileService.get_extended_stats(player_id)
+
+    @staticmethod
+    def get_role_statistics(player_id: int) -> Optional[dict]:
+        """Derived from the same single-pass computation as get_statistics()
+        — no extra query."""
+        stats = ProfileService.get_extended_stats(player_id)
+        if not stats:
+            return None
+
+        roles = stats.role_breakdown
+        favorite_role = max(roles, key=lambda r: r.games, default=None)
+        # Require a minimum sample before crowning a "best"/"worst" role,
+        # to avoid a single lucky/unlucky game deciding it.
+        eligible = [r for r in roles if r.games >= 3] or roles
+        best_role = max(eligible, key=lambda r: r.win_rate, default=None)
+        worst_role = min(eligible, key=lambda r: r.win_rate, default=None)
+
+        return {
+            "role_breakdown": [r.to_dict() for r in roles],
+            "favorite_role": favorite_role.to_dict() if favorite_role else None,
+            "best_role": best_role.to_dict() if best_role else None,
+            "worst_role": worst_role.to_dict() if worst_role else None,
+            "best_win_streak": stats.longest_streak,
+            "worst_loss_streak": stats.longest_loss_streak,
+            "current_streak_signed": stats.current_streak_signed,
+            "avg_score": stats.avg_score,
+            "best_score": stats.best_score,
+            "worst_score": stats.worst_score,
+        }
+
+    # ── Shared aggregation (used by both get_partner_statistics and
+    #    get_rivalry_statistics — the query + Python pass is identical,
+    #    only the derived "top N" picks differ) ─────────────────────────────
+
+    @staticmethod
+    def _compute_partner_aggregates(player_id: int) -> tuple[Dict[int, dict], Dict[int, Player]]:
+        """
+        O(games) — exactly 2 aggregation queries regardless of games count:
+        (1) the player's own finished slots (game_id, role, win_side),
+        (2) every other slot in those same game_ids. One Python pass builds
+        a per-other-player aggregate, role-aware (needed for mafia-duo /
+        sheriff-vs-don angles in get_rivalry_statistics, not just the
+        generic same-side/opposite-side split get_partner_statistics uses).
+        """
+        own_rows = (
+            db.session.query(GameSlot.game_id, GameSlot.role, Game.win_side)
+            .join(Game)
+            .filter(GameSlot.player_id == player_id, Game.is_finished == True)
+            .all()
+        )
+        if not own_rows:
+            return {}, {}
+
+        game_ids = [r[0] for r in own_rows]
+        own_by_game: Dict[int, tuple] = {}
+        for game_id, role, win_side in own_rows:
+            is_mafia_side = role in (Role.MAFIA, Role.DON)
+            is_city_side = role in (Role.CIVILIAN, Role.SHERIFF)
+            won = (is_mafia_side and win_side == WinSide.MAFIA) or (is_city_side and win_side == WinSide.CITY)
+            own_by_game[game_id] = (role, is_mafia_side, won)
+
+        co_rows = (
+            db.session.query(GameSlot.game_id, GameSlot.player_id, GameSlot.role)
+            .filter(GameSlot.game_id.in_(game_ids), GameSlot.player_id != player_id)
+            .all()
+        )
+
+        agg: Dict[int, dict] = {}
+        for game_id, other_player_id, other_role in co_rows:
+            own_role, own_is_mafia, own_won = own_by_game.get(game_id, (None, None, None))
+            if own_role is None:
+                continue
+            other_is_mafia = other_role in (Role.MAFIA, Role.DON)
+            same_side = other_is_mafia == own_is_mafia
+
+            a = agg.setdefault(other_player_id, {
+                "games_together": 0, "times_ally": 0, "times_opponent": 0,
+                "wins_as_ally": 0, "losses_as_ally": 0, "wins_vs": 0, "losses_vs": 0,
+                "mafia_duo_games": 0, "mafia_duo_wins": 0,
+                "sheriff_vs_don_games": 0, "sheriff_vs_don_wins": 0,   # own=SHERIFF, other=DON
+                "don_vs_sheriff_games": 0, "don_vs_sheriff_wins": 0,   # own=DON, other=SHERIFF
+            })
+            a["games_together"] += 1
+            if same_side:
+                a["times_ally"] += 1
+                if own_won:
+                    a["wins_as_ally"] += 1
+                else:
+                    a["losses_as_ally"] += 1
+                if own_is_mafia:  # both on mafia side together
+                    a["mafia_duo_games"] += 1
+                    if own_won:
+                        a["mafia_duo_wins"] += 1
+            else:
+                a["times_opponent"] += 1
+                if own_won:
+                    a["wins_vs"] += 1
+                else:
+                    a["losses_vs"] += 1
+                if own_role == Role.SHERIFF and other_role == Role.DON:
+                    a["sheriff_vs_don_games"] += 1
+                    if own_won:
+                        a["sheriff_vs_don_wins"] += 1
+                elif own_role == Role.DON and other_role == Role.SHERIFF:
+                    a["don_vs_sheriff_games"] += 1
+                    if own_won:
+                        a["don_vs_sheriff_wins"] += 1
+
+        if not agg:
+            return {}, {}
+
+        other_ids = list(agg.keys())
+        players = {
+            p.id: p for p in db.session.query(Player).filter(Player.id.in_(other_ids)).all()
+        }
+        return agg, players
+
+    @staticmethod
+    def get_partner_statistics(player_id: int, min_shared_games: int = 3) -> dict:
+        empty = {
+            "best_partner": None, "worst_partner": None,
+            "most_frequent_ally": None, "most_frequent_opponent": None,
+            "best_wr_opponent": None, "worst_wr_opponent": None,
+            "min_shared_games": min_shared_games,
+        }
+
+        agg, players = ProfileService._compute_partner_aggregates(player_id)
+        if not agg:
+            return empty
+
+        def make_entry(pid: int, d: dict) -> dict:
+            wr_vs = round(d["wins_vs"] / d["times_opponent"] * 100, 1) if d["times_opponent"] else None
+            return {
+                "player_id": pid,
+                "display_name": players[pid].display_name if pid in players else "?",
+                **d,
+                "win_rate_vs": wr_vs,
+            }
+
+        entries = [make_entry(pid, d) for pid, d in agg.items()]
+
+        def top(seq, key, min_val=1):
+            best = max(seq, key=key, default=None)
+            return best if best and key(best) >= min_val else None
+
+        best_partner = top(entries, lambda e: e["wins_as_ally"])
+        worst_partner = top(entries, lambda e: e["losses_as_ally"])
+        most_frequent_ally = top(entries, lambda e: e["times_ally"])
+        most_frequent_opponent = top(entries, lambda e: e["times_opponent"])
+
+        eligible_opponents = [e for e in entries if e["times_opponent"] >= min_shared_games]
+        best_wr_opponent = max(eligible_opponents, key=lambda e: e["win_rate_vs"], default=None)
+        worst_wr_opponent = min(eligible_opponents, key=lambda e: e["win_rate_vs"], default=None)
+
+        return {
+            "best_partner": best_partner,
+            "worst_partner": worst_partner,
+            "most_frequent_ally": most_frequent_ally,
+            "most_frequent_opponent": most_frequent_opponent,
+            "best_wr_opponent": best_wr_opponent,
+            "worst_wr_opponent": worst_wr_opponent,
+            "min_shared_games": min_shared_games,
+        }
+
+    # ── Rivalry / Social (Phase 3) ───────────────────────────────────────────
+
+    @staticmethod
+    def get_rivalry_statistics(player_id: int, min_shared_games: int = 3) -> dict:
+        """
+        Builds on the same shared aggregate as get_partner_statistics — zero
+        extra queries. Adds nemesis/favorite-victim (re-exposed win-rate-vs
+        numbers under rivalry naming), WR-based best/worst teammate, mafia-duo
+        stats and sheriff-vs-don rivalry (role-specific angles that partner
+        statistics doesn't surface).
+        """
+        empty = {
+            "nemesis": None, "favorite_victim": None,
+            "best_teammate_wr": None, "worst_teammate_wr": None,
+            "mafia_duo": None, "sheriff_vs_don": None,
+            "most_played_against": None, "min_shared_games": min_shared_games,
+        }
+
+        agg, players = ProfileService._compute_partner_aggregates(player_id)
+        if not agg:
+            return empty
+
+        def name(pid: int) -> str:
+            return players[pid].display_name if pid in players else "?"
+
+        entries = []
+        for pid, d in agg.items():
+            wr_vs = round(d["wins_vs"] / d["times_opponent"] * 100, 1) if d["times_opponent"] else None
+            wr_ally = round(d["wins_as_ally"] / d["times_ally"] * 100, 1) if d["times_ally"] else None
+            entries.append({"player_id": pid, "display_name": name(pid), **d, "win_rate_vs": wr_vs, "win_rate_ally": wr_ally})
+
+        eligible_opponents = [e for e in entries if e["times_opponent"] >= min_shared_games]
+        nemesis = min(eligible_opponents, key=lambda e: e["win_rate_vs"], default=None)
+        favorite_victim = max(eligible_opponents, key=lambda e: e["win_rate_vs"], default=None)
+
+        eligible_allies = [e for e in entries if e["times_ally"] >= min_shared_games]
+        best_teammate_wr = max(eligible_allies, key=lambda e: e["win_rate_ally"], default=None)
+        worst_teammate_wr = min(eligible_allies, key=lambda e: e["win_rate_ally"], default=None)
+
+        most_played_against = max(entries, key=lambda e: e["times_opponent"], default=None)
+        most_played_against = most_played_against if most_played_against and most_played_against["times_opponent"] > 0 else None
+
+        mafia_candidates = [e for e in entries if e["mafia_duo_games"] > 0]
+        mafia_duo = max(mafia_candidates, key=lambda e: e["mafia_duo_games"], default=None)
+        if mafia_duo:
+            mafia_duo = {
+                **mafia_duo,
+                "duo_win_rate": round(mafia_duo["mafia_duo_wins"] / mafia_duo["mafia_duo_games"] * 100, 1),
+            }
+
+        # Sheriff vs Don: показываем ту сторону, где у игрока реально есть игры
+        sheriff_candidates = [e for e in entries if e["sheriff_vs_don_games"] > 0]
+        don_candidates = [e for e in entries if e["don_vs_sheriff_games"] > 0]
+        sheriff_vs_don = None
+        if sheriff_candidates:
+            best = max(sheriff_candidates, key=lambda e: e["sheriff_vs_don_games"])
+            sheriff_vs_don = {
+                "as_role": "sheriff", "opponent": best["display_name"], "player_id": best["player_id"],
+                "games": best["sheriff_vs_don_games"],
+                "win_rate": round(best["sheriff_vs_don_wins"] / best["sheriff_vs_don_games"] * 100, 1),
+            }
+        elif don_candidates:
+            best = max(don_candidates, key=lambda e: e["don_vs_sheriff_games"])
+            sheriff_vs_don = {
+                "as_role": "don", "opponent": best["display_name"], "player_id": best["player_id"],
+                "games": best["don_vs_sheriff_games"],
+                "win_rate": round(best["don_vs_sheriff_wins"] / best["don_vs_sheriff_games"] * 100, 1),
+            }
+
+        return {
+            "nemesis": nemesis,
+            "favorite_victim": favorite_victim,
+            "best_teammate_wr": best_teammate_wr,
+            "worst_teammate_wr": worst_teammate_wr,
+            "mafia_duo": mafia_duo,
+            "sheriff_vs_don": sheriff_vs_don,
+            "most_played_against": most_played_against,
+            "min_shared_games": min_shared_games,
+        }
+
+    @staticmethod
+    def get_tournament_summary(player_id: int) -> dict:
+        """
+        Loops the player's own finished tournaments (club-scale = dozens)
+        calling RatingService.get_tournament_rating() per tournament — cost
+        is bounded by participant count per tournament, not total games.
+        Future caching target if tournament volume grows significantly.
+        """
+        from app.models import TournamentParticipant, Tournament
+        from app.services.rating_service import RatingService
+
+        participations = (
+            db.session.query(TournamentParticipant)
+            .join(Tournament)
+            .filter(TournamentParticipant.player_id == player_id, Tournament.status == "finished")
+            .all()
+        )
+
+        finals = sum(1 for p in participations if p.advanced_to_final)
+        wins = 0
+        podiums = 0
+        best_rank = None
+
+        for p in participations:
+            ratings = RatingService.get_tournament_rating(p.tournament_id)
+            entry = next((r for r in ratings if r.player_id == player_id), None)
+            if not entry or not entry.rank:
+                continue
+            if best_rank is None or entry.rank < best_rank:
+                best_rank = entry.rank
+            if entry.rank == 1:
+                wins += 1
+            if entry.rank <= 3:
+                podiums += 1
+
+        return {
+            "tournament_count": len(participations),
+            "best_result": best_rank,
+            "finals_count": finals,
+            "wins": wins,
+            "podiums": podiums,
+        }
+
+    @staticmethod
+    def get_fantasy_summary(player_id: int) -> Optional[dict]:
+        """None immediately if this player has no linked User account —
+        Fantasy is keyed by User.id, not Player.id."""
+        player = db.session.get(Player, player_id)
+        if not player or not player.user:
+            return None
+
+        from app.models import FantasyDraft
+        from app.services.fantasy_service import FantasyService
+
+        drafts = db.session.query(FantasyDraft).filter_by(user_id=player.user.id).all()
+        if not drafts:
+            return {"draft_count": 0, "best_draft_points": 0.0, "average_rank": None, "total_points": 0.0}
+
+        total_points = sum(d.total_points for d in drafts)
+        best_draft = max(drafts, key=lambda d: d.total_points, default=None)
+
+        ranks = []
+        for d in drafts:
+            leaderboard = FantasyService.get_leaderboard(d.tournament_id)
+            entry = next((e for e in leaderboard if e.user_id == player.user.id), None)
+            if entry:
+                ranks.append(entry.rank)
+        average_rank = round(sum(ranks) / len(ranks), 1) if ranks else None
+
+        return {
+            "draft_count": len(drafts),
+            "best_draft_points": best_draft.total_points if best_draft else 0.0,
+            "average_rank": average_rank,
+            "total_points": round(total_points, 2),
+        }
+
+    # ── Inventory / Achievements / Customization (delegates) ────────────────────
+
+    @staticmethod
+    def get_inventory(player_id: int):
+        from app.services.shop_service import ShopService
+        return ShopService.get_inventory(player_id)
+
+    @staticmethod
+    def get_achievements(player_id: int) -> List[dict]:
+        from app.services.achievement_service import AchievementService
+        return AchievementService.get_all_with_unlock_status(player_id)
+
+    @staticmethod
+    def get_profile_customization(player_id: int) -> dict:
+        """Read-only view of currently equipped items, by slot."""
+        from app.services.shop_service import ShopService
+        equipped = ShopService.get_equipped(player_id)
+        return {
+            slot: {"inventory_item_id": inv.id, "item": inv.item.to_dict()}
+            for slot, inv in equipped.items()
+        }

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Регистрация{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-sm-10 col-md-8 col-lg-6 col-xl-5">
+
+    <div class="text-center mb-4 mt-2">
+      <div class="brand-monogram brand-monogram-lg mx-auto mb-2">MS</div>
+      <h2 class="fw-bold mb-0">Новый аккаунт</h2>
+      <p class="text-muted small">Создайте учётную запись в MAFIA STYLE</p>
+    </div>
+
+    <div class="card">
+      <div class="card-body p-4">
+        <form method="POST" autocomplete="off">
+
+          <div class="mb-3">
+            <label class="form-label fw-medium">Никнейм <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text bg-body-secondary border-end-0">
+                <i class="bi bi-at text-muted"></i>
+              </span>
+              <input type="text" name="username" class="form-control border-start-0 ps-0"
+                     placeholder="DragonFly99" pattern="[a-zA-Z0-9_]{3,32}"
+                     title="3–32 символа: буквы, цифры, _"
+                     required autofocus>
+            </div>
+            <div class="form-text">Используется для входа и отображается публично. 3–32 символа.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-medium">E-mail <span class="text-muted small">(необязательно)</span></label>
+            <div class="input-group">
+              <span class="input-group-text bg-body-secondary border-end-0">
+                <i class="bi bi-envelope text-muted"></i>
+              </span>
+              <input type="email" name="email" class="form-control border-start-0 ps-0"
+                     placeholder="you@example.com">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-medium">Пароль <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text bg-body-secondary border-end-0">
+                <i class="bi bi-lock text-muted"></i>
+              </span>
+              <input type="password" name="password" id="pw1"
+                     class="form-control border-start-0 border-end-0 ps-0"
+                     placeholder="минимум 6 символов" minlength="6" required>
+              <button type="button" class="input-group-text bg-body-secondary border-start-0"
+                      onclick="togglePw('pw1','eye1')" tabindex="-1">
+                <i class="bi bi-eye text-muted" id="eye1"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-medium">Повторите пароль <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text bg-body-secondary border-end-0">
+                <i class="bi bi-lock-fill text-muted"></i>
+              </span>
+              <input type="password" name="password2" id="pw2"
+                     class="form-control border-start-0 border-end-0 ps-0"
+                     placeholder="••••••" minlength="6" required>
+              <button type="button" class="input-group-text bg-body-secondary border-start-0"
+                      onclick="togglePw('pw2','eye2')" tabindex="-1">
+                <i class="bi bi-eye text-muted" id="eye2"></i>
+              </button>
+            </div>
+            <div class="form-text text-danger d-none" id="pwMismatch">Пароли не совпадают</div>
+          </div>
+
+          {% if free_players %}
+          <div class="mb-4">
+            <label class="form-label fw-medium">
+              Привязать к игроку
+              <span class="text-muted small">(необязательно)</span>
+            </label>
+            <select name="player_id" class="form-select">
+              <option value="">— Без привязки —</option>
+              {% for p in free_players %}
+              <option value="{{ p.id }}">{{ p.display_name }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              Если вы уже играли в клубе — привяжите свой профиль, чтобы статистика сохранилась.
+            </div>
+          </div>
+          {% endif %}
+
+          <button type="submit" class="btn btn-danger w-100 py-2 fw-semibold" id="submitBtn">
+            <i class="bi bi-person-plus me-2"></i>Создать аккаунт
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <p class="text-center text-muted small mt-3">
+      Уже есть аккаунт?
+      <a href="{{ url_for('auth.login') }}" class="text-danger text-decoration-none fw-medium">
+        Войти
+      </a>
+    </p>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePw(inputId, iconId) {
+  const inp = document.getElementById(inputId);
+  const ico = document.getElementById(iconId);
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    ico.className = 'bi bi-eye-slash text-muted';
+  } else {
+    inp.type = 'password';
+    ico.className = 'bi bi-eye text-muted';
+  }
+}
+
+// Live password match check
+const pw1 = document.getElementById('pw1');
+const pw2 = document.getElementById('pw2');
+const mismatch = document.getElementById('pwMismatch');
+const submitBtn = document.getElementById('submitBtn');
+
+function checkPasswords() {
+  if (!pw2.value) { mismatch.classList.add('d-none'); return; }
+  const ok = pw1.value === pw2.value;
+  mismatch.classList.toggle('d-none', ok);
+  submitBtn.disabled = !ok;
+}
+
+pw1.addEventListener('input', checkPasswords);
+pw2.addEventListener('input', checkPasswords);
+</script>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Магазин{% endblock %}
+
+{% block content %}
+{% set CATEGORY_LABELS = {'profile_customization': '🖼️ Кастомизация профиля', 'nickname': '✨ Никнейм', 'physical': '📦 Физические товары'} %}
+{% set RARITY_LABELS = {'common': 'Обычная', 'rare': 'Редкая', 'epic': 'Эпическая', 'legendary': 'Легендарная'} %}
+{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark'} %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold">🛒 Магазин</h2>
+    <p class="text-muted small mb-0">Тратьте монеты на кастомизацию профиля и клубный мерч</p>
+  </div>
+  {% if player %}
+  <div class="stat-card card px-3 py-2">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-coin text-warning fs-5"></i>
+      <span class="fw-bold fs-5">{{ (player.coins or 0) | int }}</span>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<ul class="nav nav-pills mb-4 gap-2">
+  <li class="nav-item">
+    <a class="nav-link {% if not selected_category %}active{% endif %}" href="{{ url_for('shop.list_items') }}">Все</a>
+  </li>
+  {% for cat in categories %}
+  <li class="nav-item">
+    <a class="nav-link {% if selected_category == cat %}active{% endif %}"
+       href="{{ url_for('shop.list_items', category=cat.value) }}">{{ CATEGORY_LABELS.get(cat.value, cat.value) }}</a>
+  </li>
+  {% endfor %}
+</ul>
+
+{% if items %}
+<div class="row g-3">
+  {% for item in items %}
+  <div class="col-md-6 col-xl-4">
+    <a href="{{ url_for('shop.item_detail', item_id=item.id) }}" class="text-decoration-none text-reset">
+      <div class="card tournament-card h-100 rarity-{{ item.rarity.value }}">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <h5 class="fw-semibold mb-0">{{ item.name }}</h5>
+            <span class="badge {{ RARITY_BADGE.get(item.rarity.value, 'bg-secondary') }}">
+              {{ RARITY_LABELS.get(item.rarity.value, item.rarity.value) }}
+            </span>
+          </div>
+          <div class="text-muted small mb-3">{{ CATEGORY_LABELS.get(item.category.value, item.category.value) }} · {{ item.subcategory }}</div>
+          {% if item.description %}
+          <p class="text-muted small mb-3">{{ item.description }}</p>
+          {% endif %}
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-bold text-warning"><i class="bi bi-coin me-1"></i>{{ item.price | int }}</span>
+            {% if player %}
+              {% if affordability.get(item.id) %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle">Доступно</span>
+              {% else %}
+              <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Недоступно</span>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-shop fs-1 d-block mb-2 opacity-25"></i>
+    В этой категории пока нет товаров
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Кастомизация — {{ player.display_name }}{% endblock %}
+
+{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark'} %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold">🎨 Кастомизация — {{ player.display_name }}</h2>
+    <a href="{{ url_for('profile.view_profile', player_id=player_id) }}" class="text-muted small">← К профилю</a>
+  </div>
+  {% if is_own %}
+  <a href="{{ url_for('inventory.list_inventory') }}" class="btn btn-danger btn-sm">
+    <i class="bi bi-backpack4 me-1"></i>Управлять в инвентаре
+  </a>
+  {% endif %}
+</div>
+
+{% if customization %}
+<div class="row g-3">
+  {% for slot, entry in customization.items() %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100 rarity-{{ entry.item.rarity }}">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h6 class="fw-semibold mb-0">{{ entry.item.name }}</h6>
+          <span class="badge {{ RARITY_BADGE.get(entry.item.rarity, 'bg-secondary') }}">{{ entry.item.rarity }}</span>
+        </div>
+        <div class="text-muted small">слот «{{ slot }}»</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-palette fs-1 d-block mb-2 opacity-25"></i>
+    Ничего не экипировано
+    {% if is_own %}<br><a href="{{ url_for('shop.list_items') }}">Загляните в магазин</a>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}История подарков (все){% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold"><i class="bi bi-gift me-2"></i>История подарков — все игроки</h2>
+    <p class="text-muted small mb-0">Полный обзор передач предметов между игроками</p>
+  </div>
+  <a href="{{ url_for('admin_analytics.social') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-people me-1"></i>Социальная аналитика
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th class="ps-4">Дата</th>
+            <th>Предмет</th>
+            <th>От</th>
+            <th>Кому</th>
+            <th class="pe-4">Сообщение</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transfers %}
+          <tr>
+            <td class="ps-4 text-muted small">{{ t.transferred_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            <td>{{ t.shop_item.name if t.shop_item else '—' }}</td>
+            <td><a href="{{ url_for('profile.view_profile', player_id=t.from_player_id) }}">{{ t.from_player.display_name }}</a></td>
+            <td><a href="{{ url_for('profile.view_profile', player_id=t.to_player_id) }}">{{ t.to_player.display_name }}</a></td>
+            <td class="pe-4 text-muted small fst-italic">{{ t.message or '' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-4">Передач пока не было</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-between mt-3">
+  {% if page > 1 %}
+  <a href="{{ url_for('admin_analytics.gifts', page=page-1) }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  {% else %}<span></span>{% endif %}
+  {% if transfers|length == 50 %}
+  <a href="{{ url_for('admin_analytics.gifts', page=page+1) }}" class="btn btn-outline-secondary btn-sm">Вперёд →</a>
+  {% endif %}
+</div>
+{% endblock %}

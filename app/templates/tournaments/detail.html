@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% block title %}{{ tournament.name }}{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="d-flex flex-wrap align-items-start gap-3 mb-4">
+  <a href="{{ url_for('tournaments.list_tournaments') }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  <div class="flex-grow-1">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <h2 class="mb-0 fw-bold">{{ tournament.name }}</h2>
+      <span class="badge fs-6
+        {% if tournament.status == 'active' %}bg-success
+        {% elif tournament.status == 'finished' %}bg-secondary
+        {% else %}bg-warning text-dark{% endif %}">
+        {% if tournament.status == 'active' %}🟢 Активен
+        {% elif tournament.status == 'finished' %}✅ Завершён
+        {% else %}⏳ Ожидает{% endif %}
+      </span>
+    </div>
+    <div class="d-flex gap-2 mt-2 flex-wrap">
+      {% if tournament.type.value == 'individual' %}
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">👤 Индивидуальный</span>
+      {% else %}
+        <span class="badge bg-warning-subtle text-warning border border-warning-subtle">👥 Командный</span>
+      {% endif %}
+      {% if tournament.is_ranked %}
+        <span class="badge bg-success-subtle text-success border border-success-subtle">📈 Рейтинговый</span>
+      {% else %}
+        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">🏖 Нерейтинговый</span>
+      {% endif %}
+      {% if tournament.has_stages %}
+        <span class="badge bg-info-subtle text-info border border-info-subtle">📋 Этапы · cutoff={{ tournament.cutoff_size }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <!-- Actions -->
+  <div class="d-flex gap-2 flex-wrap">
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    {% if tournament.status == 'pending' %}
+    <form method="POST" action="{{ url_for('tournaments.activate_tournament', tournament_id=tournament.id) }}">
+      <button class="btn btn-success" onclick="return confirm('Запустить турнир?')">
+        <i class="bi bi-play-fill me-1"></i>Запустить
+      </button>
+    </form>
+    {% elif tournament.status == 'active' %}
+    <form method="POST" action="{{ url_for('tournaments.finish_tournament', tournament_id=tournament.id) }}">
+      <button class="btn btn-warning text-dark" onclick="return confirm('Завершить турнир?')">
+        <i class="bi bi-flag-fill me-1"></i>Завершить
+      </button>
+    </form>
+    {% endif %}
+    {% endif %}
+    <a href="{{ url_for('tournaments.leaderboard', tournament_id=tournament.id) }}"
+       class="btn btn-outline-warning"><i class="bi bi-trophy me-1"></i>Рейтинг</a>
+    {% if tournament.has_stages %}
+    <a href="{{ url_for('tournaments.stages', tournament_id=tournament.id) }}"
+       class="btn btn-outline-info"><i class="bi bi-list-ol me-1"></i>Этапы</a>
+    {% endif %}
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    <form method="POST" action="{{ url_for('tournaments.delete_tournament', tournament_id=tournament.id) }}"
+          class="d-inline" onsubmit="return confirm('Удалить турнир?')">
+      <button class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if tournament.description %}
+<div class="alert alert-secondary mb-4"><i class="bi bi-info-circle me-2"></i>{{ tournament.description }}</div>
+{% endif %}
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value">{{ participant_count }}</div>
+      <div class="stat-label">Участников</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value text-success">{{ games_finished }}</div>
+      <div class="stat-label">Игр сыграно</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value text-info">{{ games_total }}</div>
+      <div class="stat-label">Игр всего</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card card text-center p-3">
+      <div class="stat-value">
+        {% if active_stage %}
+          <span class="text-warning">{{ active_stage.name|truncate(12) }}</span>
+        {% else %}—{% endif %}
+      </div>
+      <div class="stat-label">Активный этап</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Participants panel -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">👥 Участники ({{ participant_count }})</div>
+      <div class="card-body p-0" style="max-height:380px; overflow-y:auto">
+        {% if tournament.participants %}
+        <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle small">
+          <thead>
+            <tr>
+              <th class="ps-3">Игрок</th>
+              {% if tournament.type.value == 'team' %}<th>Команда</th>{% endif %}
+              <th class="text-center">Финал?</th>
+              <th class="pe-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in tournament.participants %}
+            <tr>
+              <td class="ps-3">{{ p.player.display_name if p.player else '—' }}</td>
+              {% if tournament.type.value == 'team' %}
+              <td class="text-muted">{{ p.team.name if p.team else '—' }}</td>
+              {% endif %}
+              <td class="text-center">
+                {% if p.advanced_to_final %}
+                  <span class="badge bg-warning text-dark">✅ Финал</span>
+                {% else %}—{% endif %}
+              </td>
+              <td class="pe-3 text-end">
+                {% if tournament.status != 'active' and current_user.is_authenticated and current_user.is_admin %}
+                <form method="POST" action="{{ url_for('tournaments.remove_participant', tournament_id=tournament.id, player_id=p.player_id) }}">
+                  <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2">✕</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">Участников нет</div>
+        {% endif %}
+      </div>
+      {% if tournament.status != 'finished' and available_players and current_user.is_authenticated and current_user.is_admin %}
+      <div class="card-footer">
+        <form method="POST" action="{{ url_for('tournaments.add_participant', tournament_id=tournament.id) }}"
+              class="d-flex gap-2">
+          <select name="player_id" class="form-select form-select-sm" required>
+            <option value="">— Добавить игрока —</option>
+            {% for p in available_players %}
+            <option value="{{ p.id }}">{{ p.display_name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-sm btn-danger text-nowrap">
+            <i class="bi bi-person-plus"></i>
+          </button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Teams or Top players -->
+  <div class="col-lg-6">
+    {% if tournament.type.value == 'team' %}
+    <div class="card h-100">
+      <div class="card-header fw-semibold d-flex justify-content-between">
+        <span>👥 Команды</span>
+      </div>
+      <div class="card-body p-0">
+        {% if tournament.teams %}
+        {% for team in tournament.teams %}
+        {# players already in any team of this tournament #}
+        {% set taken_ids = [] %}
+        {% for t2 in tournament.teams %}
+          {% for m in t2.members %}{% if taken_ids.append(m.player_id) %}{% endif %}{% endfor %}
+        {% endfor %}
+        {% set free_players = available_players | selectattr('id', 'not in', taken_ids) | list %}
+        <div class="p-3 border-bottom">
+          <!-- Team header -->
+          <div class="d-flex align-items-center gap-2 mb-2">
+            {% if team.color %}
+            <div class="rounded-circle" style="width:12px;height:12px;background:{{ team.color }};flex-shrink:0"></div>
+            {% endif %}
+            <span class="fw-semibold">{{ team.name }}</span>
+            <span class="badge bg-body-secondary text-muted border ms-auto">{{ team.members|length }} чел.</span>
+          </div>
+          <!-- Members list -->
+          <div class="d-flex flex-wrap gap-1 mb-2">
+            {% for m in team.members %}
+            <span class="badge bg-body-secondary text-body border d-flex align-items-center gap-1">
+              {{ m.player.display_name if m.player else '?' }}
+              {% if tournament.status != 'finished' and current_user.is_authenticated and current_user.is_admin %}
+              <form method="POST"
+                    action="{{ url_for('tournaments.remove_team_player', team_id=team.id, player_id=m.player_id) }}"
+                    class="d-inline m-0 p-0">
+                <button type="submit" class="btn p-0 border-0 bg-transparent text-muted lh-1"
+                        style="font-size:.65rem" title="Убрать из команды"
+                        onclick="return confirm('Убрать игрока из команды?')">✕</button>
+              </form>
+              {% endif %}
+            </span>
+            {% endfor %}
+            {% if not team.members %}
+            <span class="text-muted small">нет игроков</span>
+            {% endif %}
+          </div>
+          <!-- Add player to this team -->
+          {% if tournament.status != 'finished' and current_user.is_authenticated and current_user.is_admin %}
+          {% if free_players %}
+          <form method="POST"
+                action="{{ url_for('tournaments.add_team_player', team_id=team.id) }}"
+                class="d-flex gap-2">
+            <select name="player_id" class="form-select form-select-sm" required>
+              <option value="">+ добавить игрока</option>
+              {% for p in free_players %}
+              <option value="{{ p.id }}">{{ p.display_name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">
+              <i class="bi bi-person-plus"></i>
+            </button>
+          </form>
+          {% else %}
+          <div class="text-muted small"><i class="bi bi-check-circle me-1 text-success"></i>Все участники распределены</div>
+          {% endif %}
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-people fs-2 d-block mb-2 opacity-25"></i>
+          Команд нет — создайте первую
+        </div>
+        {% endif %}
+      </div>
+      {% if tournament.status != 'finished' and current_user.is_authenticated and current_user.is_admin %}
+      <div class="card-footer">
+        <form method="POST" action="{{ url_for('tournaments.add_team', tournament_id=tournament.id) }}"
+              class="d-flex gap-2">
+          <input type="text" name="name" class="form-control form-control-sm" placeholder="Название команды" required>
+          <input type="color" name="color" class="form-control form-control-sm form-control-color" value="#e03535" style="width:46px">
+          <button type="submit" class="btn btn-sm btn-danger text-nowrap">+ Команда</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <!-- Top-5 rating preview -->
+    <div class="card h-100">
+      <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+        <span>🏅 Текущий рейтинг</span>
+        <a href="{{ url_for('tournaments.leaderboard', tournament_id=tournament.id) }}"
+           class="btn btn-sm btn-outline-secondary">Все →</a>
+      </div>
+      <div class="card-body p-0">
+        {% if player_ratings %}
+        <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th class="ps-3">#</th>
+              <th>Игрок</th>
+              <th class="text-center">Игр</th>
+              <th class="text-end pe-3">Очки</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in player_ratings[:8] %}
+            <tr>
+              <td class="ps-3 text-muted">{{ r.rank }}</td>
+              <td class="fw-medium">{{ r.display_name }}</td>
+              <td class="text-center text-muted">{{ r.games_played }}</td>
+              <td class="text-end pe-3 fw-semibold text-success">{{ r.total_score }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">Рейтинг появится после первых игр</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Games link -->
+<div class="mt-4 d-flex gap-2 flex-wrap align-items-center">
+  <a href="{{ url_for('tournaments.tournament_games', tournament_id=tournament.id) }}"
+     class="btn btn-outline-secondary">
+    <i class="bi bi-controller me-1"></i>Все игры турнира ({{ games_total }})
+  </a>
+  {% if tournament.status == 'active' and current_user.is_authenticated and current_user.is_admin %}
+  <a href="{{ url_for('games.new_game', tournament_id=tournament.id, stage_id=(active_stage.id if active_stage else '')) }}"
+     class="btn btn-outline-danger">
+    <i class="bi bi-plus-lg me-1"></i>Создать игру вручную
+  </a>
+
+  <!-- Bulk game generation -->
+  <button class="btn btn-danger" type="button"
+          data-bs-toggle="collapse" data-bs-target="#generateGamesPanel">
+    <i class="bi bi-lightning-charge me-1"></i>Сгенерировать игры
+  </button>
+  {% endif %}
+</div>
+
+{% if tournament.status == 'active' and current_user.is_authenticated and current_user.is_admin %}
+<div class="collapse mt-3" id="generateGamesPanel">
+  <div class="card border-warning">
+    <div class="card-header fw-semibold text-warning">
+      <i class="bi bi-lightning-charge me-1"></i>Авто-генерация игр турнира
+    </div>
+    <div class="card-body">
+      <p class="text-muted small mb-3">
+        Игры создаются с оптимальным распределением участников по местам:
+        каждый игрок занимает одно и то же место как можно реже.
+        Роли расставлены по умолчанию — вы можете изменить их при завершении.
+      </p>
+      <form method="POST"
+            action="{{ url_for('tournaments.generate_games', tournament_id=tournament.id) }}"
+            class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label small fw-medium">Количество игр</label>
+          <input type="number" name="n_games" class="form-control"
+                 value="6" min="1" max="200" required>
+        </div>
+        {% if tournament.has_stages and active_stage %}
+        <div class="col-md-4">
+          <label class="form-label small fw-medium">Этап</label>
+          <select name="stage_id" class="form-select">
+            <option value="">— без этапа —</option>
+            {% for s in tournament.stages %}
+            <option value="{{ s.id }}" {% if active_stage and s.id == active_stage.id %}selected{% endif %}>
+              {{ s.name }} ({{ s.status }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        <div class="col-md-auto">
+          <button type="submit" class="btn btn-warning text-dark"
+                  onclick="return confirm('Создать игры с авто-рассадкой?')">
+            <i class="bi bi-play-fill me-1"></i>Создать
+          </button>
+        </div>
+      </form>
+      <div class="mt-2 text-muted small">
+        <i class="bi bi-info-circle me-1"></i>
+        Участников в турнире: <strong>{{ participant_count }}</strong>
+        {% if participant_count < 10 %}
+        — <span class="text-danger">нужно минимум 10</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

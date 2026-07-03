@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ item.name }} — Магазин{% endblock %}
+
+{% block content %}
+{% set CATEGORY_LABELS = {'profile_customization': '🖼️ Кастомизация профиля', 'nickname': '✨ Никнейм', 'physical': '📦 Физический товар'} %}
+{% set RARITY_LABELS = {'common': 'Обычная', 'rare': 'Редкая', 'epic': 'Эпическая', 'legendary': 'Легендарная'} %}
+{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark'} %}
+
+<div class="mb-3">
+  <a href="{{ url_for('shop.list_items') }}" class="text-muted small">← Назад в магазин</a>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card rarity-{{ item.rarity.value }}">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h3 class="fw-bold mb-0">{{ item.name }}</h3>
+          <span class="badge {{ RARITY_BADGE.get(item.rarity.value, 'bg-secondary') }}">
+            {{ RARITY_LABELS.get(item.rarity.value, item.rarity.value) }}
+          </span>
+        </div>
+        <div class="text-muted small mb-3">
+          {{ CATEGORY_LABELS.get(item.category.value, item.category.value) }} · слот «{{ item.subcategory }}»
+        </div>
+
+        {% if item.description %}
+        <p class="mb-4">{{ item.description }}</p>
+        {% endif %}
+
+        <div class="d-flex align-items-center justify-content-between mb-4">
+          <span class="fw-bold fs-4 text-warning"><i class="bi bi-coin me-1"></i>{{ item.price | int }}</span>
+          {% if item.category.value == 'physical' %}
+          <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+            Выдаётся вручную администратором
+          </span>
+          {% endif %}
+        </div>
+
+        {% if not player %}
+        <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary w-100">Войдите, чтобы купить</a>
+        {% elif validation and validation.ok %}
+        <form method="POST" action="{{ url_for('shop.purchase_item', item_id=item.id) }}"
+              onsubmit="return confirm('Купить «{{ item.name }}» за {{ item.price | int }} монет?')">
+          <button type="submit" class="btn btn-danger w-100">
+            <i class="bi bi-bag-check me-1"></i>Купить
+          </button>
+        </form>
+        {% else %}
+        <button class="btn btn-outline-secondary w-100" disabled>
+          {{ validation.message if validation else 'Недоступно' }}
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

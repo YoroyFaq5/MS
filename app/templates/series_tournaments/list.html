@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Серийные турниры{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold"><i class="bi bi-collection-play me-2"></i>Серийные турниры</h2>
+    <p class="text-muted small mb-0">Один турнир — несколько игровых серий (вечеров), общий и посерийный рейтинг</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('tournaments.list_tournaments') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-trophy me-1"></i>Обычные турниры
+    </a>
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    <a href="{{ url_for('series_tournaments.new_series_tournament') }}" class="btn btn-danger">
+      <i class="bi bi-plus-lg me-1"></i>Создать
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if series_tournaments %}
+<div class="row g-3">
+  {% for st in series_tournaments %}
+  <div class="col-md-6 col-xl-4">
+    <a href="{{ url_for('series_tournaments.series_tournament_detail', series_tournament_id=st.id) }}"
+       class="text-decoration-none text-reset">
+      <div class="card h-100 tournament-card">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <h5 class="fw-bold mb-0">{{ st.tournament.name }}</h5>
+            <span class="badge fs-6
+              {% if st.tournament.status == 'active' %}bg-success
+              {% elif st.tournament.status == 'finished' %}bg-secondary
+              {% else %}bg-warning text-dark{% endif %}">
+              {% if st.tournament.status == 'active' %}🟢 Активен
+              {% elif st.tournament.status == 'finished' %}✅ Завершён
+              {% else %}⏳ Идёт{% endif %}
+            </span>
+          </div>
+          {% if st.tournament.description %}
+          <p class="text-muted small mb-3">{{ st.tournament.description }}</p>
+          {% endif %}
+          <div class="row g-2 text-center">
+            <div class="col-4">
+              <div class="bg-body-secondary rounded py-2">
+                <div class="fw-bold">{{ st.series|length }}</div>
+                <div class="text-muted" style="font-size:.7rem">СЕРИЙ</div>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="bg-body-secondary rounded py-2">
+                <div class="fw-bold">{{ st.tournament.participants|length }}</div>
+                <div class="text-muted" style="font-size:.7rem">УЧАСТНИКОВ</div>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="bg-body-secondary rounded py-2">
+                <div class="fw-bold">{{ st.tournament.games|selectattr('is_finished')|list|length }}</div>
+                <div class="text-muted" style="font-size:.7rem">ИГР</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-collection-play fs-1 d-block mb-3 opacity-25"></i>
+  <p class="mb-3">Серийных турниров пока нет</p>
+  {% if current_user.is_authenticated and current_user.is_admin %}
+  <a href="{{ url_for('series_tournaments.new_series_tournament') }}" class="btn btn-danger px-4">
+    <i class="bi bi-plus-lg me-1"></i>Создать первый
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

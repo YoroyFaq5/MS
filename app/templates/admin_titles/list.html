@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Титулы — управление{% endblock %}
+
+{% block content %}
+{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark'} %}
+{% set TYPE_LABELS = {'seasonal': 'Сезонный', 'eternal': 'Вечный', 'manual': 'Ручной'} %}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="mb-0 fw-bold"><i class="bi bi-patch-check me-2"></i>Титулы — управление</h2>
+    <p class="text-muted small mb-0">Ручная выдача/отзыв, пересчёт номинаций и клубных рекордов</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <form method="POST" action="{{ url_for('admin_titles.recompute_global') }}">
+      <button type="submit" class="btn btn-outline-warning btn-sm">
+        <i class="bi bi-arrow-repeat me-1"></i>Пересчитать вечные титулы
+      </button>
+    </form>
+    <form method="POST" action="{{ url_for('admin_titles.recompute_season') }}" class="d-flex gap-1">
+      <select name="season_id" class="form-select form-select-sm" style="width:auto" required>
+        <option value="">— сезон для пересчёта номинаций —</option>
+        {% for s in seasons %}
+        <option value="{{ s.id }}">{{ s.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-outline-secondary btn-sm">Пересчитать</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th class="ps-4">Титул</th>
+            <th>Тип</th>
+            <th>Редкость</th>
+            <th>Текущий обладатель</th>
+            <th class="text-end pe-4">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for title in titles %}
+          <tr>
+            <td class="ps-4 fw-medium">
+              {% if title.icon %}<i class="bi {{ title.icon }} me-1"></i>{% endif %}{{ title.name }}
+              <div class="text-muted small">{{ title.description or '' }}</div>
+            </td>
+            <td class="text-muted small">{{ TYPE_LABELS.get(title.type.value, title.type.value) }}</td>
+            <td><span class="badge {{ RARITY_BADGE.get(title.rarity.value, 'bg-secondary') }}">{{ title.rarity.value }}</span></td>
+            <td>
+              {% set holder = holders.get(title.id) %}
+              {% if holder %}
+              <a href="{{ url_for('profile.view_profile', player_id=holder.player_id) }}">{{ holder.player.display_name }}</a>
+              <form method="POST" action="{{ url_for('admin_titles.revoke', player_title_id=holder.id) }}" class="d-inline">
+                <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-1"
+                        onclick="return confirm('Отозвать титул у ' + '{{ holder.player.display_name }}' + '?')">отозвать</button>
+              </form>
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="collapse" data-bs-target="#grant-{{ title.id }}">
+                Выдать
+              </button>
+              <div class="collapse mt-2" id="grant-{{ title.id }}">
+                <form method="POST" action="{{ url_for('admin_titles.grant') }}" class="d-flex gap-1">
+                  <input type="hidden" name="title_id" value="{{ title.id }}">
+                  <select name="player_id" class="form-select form-select-sm" required>
+                    <option value="">— игрок —</option>
+                    {% for p in players %}
+                    <option value="{{ p.id }}">{{ p.display_name }}</option>
+                    {% endfor %}
+                  </select>
+                  <input type="text" name="reason" class="form-control form-control-sm" placeholder="причина" required minlength="3">
+                  <button type="submit" class="btn btn-sm btn-warning text-nowrap">OK</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-4">Титулов пока нет — запустите `flask seed-titles`</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

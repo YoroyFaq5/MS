@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+*.db
+.env
+instance/
+.claude
+
+# Содержит пароли пользователей открытым текстом (см. extract_legacy_to_json.py) —
+# переносить на PythonAnywhere отдельно (Files, не git), удалить после импорта.
+legacy_export/
+legacy_export_test/
+*.sql

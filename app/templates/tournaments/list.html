@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Турниры{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold">🏆 Турниры</h2>
+    <p class="text-muted small mb-0">{{ tournaments|length }} турниров</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('series_tournaments.list_series_tournaments') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-collection-play me-1"></i>Серийные турниры
+    </a>
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    <a href="{{ url_for('tournaments.new_tournament') }}" class="btn btn-danger">
+      <i class="bi bi-plus-lg me-1"></i>Создать турнир
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if tournaments %}
+<div class="row g-3">
+  {% for t in tournaments %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100 tournament-card">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div>
+            <h5 class="fw-bold mb-1">{{ t.name }}</h5>
+            <div class="d-flex gap-2 flex-wrap">
+              {% if t.type.value == 'individual' %}
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">👤 Индивидуальный</span>
+              {% else %}
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">👥 Командный</span>
+              {% endif %}
+              {% if t.is_ranked %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle">📈 Рейтинговый</span>
+              {% else %}
+                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">🏖 Нерейтинговый</span>
+              {% endif %}
+              {% if t.has_stages %}
+                <span class="badge bg-info-subtle text-info border border-info-subtle">📋 Этапы</span>
+              {% endif %}
+            </div>
+          </div>
+          <span class="badge fs-6
+            {% if t.status == 'active' %}bg-success
+            {% elif t.status == 'finished' %}bg-secondary
+            {% else %}bg-warning text-dark{% endif %}">
+            {% if t.status == 'active' %}🟢 Активен
+            {% elif t.status == 'finished' %}✅ Завершён
+            {% else %}⏳ Ожидает{% endif %}
+          </span>
+        </div>
+
+        {% if t.description %}
+        <p class="text-muted small mb-3">{{ t.description }}</p>
+        {% endif %}
+
+        <div class="row g-2 mb-3 text-center">
+          <div class="col-4">
+            <div class="bg-body-secondary rounded py-2">
+              <div class="fw-bold">{{ t.participants|length }}</div>
+              <div class="text-muted" style="font-size:.7rem">УЧАСТНИКОВ</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="bg-body-secondary rounded py-2">
+              <div class="fw-bold">{{ t.games|selectattr('is_finished')|list|length }}</div>
+              <div class="text-muted" style="font-size:.7rem">ИГР</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="bg-body-secondary rounded py-2">
+              <div class="fw-bold">{{ t.stages|length }}</div>
+              <div class="text-muted" style="font-size:.7rem">ЭТАПОВ</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('tournaments.tournament_detail', tournament_id=t.id) }}"
+             class="btn btn-sm btn-outline-secondary flex-grow-1">Открыть</a>
+          <a href="{{ url_for('tournaments.leaderboard', tournament_id=t.id) }}"
+             class="btn btn-sm btn-outline-warning">🏆</a>
+          {% if t.has_stages %}
+          <a href="{{ url_for('tournaments.stages', tournament_id=t.id) }}"
+             class="btn btn-sm btn-outline-info">📋</a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-footer text-muted small">
+        Создан {{ t.created_at.strftime('%d.%m.%Y') }}
+        {% if t.started_at %} · Старт {{ t.started_at.strftime('%d.%m.%Y') }}{% endif %}
+        {% if t.finished_at %} · Финиш {{ t.finished_at.strftime('%d.%m.%Y') }}{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-trophy fs-1 d-block mb-3 opacity-25"></i>
+  <p class="mb-3">Турниров пока нет</p>
+  {% if current_user.is_authenticated and current_user.is_admin %}
+  <a href="{{ url_for('tournaments.new_tournament') }}" class="btn btn-danger px-4">
+    <i class="bi bi-plus-lg me-1"></i>Создать первый турнир
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

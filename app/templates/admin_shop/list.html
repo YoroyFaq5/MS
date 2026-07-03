@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Магазин — управление{% endblock %}
+
+{% block content %}
+{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark'} %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold">🛒 Магазин — управление</h2>
+    <p class="text-muted small mb-0">Товары кастомизации, никнеймов и физический мерч</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin_shop.list_achievements') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-trophy me-1"></i>Достижения
+    </a>
+    <a href="{{ url_for('admin_shop.new_item') }}" class="btn btn-danger btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Новый товар
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th class="ps-4">Название</th>
+            <th>Категория</th>
+            <th>Слот</th>
+            <th>Редкость</th>
+            <th class="text-end">Цена</th>
+            <th class="text-center">Статус</th>
+            <th class="text-end pe-4">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td class="ps-4 fw-medium">{{ item.name }}</td>
+            <td class="text-muted small">{{ item.category.value }}</td>
+            <td class="text-muted small">{{ item.subcategory }}</td>
+            <td><span class="badge {{ RARITY_BADGE.get(item.rarity.value, 'bg-secondary') }}">{{ item.rarity.value }}</span></td>
+            <td class="text-end text-warning fw-semibold">{{ item.price | int }}</td>
+            <td class="text-center">
+              {% if item.is_active %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle">Активен</span>
+              {% else %}
+              <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Отключён</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              <div class="d-flex gap-1 justify-content-end flex-wrap">
+                <a href="{{ url_for('admin_shop.edit_item', item_id=item.id) }}" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                {% if item.is_active %}
+                <form method="POST" action="{{ url_for('admin_shop.deactivate_item', item_id=item.id) }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Отключить</button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_for('admin_shop.activate_item', item_id=item.id) }}">
+                  <button type="submit" class="btn btn-sm btn-outline-success">Включить</button>
+                </form>
+                {% endif %}
+                <button type="button" class="btn btn-sm btn-outline-warning"
+                        data-bs-toggle="collapse" data-bs-target="#grant-{{ item.id }}">
+                  Выдать
+                </button>
+              </div>
+              <div class="collapse mt-2" id="grant-{{ item.id }}">
+                <form method="POST" action="{{ url_for('admin_shop.grant_item', item_id=item.id) }}"
+                      class="d-flex gap-1">
+                  <select name="player_id" class="form-select form-select-sm" required>
+                    <option value="">— игрок —</option>
+                    {% for p in players %}
+                    <option value="{{ p.id }}">{{ p.display_name }}</option>
+                    {% endfor %}
+                  </select>
+                  <input type="text" name="reason" class="form-control form-control-sm" placeholder="причина" required minlength="3">
+                  <button type="submit" class="btn btn-sm btn-warning text-nowrap">OK</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-4">Товаров пока нет</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

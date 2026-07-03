@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}{{ series.name }} — {{ tournament.name }}{% endblock %}
+
+{% set SERIES_STATUS = {'pending': ('Ожидает', 'bg-secondary-subtle text-secondary border border-secondary-subtle'),
+                         'active': ('🟢 Активна', 'bg-success-subtle text-success border border-success-subtle'),
+                         'finished': ('✅ Завершена', 'bg-info-subtle text-info border border-info-subtle'),
+                         'cancelled': ('❌ Отменена', 'bg-danger-subtle text-danger border border-danger-subtle')} %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-start gap-3 mb-4">
+  <a href="{{ url_for('series_tournaments.series_tournament_detail', series_tournament_id=series_tournament.id) }}"
+     class="btn btn-outline-secondary btn-sm">← {{ tournament.name }}</a>
+  <div class="flex-grow-1">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <h2 class="mb-0 fw-bold">{{ series.name }}</h2>
+      <span class="badge fs-6 {{ SERIES_STATUS.get(series.status.value, ('?', 'bg-secondary'))[1] }}">
+        {{ SERIES_STATUS.get(series.status.value, ('?', ''))[0] }}
+      </span>
+    </div>
+    {% if series.series_date %}
+    <p class="text-muted small mt-1 mb-0">{{ series.series_date.strftime('%d.%m.%Y') }}</p>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if series.status.value == 'active' and current_user.is_authenticated and current_user.is_admin %}
+    <a href="{{ url_for('games.new_game', tournament_id=tournament.id, stage_id=series.stage_id) }}"
+       class="btn btn-danger"><i class="bi bi-plus-lg me-1"></i>Добавить игру</a>
+    <form method="POST" action="{{ url_for('series_tournaments.finish_series', series_id=series.id) }}"
+          onsubmit="return confirm('Завершить серию?')">
+      <button class="btn btn-outline-secondary"><i class="bi bi-flag-fill me-1"></i>Завершить</button>
+    </form>
+    <form method="POST" action="{{ url_for('series_tournaments.cancel_series', series_id=series.id) }}"
+          onsubmit="return confirm('Отменить серию? Она будет исключена из общего рейтинга.')">
+      <button class="btn btn-outline-danger"><i class="bi bi-x-lg me-1"></i>Отменить</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header fw-semibold"><i class="bi bi-trophy me-2"></i>Рейтинг серии</div>
+      <div class="card-body p-0">
+        {% if leaderboard %}
+        <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th class="ps-4">#</th>
+              <th>Игрок</th>
+              <th class="text-center">Игр</th>
+              <th class="text-center">Побед</th>
+              <th class="text-center">WR</th>
+              <th class="text-end pe-4">Очки</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in leaderboard %}
+            <tr>
+              <td class="ps-4">
+                {% if r.rank == 1 %}<span class="badge bg-warning text-dark">🥇</span>
+                {% elif r.rank == 2 %}<span class="badge bg-secondary">🥈</span>
+                {% elif r.rank == 3 %}<span class="badge" style="background:#cd7f32">🥉</span>
+                {% else %}<span class="text-muted">{{ r.rank }}</span>{% endif %}
+              </td>
+              <td>
+                <a href="{{ url_for('series_tournaments.player_stats', series_tournament_id=series_tournament.id, player_id=r.player_id) }}"
+                   class="text-decoration-none fw-medium">{{ r.display_name }}</a>
+              </td>
+              <td class="text-center text-muted">{{ r.games_played }}</td>
+              <td class="text-center text-muted">{{ r.games_won }}</td>
+              <td class="text-center text-muted">{{ r.win_rate }}%</td>
+              <td class="text-end pe-4 fw-semibold text-success">{{ r.total_score }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-controller fs-1 d-block mb-2 opacity-25"></i>
+          В этой серии пока нет завершённых игр
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header fw-semibold"><i class="bi bi-controller me-2"></i>Игры серии ({{ games|length }})</div>
+      <div class="card-body p-0" style="max-height:420px; overflow-y:auto">
+        {% if games %}
+        <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle small">
+          <thead><tr><th class="ps-3">Игра</th><th>Дата</th><th class="pe-3 text-end">Статус</th></tr></thead>
+          <tbody>
+            {% for g in games %}
+            <tr>
+              <td class="ps-3">
+                <a href="{{ url_for('games.game_detail', game_id=g.id) }}" class="text-decoration-none">#{{ g.id }}</a>
+              </td>
+              <td class="text-muted">{{ g.played_at.strftime('%d.%m.%Y') }}</td>
+              <td class="pe-3 text-end">
+                {% if g.is_finished %}<span class="badge bg-success-subtle text-success border border-success-subtle">Завершена</span>
+                {% else %}<span class="badge bg-warning-subtle text-warning border border-warning-subtle">Не завершена</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">Игр пока нет</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
