@@ -102,7 +102,10 @@ def new_item():
             return redirect(url_for("admin_shop.list_items"))
         return redirect(url_for("admin_shop.new_item"))
 
-    return render_template("admin_shop/form.html", item=None, categories=list(ShopCategory), rarities=list(Rarity))
+    return render_template(
+        "admin_shop/form.html", item=None, categories=list(ShopCategory), rarities=list(Rarity),
+        initial_type="custom", personalization_types=PERSONALIZATION_TYPES,
+    )
 
 
 @admin_shop_bp.route("/<int:item_id>/edit", methods=["GET", "POST"])
