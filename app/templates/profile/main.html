@@ -26,8 +26,8 @@
 <div class="profile-banner mb-4"
      {% if background %}style="background-image:url('{{ background.item.data.image_url or '' }}'); background-size:cover;"{% endif %}>
   <div class="d-flex align-items-center gap-3 flex-wrap">
-    <div class="avatar-circle {% if frame %}profile-frame{% if frame.item.data.effect == 'glow' %} fx-frame-glow{% elif frame.item.data.effect == 'rainbow' %} fx-frame-rainbow{% endif %}{% endif %}"
-         {% if frame and frame.item.data.color %}style="border-color:{{ frame.item.data.color }};--fx-color:{{ frame.item.data.color }}"{% endif %}>
+    <div class="avatar-circle {% if frame %}profile-frame{% if frame.item.data.theme %} fx-frame-themed fx-frame-theme-{{ frame.item.data.theme }}{% elif frame.item.data.effect == 'glow' %} fx-frame-glow{% endif %}{% endif %}"
+         {% if frame and frame.item.data.color and not frame.item.data.theme %}style="border-color:{{ frame.item.data.color }};--fx-color:{{ frame.item.data.color }}"{% endif %}>
       {% if profile.avatar_url %}
         <img src="{{ profile.avatar_url }}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
       {% else %}
@@ -37,10 +37,12 @@
     <div>
       <h2 class="mb-1 fw-bold">
         {% if nick_prefix %}<span class="me-1{% if nick_prefix.item.data.effect %} fx-badge-{{ nick_prefix.item.data.effect }}{% endif %}">{{ nick_prefix.item.data.text }}</span>{% endif %}
-        {% if nick_gradient and nick_gradient.item.data.effect == 'rainbow' %}
-        <span class="fx-nick-rainbow">{{ profile.player.display_name }}</span>
+        {% if nick_gradient and nick_gradient.item.data.theme %}
+        <span class="fx-nick-themed fx-nick-theme-{{ nick_gradient.item.data.theme }}">{{ profile.player.display_name }}</span>
         {% elif nick_gradient %}
         <span class="{% if nick_gradient.item.data.effect == 'shimmer' %}fx-nick-shimmer{% endif %}" style="background:linear-gradient(90deg,{{ nick_gradient.item.data.from }},{{ nick_gradient.item.data.to }});-webkit-background-clip:text;background-clip:text;color:transparent;">{{ profile.player.display_name }}</span>
+        {% elif nick_color and nick_color.item.data.theme %}
+        <span class="fx-nick-themed fx-nick-theme-{{ nick_color.item.data.theme }}">{{ profile.player.display_name }}</span>
         {% elif nick_color %}
         <span class="{% if nick_color.item.data.effect == 'glow' %}fx-nick-glow{% endif %}" style="color:{{ nick_color.item.data.color }};--fx-color:{{ nick_color.item.data.color }}">{{ profile.player.display_name }}</span>
         {% else %}
