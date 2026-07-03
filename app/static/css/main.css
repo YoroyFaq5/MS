@@ -636,6 +636,134 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   animation: fx-rainbow-shift 3s linear infinite;
 }
 
+/* 🌌 Galaxy — slow swirl + twinkling multi-color flicker (stars) */
+@keyframes fx-galaxy-twinkle {
+  0%, 100% { box-shadow: 0 0 8px 2px #6a0dad, 0 0 2px 1px #00d4ff; }
+  30%      { box-shadow: 0 0 14px 3px #ff2d95, 0 0 3px 1px #6a0dad; }
+  60%      { box-shadow: 0 0 10px 2px #00d4ff, 0 0 3px 1px #ff2d95; }
+  85%      { box-shadow: 0 0 16px 4px #6a0dad, 0 0 4px 2px #00d4ff; }
+}
+.fx-frame-theme-galaxy {
+  --fx-ring: conic-gradient(from 0deg, #1a0b3d, #6a0dad, #ff2d95, #00d4ff, #1a0b3d);
+  --fx-ring-speed: 6s;
+  animation: fx-galaxy-twinkle 3s ease-in-out infinite;
+}
+.fx-nick-theme-galaxy {
+  --fx-text-gradient: linear-gradient(90deg, #6a0dad, #ff2d95, #00d4ff, #6a0dad);
+  animation: fx-rainbow-shift 4s ease-in-out infinite, fx-galaxy-text-twinkle 3s ease-in-out infinite;
+}
+@keyframes fx-galaxy-text-twinkle {
+  0%, 100% { text-shadow: 0 0 4px #6a0dad; }
+  40%      { text-shadow: 0 0 10px #ff2d95; }
+  70%      { text-shadow: 0 0 8px #00d4ff; }
+}
+
+/* 💎 Diamond — sharp bright glint flash on silver/white (faster, crisper than ice) */
+@keyframes fx-diamond-glint {
+  0%, 100% { box-shadow: 0 0 5px 1px #c0c0c0; }
+  15%      { box-shadow: 0 0 18px 4px #ffffff, 0 0 6px 2px #a0e9ff; }
+  30%      { box-shadow: 0 0 5px 1px #c0c0c0; }
+}
+.fx-frame-theme-diamond {
+  --fx-ring: conic-gradient(from 0deg, #ffffff, #c0c0c0, #a0e9ff, #ffffff, #c0c0c0, #ffffff);
+  --fx-ring-speed: 2.5s;
+  animation: fx-diamond-glint 1.8s ease-in-out infinite;
+}
+.fx-nick-theme-diamond {
+  --fx-text-gradient: linear-gradient(90deg, #ffffff, #c0c0c0, #a0e9ff, #ffffff);
+  animation: fx-rainbow-shift 1.6s linear infinite, fx-diamond-text-glint 1.8s ease-in-out infinite;
+}
+@keyframes fx-diamond-text-glint {
+  0%, 100% { text-shadow: 0 0 3px #c0c0c0; }
+  15%      { text-shadow: 0 0 10px #ffffff, 0 0 4px #a0e9ff; }
+  30%      { text-shadow: 0 0 3px #c0c0c0; }
+}
+
+/* 🩸 Blood — heartbeat double-thump rhythm, not a smooth pulse */
+@keyframes fx-blood-heartbeat {
+  0%, 100% { box-shadow: 0 0 5px 1px #4a0000; }
+  10%      { box-shadow: 0 0 16px 4px #ff0000; }
+  20%      { box-shadow: 0 0 5px 1px #4a0000; }
+  30%      { box-shadow: 0 0 20px 5px #ff0000; }
+  45%      { box-shadow: 0 0 5px 1px #4a0000; }
+}
+.fx-frame-theme-blood {
+  --fx-ring: conic-gradient(from 0deg, #4a0000, #8b0000, #ff0000, #4a0000);
+  --fx-ring-speed: 4s;
+  animation: fx-blood-heartbeat 1.8s ease-in-out infinite;
+}
+.fx-nick-theme-blood {
+  --fx-text-gradient: linear-gradient(90deg, #4a0000, #8b0000, #ff0000, #4a0000);
+  animation: fx-rainbow-shift 2s linear infinite, fx-blood-text-heartbeat 1.8s ease-in-out infinite;
+}
+@keyframes fx-blood-text-heartbeat {
+  0%, 100% { text-shadow: 0 0 3px #4a0000; }
+  10%      { text-shadow: 0 0 10px #ff0000; }
+  20%      { text-shadow: 0 0 3px #4a0000; }
+  30%      { text-shadow: 0 0 12px #ff0000; }
+  45%      { text-shadow: 0 0 3px #4a0000; }
+}
+
+/* 🐛 Glitch — RGB channel split + digital jitter (steps(), not eased —
+   deliberately jumpy/broken-looking, distinct mechanic from every other
+   theme: transform+filter jump instead of a glow pulse) */
+@keyframes fx-glitch-text {
+  0%, 89%, 100% { text-shadow: none; transform: translate(0,0) skew(0deg); }
+  90% { text-shadow: -2px 0 #ff0055, 2px 0 #00fff9; transform: translate(-1px,0) skew(-2deg); }
+  92% { text-shadow: 2px 0 #ff0055, -2px 0 #00fff9; transform: translate(1px,0) skew(2deg); }
+  94% { text-shadow: -1px 0 #ff0055, 1px 0 #00fff9; transform: translate(0,0) skew(0deg); }
+  96%, 100% { text-shadow: none; transform: translate(0,0); }
+}
+.fx-nick-theme-glitch {
+  --fx-text-gradient: linear-gradient(90deg, #00fff9, #ffffff, #ff0055, #00fff9);
+  animation: fx-rainbow-shift 3s linear infinite, fx-glitch-text 2.5s steps(1) infinite;
+  display: inline-block;
+}
+@keyframes fx-glitch-frame {
+  0%, 89%, 100% { transform: translate(0,0); filter: none; }
+  90% { transform: translate(-2px,1px); filter: hue-rotate(90deg); }
+  93% { transform: translate(2px,-1px); filter: hue-rotate(-90deg); }
+  96% { transform: translate(0,0); filter: none; }
+}
+.fx-frame-theme-glitch {
+  --fx-ring: conic-gradient(from 0deg, #00fff9, #ff0055, #ffffff, #00fff9);
+  --fx-ring-speed: 4s;
+  animation: fx-glitch-frame 2.5s steps(1) infinite;
+}
+
+/* 🌈 Aurora — slow dreamy flowing pastel-neon (calmer, softer than Rainbow) */
+@keyframes fx-aurora-glow {
+  0%, 100% { box-shadow: 0 0 8px 2px #00ffa2; }
+  33%      { box-shadow: 0 0 14px 3px #00c2ff; }
+  66%      { box-shadow: 0 0 14px 3px #b967ff; }
+}
+.fx-frame-theme-aurora {
+  --fx-ring: conic-gradient(from 0deg, #00ffa2, #00c2ff, #b967ff, #00ffa2);
+  --fx-ring-speed: 8s;
+  animation: fx-aurora-glow 4s ease-in-out infinite;
+}
+.fx-nick-theme-aurora {
+  --fx-text-gradient: linear-gradient(90deg, #00ffa2, #00c2ff, #b967ff, #00ffa2);
+  animation: fx-rainbow-shift 5s ease-in-out infinite;
+  text-shadow: 0 0 8px rgba(0,255,162,.4);
+}
+
+/* 🌀 Vortex — fast, high-energy psychedelic spin */
+@keyframes fx-vortex-pulse {
+  0%, 100% { box-shadow: 0 0 8px 2px #7000ff; }
+  50%      { box-shadow: 0 0 18px 5px #ff00e5, 0 0 6px 2px #00e5ff; }
+}
+.fx-frame-theme-vortex {
+  --fx-ring: conic-gradient(from 0deg, #ff00e5, #7000ff, #00e5ff, #ff00e5, #7000ff, #00e5ff, #ff00e5);
+  --fx-ring-speed: 0.9s;
+  animation: fx-vortex-pulse 1s ease-in-out infinite;
+}
+.fx-nick-theme-vortex {
+  --fx-text-gradient: linear-gradient(90deg, #ff00e5, #7000ff, #00e5ff, #ff00e5);
+  animation: fx-rainbow-shift 0.7s linear infinite;
+  text-shadow: 0 0 8px #7000ff;
+}
+
 @keyframes fx-bounce {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(-4px); }
