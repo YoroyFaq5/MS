@@ -348,6 +348,37 @@ def _shop_items() -> list:
             data={}, is_unique_purchase=False,
         ),
     ]
+
+    # ── Анимированные тематические эффекты (рамка + ник на каждую тему) ────
+    # Генерируются из THEMES вместо ручного перечисления 106 dict'ов —
+    # THEMES/THEME_ULTRA/THEME_EPIC_WAVE в admin_shop.py остаются
+    # единственным источником правды о том, какие темы вообще существуют.
+    from app.routes.admin_shop import THEMES, THEME_ULTRA, THEME_EPIC_WAVE
+
+    for code, label in THEMES:
+        if code in THEME_ULTRA:
+            tier = "ultra"
+        elif code in THEME_EPIC_WAVE:
+            tier = "epic_wave"
+        else:
+            tier = "mythic"
+        price = THEME_TIER_PRICE[tier]
+
+        items.append(dict(
+            name=f"Рамка «{label}»", category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="frame", rarity=Rarity.LEGENDARY if tier != "epic_wave" else Rarity.EPIC,
+            price=price,
+            description=f"Анимированная тематическая рамка профиля — {label}.",
+            data={"theme": code},
+        ))
+        items.append(dict(
+            name=f"Ник «{label}»", category=ShopCategory.NICKNAME,
+            subcategory="nick_gradient", rarity=Rarity.LEGENDARY if tier != "epic_wave" else Rarity.EPIC,
+            price=price,
+            description=f"Анимированное тематическое оформление никнейма — {label}.",
+            data={"theme": code},
+        ))
+
     return items
 
 
