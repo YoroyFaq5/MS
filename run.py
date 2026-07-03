@@ -378,6 +378,13 @@ def _shop_items() -> list:
             description=f"Анимированное тематическое оформление никнейма — {label}.",
             data={"theme": code},
         ))
+        items.append(dict(
+            name=f"Фон «{label}»", category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="background", rarity=Rarity.LEGENDARY if tier != "epic_wave" else Rarity.EPIC,
+            price=price,
+            description=f"Анимированный тематический фон профиля — {label}.",
+            data={"theme": code},
+        ))
 
     return items
 
