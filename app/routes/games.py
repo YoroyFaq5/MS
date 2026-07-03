@@ -255,9 +255,9 @@ def new_game():
         selected_ids = []
         for seat in range(1, TOTAL_PLAYERS + 1):
             pid_str = request.form.get(f"player_{seat}")
-            role_str = request.form.get(f"role_{seat}")
-            if not pid_str or not role_str:
-                errors.append(f"Место {seat}: игрок и роль обязательны.")
+            role_str = request.form.get(f"role_{seat}") or Role.CIVILIAN.value
+            if not pid_str:
+                errors.append(f"Место {seat}: игрок обязателен.")
                 continue
             try:
                 pid = int(pid_str)
