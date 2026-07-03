@@ -76,8 +76,14 @@
               {% if u.last_login_at %}{{ u.last_login_at.strftime('%d.%m.%Y') }}{% else %}—{% endif %}
             </td>
             <td class="text-end pe-4">
-              {% if u.id != current_user.id %}
               <div class="d-flex gap-1 justify-content-end">
+                <a href="{{ url_for('auth.admin_user_edit', user_id=u.id) }}"
+                   class="btn btn-sm btn-outline-primary" title="Изменить логин/пароль">
+                  <i class="bi bi-pencil"></i>
+                </a>
+              </div>
+              {% if u.id != current_user.id %}
+              <div class="d-flex gap-1 justify-content-end mt-1">
                 <form method="POST"
                       action="{{ url_for('auth.toggle_admin', user_id=u.id) }}"
                       onsubmit="return confirm('{{ 'Снять права администратора?' if u.is_admin else 'Назначить администратором?' }}')">
