@@ -137,7 +137,16 @@ def edit_item(item_id: int):
         flash(result.message, "success" if result.ok else "danger")
         return redirect(url_for("admin_shop.list_items"))
 
-    return render_template("admin_shop/form.html", item=item, categories=list(ShopCategory), rarities=list(Rarity))
+    initial_type = "custom"
+    for ptype, spec in PERSONALIZATION_TYPES.items():
+        if item.category.value == spec["category"] and item.subcategory == spec["subcategory"]:
+            initial_type = ptype
+            break
+
+    return render_template(
+        "admin_shop/form.html", item=item, categories=list(ShopCategory), rarities=list(Rarity),
+        initial_type=initial_type, personalization_types=PERSONALIZATION_TYPES,
+    )
 
 
 @admin_shop_bp.route("/<int:item_id>/deactivate", methods=["POST"])
