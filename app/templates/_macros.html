@@ -28,3 +28,43 @@
 {%- endif -%}
 {%- if nick_suffix %}<span class="ms-1{% if nick_suffix.item.data.effect %} fx-badge-{{ nick_suffix.item.data.effect }}{% endif %}">{{ nick_suffix.item.data.text }}</span>{% endif -%}
 {%- endmacro %}
+
+{#
+  Живой предпросмотр товара магазина — та же CSS-система тем/эффектов,
+  что и на настоящем профиле (fx-frame-theme-*/fx-nick-theme-*), но на
+  примере слова "Игрок" вместо реального ника. Не требует покупки/
+  экипировки — просто рендерит эффект по ShopItem.data напрямую.
+
+  item: объект ShopItem.
+#}
+{% macro shop_item_preview(item) -%}
+{%- set cat = item.category.value -%}
+{%- set sub = item.subcategory -%}
+{%- set d = item.data or {} -%}
+{%- if cat == 'profile_customization' and sub == 'frame' -%}
+<div class="avatar-circle profile-frame mx-auto{% if d.theme %} fx-frame-themed fx-frame-theme-{{ d.theme }}{% elif d.effect == 'glow' %} fx-frame-glow{% endif %}"
+     style="width:48px;height:48px;font-size:1.1rem;{% if d.color and not d.theme %}border-color:{{ d.color }};--fx-color:{{ d.color }};{% endif %}">П</div>
+{%- elif cat == 'profile_customization' and sub == 'background' -%}
+<div class="rounded" style="width:100%;height:52px;{% if d.image_url %}background-image:url('{{ d.image_url }}');background-size:cover;{% endif %}"></div>
+{%- elif cat == 'nickname' and sub == 'nick_gradient' -%}
+  {%- if d.theme -%}
+  <span class="fw-bold fx-nick-themed fx-nick-theme-{{ d.theme }}">Игрок</span>
+  {%- else -%}
+  <span class="fw-bold{% if d.effect == 'shimmer' %} fx-nick-shimmer{% endif %}" style="background:linear-gradient(90deg,{{ d.from }},{{ d.to }});-webkit-background-clip:text;background-clip:text;color:transparent;">Игрок</span>
+  {%- endif -%}
+{%- elif cat == 'nickname' and sub == 'nick_color' -%}
+  {%- if d.theme -%}
+  <span class="fw-bold fx-nick-themed fx-nick-theme-{{ d.theme }}">Игрок</span>
+  {%- else -%}
+  <span class="fw-bold{% if d.effect == 'glow' %} fx-nick-glow{% endif %}" style="color:{{ d.color }};--fx-color:{{ d.color }}">Игрок</span>
+  {%- endif -%}
+{%- elif cat == 'nickname' and sub == 'nick_prefix' -%}
+<span class="fw-bold"><span class="me-1{% if d.effect %} fx-badge-{{ d.effect }}{% endif %}">{{ d.text }}</span>Игрок</span>
+{%- elif cat == 'nickname' and sub == 'nick_suffix' -%}
+<span class="fw-bold">Игрок<span class="ms-1{% if d.effect %} fx-badge-{{ d.effect }}{% endif %}">{{ d.text }}</span></span>
+{%- elif item.image_url -%}
+<img src="{{ item.image_url }}" alt="" style="max-width:100%;max-height:52px;border-radius:var(--ms-radius);">
+{%- else -%}
+<i class="bi bi-box-seam fs-2 text-muted opacity-50"></i>
+{%- endif -%}
+{%- endmacro %}

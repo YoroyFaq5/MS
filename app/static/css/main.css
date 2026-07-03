@@ -383,6 +383,12 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   font-size: 1.5rem; font-weight: 700; flex-shrink: 0;
 }
 
+/* Косметическая рамка вокруг аватара (профиль + предпросмотр в магазине) */
+.profile-frame {
+  border: 3px solid var(--ms-border);
+  border-radius: 50%;
+}
+
 .avatar-sm {
   width: 28px; height: 28px; border-radius: 50%;
   background: var(--ms-gold); color: #0D0D0D;

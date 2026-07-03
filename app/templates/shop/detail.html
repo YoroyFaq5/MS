@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import shop_item_preview %}
 {% block title %}{{ item.name }} — Магазин{% endblock %}
 
 {% block content %}
@@ -14,6 +15,9 @@
   <div class="col-lg-6">
     <div class="card rarity-{{ item.rarity.value }}">
       <div class="card-body p-4">
+        <div class="d-flex align-items-center justify-content-center mb-4 py-4" style="background:var(--ms-surface-raised);border-radius:var(--ms-radius);overflow:hidden;">
+          <div style="transform:scale(1.6);">{{ shop_item_preview(item) }}</div>
+        </div>
         <div class="d-flex justify-content-between align-items-start mb-2">
           <h3 class="fw-bold mb-0">{{ item.name }}</h3>
           <span class="badge {{ RARITY_BADGE.get(item.rarity.value, 'bg-secondary') }}">
