@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from app import db
 from app.models import Player
 from app.services import RatingService
+from app.services.economy_service import EconomyService
 from app.auth_decorators import admin_required
 
 players_bp = Blueprint("players", __name__)
@@ -32,6 +33,7 @@ def add_player():
         player = Player(nickname=nickname, name=name)
         db.session.add(player)
         db.session.commit()
+        EconomyService.grant_welcome_bonus(player)
         flash(f"Игрок «{player.nickname}» добавлен.", "success")
         return redirect(url_for("players.list_players"))
 

@@ -266,6 +266,21 @@ def admin_economy_adjust():
     return redirect(url_for("auth.admin_economy"))
 
 
+@auth_bp.route("/admin/economy/reset-all", methods=["POST"])
+@admin_required
+def admin_economy_reset_all():
+    from app.services.economy_service import EconomyService
+
+    confirm = request.form.get("confirm_reset", "")
+    if confirm != "ОБНУЛИТЬ":
+        flash("Сброс не выполнен — подтверждение не совпало.", "danger")
+        return redirect(url_for("auth.admin_economy"))
+
+    result = EconomyService.reset_all_balances()
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("auth.admin_economy"))
+
+
 @auth_bp.route("/admin/economy/fantasy-settings", methods=["POST"])
 @admin_required
 def admin_economy_fantasy_settings():

@@ -148,6 +148,7 @@ def players_quick_create():
     player = Player(nickname=nickname, name=nickname)
     db.session.add(player)
     db.session.commit()
+    EconomyService.grant_welcome_bonus(player)
     return _ok(player.to_dict(), f"Игрок «{nickname}» создан.")
 
 

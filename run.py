@@ -36,10 +36,33 @@ def seed_players():
 
 @app.cli.command("seed-shop")
 def seed_shop():
-    """Seed example ShopItem rows across all 3 categories. Re-run-safe."""
+    """Seed ShopItem rows across all 3 categories. Re-run-safe.
+    Subcategories match exactly what app/templates/profile/main.html reads
+    from item.data — see profile_customization:{frame,background} and
+    nickname:{nick_color,nick_gradient,nick_prefix,nick_suffix}."""
+    from urllib.parse import quote
     from app.models import ShopItem, ShopCategory, Rarity
 
+    def _gradient_bg(c1: str, c2: str) -> str:
+        """
+        Inline SVG gradient as a data: URI — no external image hosting needed.
+        Fully percent-encoded (not just '#'/' ') — the SVG itself uses single
+        quotes for its own attributes, and the template embeds this URI inside
+        a single-quoted CSS url('...'); an unescaped ' here would prematurely
+        close that CSS string and break the background entirely.
+        """
+        svg = (
+            "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='200'>"
+            "<defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>"
+            f"<stop offset='0%' stop-color='{c1}'/>"
+            f"<stop offset='100%' stop-color='{c2}'/>"
+            "</linearGradient></defs>"
+            "<rect width='400' height='200' fill='url(#g)'/></svg>"
+        )
+        return "data:image/svg+xml," + quote(svg, safe="")
+
     items = [
+        # ── Рамки профиля (profile_customization:frame) ──────────────────────
         dict(
             name="Золотая рамка", category=ShopCategory.PROFILE_CUSTOMIZATION,
             subcategory="frame", rarity=Rarity.LEGENDARY, price=500.0,
@@ -47,11 +70,87 @@ def seed_shop():
             data={"color": "#fbbf24"},
         ),
         dict(
+            name="Серебряная рамка", category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="frame", rarity=Rarity.RARE, price=200.0,
+            description="Серебряная рамка вокруг аватара.",
+            data={"color": "#c0c0c0"},
+        ),
+        dict(
+            name="Бронзовая рамка", category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="frame", rarity=Rarity.COMMON, price=80.0,
+            description="Бронзовая рамка вокруг аватара.",
+            data={"color": "#cd7f32"},
+        ),
+        dict(
+            name="Рубиновая рамка", category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="frame", rarity=Rarity.EPIC, price=350.0,
+            description="Рубиновая рамка вокруг аватара.",
+            data={"color": "#e11d48"},
+        ),
+        dict(
+            name="Изумрудная рамка", category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="frame", rarity=Rarity.EPIC, price=350.0,
+            description="Изумрудная рамка вокруг аватара.",
+            data={"color": "#10b981"},
+        ),
+        dict(
+            name="Сапфировая рамка", category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="frame", rarity=Rarity.EPIC, price=350.0,
+            description="Сапфировая рамка вокруг аватара.",
+            data={"color": "#3b82f6"},
+        ),
+        dict(
+            name="Аметистовая рамка", category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="frame", rarity=Rarity.EPIC, price=350.0,
+            description="Аметистовая рамка вокруг аватара.",
+            data={"color": "#a855f7"},
+        ),
+        dict(
+            name="Огненная рамка", category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="frame", rarity=Rarity.LEGENDARY, price=600.0,
+            description="Ярко-оранжевая рамка вокруг аватара.",
+            data={"color": "#ff6b35"},
+        ),
+
+        # ── Фоны профиля (profile_customization:background) ──────────────────
+        dict(
             name='Тёмный фон "Ночь города"', category=ShopCategory.PROFILE_CUSTOMIZATION,
             subcategory="background", rarity=Rarity.EPIC, price=300.0,
-            description="Атмосферный фон профиля.",
-            data={"image_url": ""},
+            description="Атмосферный тёмный фон профиля.",
+            data={"image_url": _gradient_bg("#0f172a", "#1e293b")},
         ),
+        dict(
+            name='Фон "Закат"', category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="background", rarity=Rarity.EPIC, price=300.0,
+            description="Оранжево-красный градиентный фон профиля.",
+            data={"image_url": _gradient_bg("#f97316", "#e03535")},
+        ),
+        dict(
+            name='Фон "Океан"', category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="background", rarity=Rarity.RARE, price=200.0,
+            description="Сине-голубой градиентный фон профиля.",
+            data={"image_url": _gradient_bg("#0ea5e9", "#1e3a8a")},
+        ),
+        dict(
+            name='Фон "Лес"', category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="background", rarity=Rarity.RARE, price=200.0,
+            description="Зелёный градиентный фон профиля.",
+            data={"image_url": _gradient_bg("#166534", "#4ade80")},
+        ),
+        dict(
+            name='Фон "Космос"', category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="background", rarity=Rarity.LEGENDARY, price=450.0,
+            description="Глубокий фиолетово-чёрный фон профиля.",
+            data={"image_url": _gradient_bg("#000000", "#4c1d95")},
+        ),
+        dict(
+            name='Фон "Рассвет"', category=ShopCategory.PROFILE_CUSTOMIZATION,
+            subcategory="background", rarity=Rarity.RARE, price=200.0,
+            description="Розово-жёлтый градиентный фон профиля.",
+            data={"image_url": _gradient_bg("#f472b6", "#fde047")},
+        ),
+
+        # ── Цвет ника (nickname:nick_color) ───────────────────────────────────
         dict(
             name="Ник цвета золота", category=ShopCategory.NICKNAME,
             subcategory="nick_color", rarity=Rarity.RARE, price=150.0,
@@ -59,14 +158,154 @@ def seed_shop():
             data={"color": "#fbbf24"},
         ),
         dict(
+            name="Ник цвета огня", category=ShopCategory.NICKNAME,
+            subcategory="nick_color", rarity=Rarity.RARE, price=150.0,
+            description="Никнейм окрашивается в огненно-красный цвет.",
+            data={"color": "#ef4444"},
+        ),
+        dict(
+            name="Ник цвета льда", category=ShopCategory.NICKNAME,
+            subcategory="nick_color", rarity=Rarity.RARE, price=150.0,
+            description="Никнейм окрашивается в ледяной голубой цвет.",
+            data={"color": "#38bdf8"},
+        ),
+        dict(
+            name="Ник цвета изумруда", category=ShopCategory.NICKNAME,
+            subcategory="nick_color", rarity=Rarity.RARE, price=150.0,
+            description="Никнейм окрашивается в изумрудный цвет.",
+            data={"color": "#10b981"},
+        ),
+        dict(
+            name="Ник цвета аметиста", category=ShopCategory.NICKNAME,
+            subcategory="nick_color", rarity=Rarity.RARE, price=150.0,
+            description="Никнейм окрашивается в фиолетовый цвет.",
+            data={"color": "#a855f7"},
+        ),
+        dict(
+            name="Ник цвета розового кварца", category=ShopCategory.NICKNAME,
+            subcategory="nick_color", rarity=Rarity.COMMON, price=100.0,
+            description="Никнейм окрашивается в нежно-розовый цвет.",
+            data={"color": "#f472b6"},
+        ),
+
+        # ── Градиент ника (nickname:nick_gradient) ────────────────────────────
+        dict(
             name='Градиент "Закат"', category=ShopCategory.NICKNAME,
             subcategory="nick_gradient", rarity=Rarity.EPIC, price=250.0,
             description="Градиентная раскраска никнейма.",
             data={"from": "#f97316", "to": "#e03535"},
         ),
         dict(
+            name='Градиент "Океан"', category=ShopCategory.NICKNAME,
+            subcategory="nick_gradient", rarity=Rarity.EPIC, price=250.0,
+            description="Сине-фиолетовая градиентная раскраска никнейма.",
+            data={"from": "#0ea5e9", "to": "#6366f1"},
+        ),
+        dict(
+            name='Градиент "Огонь и лёд"', category=ShopCategory.NICKNAME,
+            subcategory="nick_gradient", rarity=Rarity.LEGENDARY, price=400.0,
+            description="Контрастная красно-голубая раскраска никнейма.",
+            data={"from": "#ef4444", "to": "#38bdf8"},
+        ),
+        dict(
+            name='Градиент "Северное сияние"', category=ShopCategory.NICKNAME,
+            subcategory="nick_gradient", rarity=Rarity.LEGENDARY, price=400.0,
+            description="Зелёно-фиолетовая раскраска никнейма.",
+            data={"from": "#10b981", "to": "#a855f7"},
+        ),
+        dict(
+            name='Градиент "Золото"', category=ShopCategory.NICKNAME,
+            subcategory="nick_gradient", rarity=Rarity.RARE, price=200.0,
+            description="Золотисто-янтарная раскраска никнейма.",
+            data={"from": "#fbbf24", "to": "#f59e0b"},
+        ),
+
+        # ── Префикс ника (nickname:nick_prefix) ───────────────────────────────
+        dict(
+            name="Префикс ⭐ Звезда", category=ShopCategory.NICKNAME,
+            subcategory="nick_prefix", rarity=Rarity.COMMON, price=80.0,
+            description="Значок перед никнеймом.",
+            data={"text": "⭐"},
+        ),
+        dict(
+            name="Префикс 🔥 Огонь", category=ShopCategory.NICKNAME,
+            subcategory="nick_prefix", rarity=Rarity.COMMON, price=80.0,
+            description="Значок перед никнеймом.",
+            data={"text": "🔥"},
+        ),
+        dict(
+            name="Префикс 👑 Корона", category=ShopCategory.NICKNAME,
+            subcategory="nick_prefix", rarity=Rarity.EPIC, price=300.0,
+            description="Значок перед никнеймом.",
+            data={"text": "👑"},
+        ),
+        dict(
+            name="Префикс 💎 Бриллиант", category=ShopCategory.NICKNAME,
+            subcategory="nick_prefix", rarity=Rarity.LEGENDARY, price=500.0,
+            description="Значок перед никнеймом.",
+            data={"text": "💎"},
+        ),
+        dict(
+            name="Префикс ☠️ Череп", category=ShopCategory.NICKNAME,
+            subcategory="nick_prefix", rarity=Rarity.RARE, price=150.0,
+            description="Значок перед никнеймом.",
+            data={"text": "☠️"},
+        ),
+
+        # ── Суффикс ника (nickname:nick_suffix) ───────────────────────────────
+        dict(
+            name="Суффикс MVP", category=ShopCategory.NICKNAME,
+            subcategory="nick_suffix", rarity=Rarity.RARE, price=150.0,
+            description="Текст после никнейма.",
+            data={"text": "MVP"},
+        ),
+        dict(
+            name="Суффикс PRO", category=ShopCategory.NICKNAME,
+            subcategory="nick_suffix", rarity=Rarity.COMMON, price=80.0,
+            description="Текст после никнейма.",
+            data={"text": "PRO"},
+        ),
+        dict(
+            name="Суффикс GOD", category=ShopCategory.NICKNAME,
+            subcategory="nick_suffix", rarity=Rarity.LEGENDARY, price=500.0,
+            description="Текст после никнейма.",
+            data={"text": "GOD"},
+        ),
+        dict(
+            name="Суффикс ⚡", category=ShopCategory.NICKNAME,
+            subcategory="nick_suffix", rarity=Rarity.COMMON, price=80.0,
+            description="Значок после никнейма.",
+            data={"text": "⚡"},
+        ),
+
+        # ── Физический мерч (выдаётся вручную) ────────────────────────────────
+        dict(
             name="Клубная футболка", category=ShopCategory.PHYSICAL,
             subcategory="merch", rarity=Rarity.COMMON, price=1000.0,
+            description="Официальный мерч клуба. Выдаётся вручную администратором.",
+            data={}, is_unique_purchase=False,
+        ),
+        dict(
+            name="Клубное худи", category=ShopCategory.PHYSICAL,
+            subcategory="merch", rarity=Rarity.RARE, price=1800.0,
+            description="Официальный мерч клуба. Выдаётся вручную администратором.",
+            data={}, is_unique_purchase=False,
+        ),
+        dict(
+            name="Клубная кепка", category=ShopCategory.PHYSICAL,
+            subcategory="merch", rarity=Rarity.COMMON, price=700.0,
+            description="Официальный мерч клуба. Выдаётся вручную администратором.",
+            data={}, is_unique_purchase=False,
+        ),
+        dict(
+            name="Клубная кружка", category=ShopCategory.PHYSICAL,
+            subcategory="merch", rarity=Rarity.COMMON, price=500.0,
+            description="Официальный мерч клуба. Выдаётся вручную администратором.",
+            data={}, is_unique_purchase=False,
+        ),
+        dict(
+            name="Стикерпак клуба", category=ShopCategory.PHYSICAL,
+            subcategory="merch", rarity=Rarity.COMMON, price=200.0,
             description="Официальный мерч клуба. Выдаётся вручную администратором.",
             data={}, is_unique_purchase=False,
         ),

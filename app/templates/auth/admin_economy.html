@@ -58,6 +58,30 @@
       </div>
     </div>
 
+    <!-- Danger zone: reset all balances -->
+    <div class="card mt-4 border-danger">
+      <div class="card-header fw-semibold text-danger">⚠️ Опасная зона</div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Обнуляет баланс <strong>всех</strong> игроков и безвозвратно удаляет
+          <strong>всю историю транзакций</strong>. Отменить нельзя.
+        </p>
+        <form method="POST" action="{{ url_for('auth.admin_economy_reset_all') }}"
+              onsubmit="return confirm('Точно обнулить балансы ВСЕХ игроков и удалить ВСЮ историю транзакций? Это необратимо.');">
+          <div class="mb-3">
+            <label class="form-label small fw-medium">
+              Для подтверждения введите <code>ОБНУЛИТЬ</code>
+            </label>
+            <input type="text" name="confirm_reset" class="form-control" required
+                   placeholder="ОБНУЛИТЬ" autocomplete="off">
+          </div>
+          <button type="submit" class="btn btn-outline-danger w-100">
+            <i class="bi bi-exclamation-triangle me-1"></i>Обнулить балансы у всех
+          </button>
+        </form>
+      </div>
+    </div>
+
     <!-- Fantasy settings -->
     <div class="card mt-4">
       <div class="card-header fw-semibold">🎯 Настройки Fantasy Draft</div>
@@ -171,6 +195,8 @@
                     <span class="badge bg-dark-subtle text-dark border border-dark-subtle">🎯 Fantasy взнос</span>
                   {% elif src == 'admin_adjustment' %}
                     <span class="badge bg-danger-subtle text-danger border border-danger-subtle">⚙️ Админ</span>
+                  {% elif src == 'system_bonus' %}
+                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">🎁 Бонус</span>
                   {% else %}
                     <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">{{ src }}</span>
                   {% endif %}

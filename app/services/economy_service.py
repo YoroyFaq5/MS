@@ -71,6 +71,9 @@ FANTASY_SECOND_PLACE_SHARE_DEFAULT = 0.30
 # Anti-abuse: max coins a player can earn from games in a single day
 DAILY_GAME_REWARD_CAP   = 200.0
 
+# Стартовый бонус, начисляемый при создании нового Player.
+WELCOME_BONUS_AMOUNT = 100.0
+
 # ---------------------------------------------------------------------------
 # Result DTO
 # ---------------------------------------------------------------------------
@@ -202,6 +205,41 @@ class EconomyService:
             db.session.commit()
         return EconomyResult.success(
             f"Корректировка {'+' if amount >= 0 else ''}{amount}: {reason}", data=tx
+        )
+
+    @staticmethod
+    def grant_welcome_bonus(player: Player, commit: bool = True) -> EconomyResult:
+        """
+        Стартовый бонус новому игроку — единая точка входа, вызывается из
+        обоих мест создания Player (players.py::add_player,
+        api.py::players_quick_create). НЕ вызывается из миграции (там
+        баланс сознательно не переносится и не выставляется — см.
+        migration_service.py).
+        """
+        tx = EconomyService._record(
+            player, WELCOME_BONUS_AMOUNT, "Приветственный бонус новому игроку",
+            CoinSourceType.SYSTEM_BONUS,
+        )
+        if commit:
+            db.session.commit()
+        return EconomyResult.success(
+            f"Начислен приветственный бонус: {WELCOME_BONUS_AMOUNT} монет.", data=tx
+        )
+
+    @staticmethod
+    def reset_all_balances() -> EconomyResult:
+        """
+        Полный сброс экономики: удаляет ВСЮ историю CoinTransaction и
+        обнуляет Player.coins у всех игроков. Необратимо (в отличие от
+        остальной логики сервиса, которая ведёт неизменяемый леджер) —
+        осознанное решение по явному запросу администратора, не
+        вызывается автоматически ниоткуда.
+        """
+        tx_count = db.session.query(CoinTransaction).delete()
+        player_count = db.session.query(Player).update({Player.coins: 0.0})
+        db.session.commit()
+        return EconomyResult.success(
+            f"Баланс обнулён у {player_count} игроков, удалено записей истории: {tx_count}."
         )
 
     @staticmethod
