@@ -6,3 +6,20 @@ WARNING: This is a development server. Do not use it in a production deployment.
  * Running on http://198.18.0.1:5000
 Press CTRL+C to quit
 127.0.0.1 - - [04/Jul/2026 00:26:00] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [04/Jul/2026 00:26:11] "POST /auth/login HTTP/1.1" 302 -
+127.0.0.1 - - [04/Jul/2026 00:26:11] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [04/Jul/2026 00:26:11] "POST /admin/shop/new HTTP/1.1" 302 -
+127.0.0.1 - - [04/Jul/2026 00:26:11] "GET /admin/shop/ HTTP/1.1" 200 -
+127.0.0.1 - - [04/Jul/2026 00:26:11] "POST /admin/shop/new HTTP/1.1" 302 -
+127.0.0.1 - - [04/Jul/2026 00:26:11] "GET /admin/shop/ HTTP/1.1" 200 -
+127.0.0.1 - - [04/Jul/2026 00:26:11] "POST /admin/shop/new HTTP/1.1" 302 -
+127.0.0.1 - - [04/Jul/2026 00:26:11] "GET /admin/shop/ HTTP/1.1" 200 -
+127.0.0.1 - - [04/Jul/2026 00:26:11] "POST /admin/shop/new HTTP/1.1" 302 -
+127.0.0.1 - - [04/Jul/2026 00:26:11] "GET /admin/shop/ HTTP/1.1" 200 -
+127.0.0.1 - - [04/Jul/2026 00:26:41] "GET /profile/1 HTTP/1.1" 200 -
+127.0.0.1 - - [04/Jul/2026 00:26:57] "GET /profile/1 HTTP/1.1" 200 -
+127.0.0.1 - - [04/Jul/2026 00:27:15] "POST /auth/login HTTP/1.1" 302 -
+127.0.0.1 - - [04/Jul/2026 00:27:15] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [04/Jul/2026 00:27:15] "POST /admin/shop/new HTTP/1.1" 302 -
+127.0.0.1 - - [04/Jul/2026 00:27:15] "GET /admin/shop/ HTTP/1.1" 200 -
+127.0.0.1 - - [04/Jul/2026 00:27:15] "GET /admin/shop/1/edit HTTP/1.1" 200 -
