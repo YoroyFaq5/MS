@@ -74,7 +74,18 @@ class ShopService:
         if not item or not item.is_active:
             return ShopResult.fail("Товар не найден или недоступен.")
 
-        if item.is_unique_purchase:
+        if item.rarity in UNIQUE_RARITIES:
+            existing = ShopService.get_current_owner(item.id)
+            if existing:
+                if existing.player_id == player.id:
+                    return ShopResult.fail(f"«{item.name}» уже у вас.")
+                min_offer = existing.price_paid + MIN_BUYOUT_INCREMENT
+                return ShopResult.fail(
+                    f"«{item.name}» уже принадлежит другому игроку. "
+                    f"Это уникальный предмет — можно только перекупить дороже "
+                    f"(мин. {min_offer:.0f} монет)."
+                )
+        elif item.is_unique_purchase:
             owned = (
                 db.session.query(InventoryItem)
                 .filter_by(player_id=player.id, item_id=item.id)
@@ -106,6 +117,86 @@ class ShopService:
             logger.exception(f"Achievement check failed after purchase for player #{player.id}")
 
         return ShopResult.success(f"«{item.name}» куплен за {item.price:.0f} монет.", data=inv)
+
+    # ── Уникальные предметы (Mythic/Ultra) — перекуп ────────────────────────────
+
+    @staticmethod
+    def get_current_owner(item_id: int) -> Optional[InventoryItem]:
+        """Единственный (по построению) владелец Mythic/Ultra-предмета,
+        если он уже куплен — иначе None."""
+        return db.session.query(InventoryItem).filter_by(item_id=item_id).first()
+
+    @staticmethod
+    def buyout_item(challenger: Player, item_id: int, offer_price: float) -> ShopResult:
+        """
+        Перекупает уникальный (Mythic/Ultra) предмет у текущего владельца.
+        Требует offer_price >= цена_прошлого_владельца + MIN_BUYOUT_INCREMENT.
+        Прежний владелец получает RESALE_OWNER_SHARE от offer_price, остаток —
+        комиссия клуба (сгорает, как и обычная покупка). Владение переходит
+        сразу — старая InventoryItem удаляется (снимая её как экипированную
+        автоматически, вместе с записью), новая создаётся для покупателя.
+        """
+        item = db.session.get(ShopItem, item_id)
+        if not item or not item.is_active:
+            return ShopResult.fail("Товар не найден или недоступен.")
+        if item.rarity not in UNIQUE_RARITIES:
+            return ShopResult.fail("Перекуп доступен только для предметов редкости Mythic и Ultra.")
+
+        existing = ShopService.get_current_owner(item.id)
+        if not existing:
+            return ShopResult.fail("Этот предмет ещё никем не куплен — оформите обычную покупку.")
+        if existing.player_id == challenger.id:
+            return ShopResult.fail("Вы уже владеете этим предметом.")
+
+        min_offer = existing.price_paid + MIN_BUYOUT_INCREMENT
+        if offer_price < min_offer:
+            return ShopResult.fail(
+                f"Минимальная ставка — {min_offer:.0f} монет "
+                f"(текущая цена {existing.price_paid:.0f} + шаг {MIN_BUYOUT_INCREMENT:.0f})."
+            )
+
+        spend_result = EconomyService.spend_coins(
+            challenger, offer_price, f"Перекуп: {item.name}", commit=False
+        )
+        if not spend_result.ok:
+            return ShopResult.fail(spend_result.message)
+
+        previous_owner = db.session.get(Player, existing.player_id)
+        payout = round(offer_price * RESALE_OWNER_SHARE, 2)
+        if previous_owner and payout > 0:
+            EconomyService.add_coins(
+                previous_owner, payout,
+                f"«{item.name}» перекуплен игроком {challenger.display_name} за {offer_price:.0f}",
+                CoinSourceType.RESALE_PAYOUT, commit=False,
+            )
+
+        db.session.delete(existing)
+        db.session.flush()
+
+        new_inv = InventoryItem(
+            player_id=challenger.id,
+            item_id=item.id,
+            price_paid=offer_price,
+            source="buyout",
+        )
+        db.session.add(new_inv)
+        db.session.commit()
+        logger.info(
+            f"Player #{challenger.id} bought out ShopItem #{item.id} "
+            f"from player #{previous_owner.id if previous_owner else '?'} for {offer_price}"
+        )
+
+        try:
+            from app.services.achievement_service import AchievementService
+            AchievementService.check_after_purchase(challenger.id)
+        except Exception:
+            logger.exception(f"Achievement check failed after buyout for player #{challenger.id}")
+
+        return ShopResult.success(
+            f"Вы перекупили «{item.name}» за {offer_price:.0f} монет! "
+            f"Прежний владелец получил {payout:.0f}.",
+            data=new_inv,
+        )
 
     # ── Inventory ────────────────────────────────────────────────────────────
 
