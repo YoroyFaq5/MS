@@ -204,6 +204,38 @@ def toggle_active(user_id: int):
     return redirect(url_for("auth.admin_users"))
 
 
+@auth_bp.route("/admin/users/<int:user_id>/edit")
+@admin_required
+def admin_user_edit(user_id: int):
+    target = db.session.get(User, user_id) or abort(404)
+    return render_template("auth/admin_user_edit.html", target=target)
+
+
+@auth_bp.route("/admin/users/<int:user_id>/change-username", methods=["POST"])
+@admin_required
+def admin_change_username(user_id: int):
+    target = db.session.get(User, user_id) or abort(404)
+    result = AuthService.admin_change_username(
+        target, request.form.get("username", ""), current_user
+    )
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("auth.admin_user_edit", user_id=user_id))
+
+
+@auth_bp.route("/admin/users/<int:user_id>/reset-password", methods=["POST"])
+@admin_required
+def admin_reset_password(user_id: int):
+    target = db.session.get(User, user_id) or abort(404)
+    new_password = request.form.get("new_password", "")
+    confirm_password = request.form.get("confirm_password", "")
+    if new_password != confirm_password:
+        flash("Пароли не совпадают.", "danger")
+        return redirect(url_for("auth.admin_user_edit", user_id=user_id))
+    result = AuthService.admin_reset_password(target, new_password, current_user)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("auth.admin_user_edit", user_id=user_id))
+
+
 # ── API ───────────────────────────────────────────────────────────────────────
 
 @auth_bp.route("/api/me")
