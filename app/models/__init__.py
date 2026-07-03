@@ -617,6 +617,7 @@ class CoinSourceType(PyEnum):
     ADMIN_ADJUSTMENT   = "admin_adjustment"
     FANTASY_REWARD     = "fantasy_reward"
     PURCHASE           = "purchase"    # future
+    RESALE_PAYOUT      = "resale_payout"  # ShopService.buyout_item() — выплата прежнему владельцу
 
 
 class CoinTransaction(db.Model):

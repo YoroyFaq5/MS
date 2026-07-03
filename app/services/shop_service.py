@@ -19,10 +19,19 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 from app import db
-from app.models import Player, ShopItem, InventoryItem, ShopCategory
+from app.models import Player, ShopItem, InventoryItem, ShopCategory, Rarity, CoinSourceType
 from app.services.economy_service import EconomyService
 
 logger = logging.getLogger(__name__)
+
+# Mythic/Ultra — не "макс. 1 на игрока" (как обычный is_unique_purchase),
+# а ровно 1 экземпляр на весь клуб. Как только кто-то владеет им, его
+# больше нельзя купить обычной покупкой — только перекупить дороже через
+# buyout_item(). Прежний владелец получает часть суммы перекупа (не всю —
+# комиссия клуба), остальное сгорает, как и при обычной покупке.
+UNIQUE_RARITIES = {Rarity.MYTHIC, Rarity.ULTRA}
+MIN_BUYOUT_INCREMENT = 100.0
+RESALE_OWNER_SHARE = 0.8
 
 
 @dataclass
