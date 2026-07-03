@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Редактирование пользователя — Админ{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold">✏️ {{ target.username }}</h2>
+    <p class="text-muted small mb-0">Редактирование логина и пароля</p>
+  </div>
+  <a href="{{ url_for('auth.admin_users') }}" class="btn btn-outline-secondary btn-sm">← К списку</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Логин</h5>
+        <form method="POST" action="{{ url_for('auth.admin_change_username', user_id=target.id) }}">
+          <div class="mb-3">
+            <label class="form-label small text-muted">Новый логин</label>
+            <input type="text" name="username" class="form-control" value="{{ target.username }}"
+                   pattern="[a-zA-Z0-9_]{3,32}" required>
+            <div class="form-text">3–32 символа, только латиница/цифры/«_».</div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">Сохранить логин</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Сброс пароля</h5>
+        <p class="text-muted small">
+          Посмотреть текущий пароль нельзя — он хранится в хешированном виде.
+          Можно только задать новый.
+        </p>
+        <form method="POST" action="{{ url_for('auth.admin_reset_password', user_id=target.id) }}"
+              onsubmit="return confirm('Сбросить пароль пользователя «{{ target.username }}»?')">
+          <div class="mb-3">
+            <label class="form-label small text-muted">Новый пароль</label>
+            <input type="password" name="new_password" class="form-control" minlength="6" required autocomplete="new-password">
+          </div>
+          <div class="mb-3">
+            <label class="form-label small text-muted">Повторите пароль</label>
+            <input type="password" name="confirm_password" class="form-control" minlength="6" required autocomplete="new-password">
+          </div>
+          <button type="submit" class="btn btn-warning btn-sm">Сбросить пароль</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
