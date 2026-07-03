@@ -20,7 +20,7 @@
       <div class="fs-2 mb-1">🥈</div>
       <div class="fw-bold">{{ player_name(ratings[1], equipped_bulk.get(ratings[1].player_id, {})) }}</div>
       <div class="text-muted small">{{ ratings[1].games_played }} игр</div>
-      <div class="fs-5 fw-bold text-secondary mt-1">{{ ratings[1].total_score }}</div>
+      <div class="fs-5 fw-bold text-secondary mt-1">{{ ratings[1].total_score|round(2) }}</div>
     </div>
   </div>
   <!-- 1st -->
@@ -29,7 +29,7 @@
       <div class="fs-1 mb-1">🥇</div>
       <div class="fw-bold fs-5">{{ player_name(ratings[0], equipped_bulk.get(ratings[0].player_id, {})) }}</div>
       <div class="text-muted small">{{ ratings[0].games_played }} игр</div>
-      <div class="fs-4 fw-bold text-warning mt-1">{{ ratings[0].total_score }}</div>
+      <div class="fs-4 fw-bold text-warning mt-1">{{ ratings[0].total_score|round(2) }}</div>
     </div>
   </div>
   <!-- 3rd -->
@@ -38,7 +38,7 @@
       <div class="fs-2 mb-1">🥉</div>
       <div class="fw-bold">{{ player_name(ratings[2], equipped_bulk.get(ratings[2].player_id, {})) }}</div>
       <div class="text-muted small">{{ ratings[2].games_played }} игр</div>
-      <div class="fs-5 fw-bold mt-1" style="color:#cd7f32">{{ ratings[2].total_score }}</div>
+      <div class="fs-5 fw-bold mt-1" style="color:#cd7f32">{{ ratings[2].total_score|round(2) }}</div>
     </div>
   </div>
 </div>
@@ -89,8 +89,8 @@
                 <span class="text-muted small">{{ r.win_rate }}%</span>
               </div>
             </td>
-            <td class="text-center text-muted">{{ r.avg_score }}</td>
-            <td class="text-end pe-4 fw-bold text-success fs-6">{{ r.total_score }}</td>
+            <td class="text-center text-muted">{{ r.avg_score|round(2) }}</td>
+            <td class="text-end pe-4 fw-bold text-success fs-6">{{ r.total_score|round(2) }}</td>
           </tr>
           {% endfor %}
         </tbody>

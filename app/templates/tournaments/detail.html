@@ -277,7 +277,7 @@
               <td class="ps-3 text-muted">{{ r.rank }}</td>
               <td class="fw-medium">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
               <td class="text-center text-muted">{{ r.games_played }}</td>
-              <td class="text-end pe-3 fw-semibold text-success">{{ r.total_score }}</td>
+              <td class="text-end pe-3 fw-semibold text-success">{{ r.total_score|round(2) }}</td>
             </tr>
             {% endfor %}
           </tbody>

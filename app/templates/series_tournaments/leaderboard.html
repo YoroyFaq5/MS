@@ -20,7 +20,7 @@
       <div class="fs-2 mb-1">🥈</div>
       <div class="fw-bold">{{ player_name(overall[1], equipped_bulk.get(overall[1].player_id, {})) }}</div>
       <div class="text-muted small">{{ overall[1].series_played }} серий</div>
-      <div class="fs-5 fw-bold text-secondary mt-1">{{ overall[1].total_score }}</div>
+      <div class="fs-5 fw-bold text-secondary mt-1">{{ overall[1].total_score|round(2) }}</div>
     </div>
   </div>
   <div class="col-4 col-md-3 order-0 order-md-1">
@@ -28,7 +28,7 @@
       <div class="fs-1 mb-1">🥇</div>
       <div class="fw-bold fs-5">{{ player_name(overall[0], equipped_bulk.get(overall[0].player_id, {})) }}</div>
       <div class="text-muted small">{{ overall[0].series_played }} серий</div>
-      <div class="fs-4 fw-bold text-warning mt-1">{{ overall[0].total_score }}</div>
+      <div class="fs-4 fw-bold text-warning mt-1">{{ overall[0].total_score|round(2) }}</div>
     </div>
   </div>
   <div class="col-4 col-md-3 order-2">
@@ -36,7 +36,7 @@
       <div class="fs-2 mb-1">🥉</div>
       <div class="fw-bold">{{ player_name(overall[2], equipped_bulk.get(overall[2].player_id, {})) }}</div>
       <div class="text-muted small">{{ overall[2].series_played }} серий</div>
-      <div class="fs-5 fw-bold mt-1" style="color:#cd7f32">{{ overall[2].total_score }}</div>
+      <div class="fs-5 fw-bold mt-1" style="color:#cd7f32">{{ overall[2].total_score|round(2) }}</div>
     </div>
   </div>
 </div>
@@ -84,10 +84,10 @@
                 <span class="text-muted small">{{ e.win_rate }}%</span>
               </div>
             </td>
-            <td class="text-center text-muted">{{ e.avg_score_per_game }}</td>
-            <td class="text-center text-muted">{{ e.avg_score_per_series }}</td>
-            <td class="text-center text-muted">{{ e.bonus_points }}</td>
-            <td class="text-end pe-4 fw-bold text-success fs-6">{{ e.total_score }}</td>
+            <td class="text-center text-muted">{{ e.avg_score_per_game|round(2) }}</td>
+            <td class="text-center text-muted">{{ e.avg_score_per_series|round(2) }}</td>
+            <td class="text-center text-muted">{{ e.bonus_points|round(2) }}</td>
+            <td class="text-end pe-4 fw-bold text-success fs-6">{{ e.total_score|round(2) }}</td>
           </tr>
           {% endfor %}
         </tbody>

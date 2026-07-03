@@ -24,19 +24,19 @@
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">
     <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value">{{ stats.avg_score }}</div>
+      <div class="stat-value">{{ stats.avg_score|round(2) }}</div>
       <div class="stat-label">Ср. баллы за игру</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value text-success">{{ stats.best_score }}</div>
+      <div class="stat-value text-success">{{ stats.best_score|round(2) }}</div>
       <div class="stat-label">Лучший результат</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value text-danger">{{ stats.worst_score }}</div>
+      <div class="stat-value text-danger">{{ stats.worst_score|round(2) }}</div>
       <div class="stat-label">Худший результат</div>
     </div>
   </div>

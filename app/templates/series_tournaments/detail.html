@@ -161,7 +161,7 @@
                    class="text-decoration-none fw-medium">{{ player_name(e, equipped_bulk.get(e.player_id, {})) }}</a>
               </td>
               <td class="text-center text-muted">{{ e.series_played }}</td>
-              <td class="text-end pe-3 fw-semibold text-success">{{ e.total_score }}</td>
+              <td class="text-end pe-3 fw-semibold text-success">{{ e.total_score|round(2) }}</td>
             </tr>
             {% endfor %}
           </tbody>

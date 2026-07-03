@@ -72,7 +72,7 @@
               <td class="text-center text-muted">{{ r.games_played }}</td>
               <td class="text-center text-muted">{{ r.games_won }}</td>
               <td class="text-center text-muted">{{ r.win_rate }}%</td>
-              <td class="text-end pe-4 fw-semibold text-success">{{ r.total_score }}</td>
+              <td class="text-end pe-4 fw-semibold text-success">{{ r.total_score|round(2) }}</td>
             </tr>
             {% endfor %}
           </tbody>

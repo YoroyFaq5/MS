@@ -33,7 +33,7 @@
     </div>
     <div class="ms-auto text-end">
       <div class="text-muted small">Очки</div>
-      <div class="fw-bold fs-4 text-warning">{{ season.winner_score }}</div>
+      <div class="fw-bold fs-4 text-warning">{{ season.winner_score|round(2) }}</div>
     </div>
     {% if season.year_tournament_id %}
     <a href="{{ url_for('tournaments.tournament_detail', tournament_id=season.year_tournament_id) }}"

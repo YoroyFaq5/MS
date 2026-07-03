@@ -108,8 +108,8 @@
             <td class="fw-medium">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
             <td class="text-center text-muted">{{ r.games_played }}</td>
             <td class="text-center text-muted">{{ r.games_won }}</td>
-            <td class="text-center text-muted">{{ r.avg_score }}</td>
-            <td class="text-end pe-4 fw-bold text-success">{{ r.total_score }}</td>
+            <td class="text-center text-muted">{{ r.avg_score|round(2) }}</td>
+            <td class="text-end pe-4 fw-bold text-success">{{ r.total_score|round(2) }}</td>
           </tr>
           {% endfor %}
         </tbody>
