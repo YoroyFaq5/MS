@@ -237,7 +237,7 @@ function updatePreview() {
 
   if (t === 'frame') {
     if (theme) {
-      frame.classList.add('fx-frame-themed', `fx-frame-theme-${theme}`);
+      frame.classList.add('profile-frame', 'fx-frame-themed', `fx-frame-theme-${theme}`);
     } else {
       const color = document.querySelector('input[name=data_color]').value;
       frame.classList.add('profile-frame');
