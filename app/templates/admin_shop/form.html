@@ -273,9 +273,17 @@ function updatePreview() {
       ? `<span class="me-1 ${badgeClass}">${text}</span>Игрок`
       : `Игрок<span class="ms-1 ${badgeClass}">${text}</span>`;
   } else if (t === 'background') {
-    const url = document.querySelector('input[name=data_image_url]').value;
-    document.getElementById('previewBox').style.backgroundImage = url ? `url('${url}')` : '';
-    document.getElementById('previewBox').style.backgroundSize = 'cover';
+    const box = document.getElementById('previewBox');
+    box.classList.remove('fx-bg-themed');
+    box.className = box.className.replace(/fx-bg-theme-\S+/g, '');
+    box.style.backgroundImage = '';
+    if (theme) {
+      box.classList.add('fx-bg-themed', `fx-bg-theme-${theme}`);
+    } else {
+      const url = document.querySelector('input[name=data_image_url]').value;
+      box.style.backgroundImage = url ? `url('${url}')` : '';
+      box.style.backgroundSize = 'cover';
+    }
   }
 }
 
