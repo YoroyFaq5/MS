@@ -26,7 +26,7 @@ THEMES: list[tuple[str, str]] = [
     ("diamond", "💎 Алмаз"),
     ("blood", "🩸 Кровь"),
     ("glitch", "🐛 Глитч"),
-    ("aurora", "🌈 Аврора"),
+    ("aurora", "💫 Аврора"),
     ("vortex", "🌀 Портал"),
 ]
 
