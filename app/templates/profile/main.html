@@ -19,8 +19,8 @@
 {% set frame = profile.customization.get('profile_customization:frame') %}
 {% set background = profile.customization.get('profile_customization:background') %}
 
-<div class="profile-banner mb-4"
-     {% if background %}style="background-image:url('{{ background.item.data.image_url or '' }}'); background-size:cover;"{% endif %}>
+<div class="profile-banner mb-4{% if background and background.item.data.theme %} fx-bg-themed fx-bg-theme-{{ background.item.data.theme }}{% endif %}"
+     {% if background and background.item.data.image_url and not background.item.data.theme %}style="background-image:url('{{ background.item.data.image_url }}'); background-size:cover;"{% endif %}>
   <div class="d-flex align-items-center gap-3 flex-wrap">
     <div class="avatar-circle {% if frame %}profile-frame{% if frame.item.data.theme or frame.item.data.effect == 'rainbow' %} fx-frame-themed fx-frame-theme-{{ frame.item.data.theme or 'rainbow' }}{% elif frame.item.data.effect == 'glow' %} fx-frame-glow{% endif %}{% endif %}"
          {% if frame and frame.item.data.color and not frame.item.data.theme and frame.item.data.effect != 'rainbow' %}style="border-color:{{ frame.item.data.color }};--fx-color:{{ frame.item.data.color }}"{% endif %}>

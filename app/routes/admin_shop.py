@@ -94,7 +94,7 @@ PERSONALIZATION_TYPES: dict[str, dict] = {
     "frame":        {"category": "profile_customization", "subcategory": "frame",
                       "effects": ["", "glow"], "themes": True},
     "background":   {"category": "profile_customization", "subcategory": "background",
-                      "effects": [], "themes": False},
+                      "effects": [], "themes": True},
     "nick_color":   {"category": "nickname", "subcategory": "nick_color",
                       "effects": ["", "glow"], "themes": True},
     "nick_gradient": {"category": "nickname", "subcategory": "nick_gradient",
