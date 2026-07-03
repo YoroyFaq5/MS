@@ -72,7 +72,7 @@
           <span class="fs-4">🏆</span>
           <div>
             <div class="fw-semibold text-warning">{{ player_name(season.winner, equipped_bulk.get(season.winner.id, {})) }}</div>
-            <div class="text-muted small">{{ season.winner_score }} очков</div>
+            <div class="text-muted small">{{ season.winner_score|round(2) }} очков</div>
           </div>
         </div>
         {% elif season.status.value == 'waiting_tiebreak' %}
@@ -146,13 +146,13 @@
                 <span class="text-muted small">{{ r.win_rate }}%</span>
               </div>
             </td>
-            <td class="text-center text-muted">{{ r.avg_score }}</td>
+            <td class="text-center text-muted">{{ r.avg_score|round(2) }}</td>
             <td class="text-center">
               <span class="{% if r.elo > 1000 %}text-success{% elif r.elo < 1000 %}text-danger{% else %}text-muted{% endif %} small fw-medium">
                 {{ r.elo|round|int }}
               </span>
             </td>
-            <td class="text-end pe-4 fw-bold text-success">{{ r.total_score }}</td>
+            <td class="text-end pe-4 fw-bold text-success">{{ r.total_score|round(2) }}</td>
           </tr>
           {% endfor %}
         </tbody>

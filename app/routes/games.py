@@ -62,10 +62,62 @@ def _new_game_form_context(tournaments, preselect_tournament=None, preselect_sta
 
 # ── Public: просмотр ──────────────────────────────────────────────────────────
 
+GAMES_PER_PAGE = 12
+
+
 @games_bp.route("/")
 def list_games():
-    games = db.session.query(Game).order_by(Game.played_at.desc()).all()
-    return render_template("games/list.html", games=games)
+    from sqlalchemy import select
+    from datetime import datetime as dt
+
+    # Незавершённые игры — отдельно, простым списком сверху (их обычно 0-1,
+    # это рабочий инструмент админа "доиграть/завершить", а не архив).
+    pending_games = (
+        db.session.query(Game)
+        .filter(Game.is_finished == False)
+        .order_by(Game.played_at.desc())
+        .all()
+    )
+
+    # Доступные месяцы для фильтра — по датам завершённых игр.
+    finished_dates = [
+        d for (d,) in db.session.query(Game.played_at).filter(Game.is_finished == True).all()
+    ]
+    available_months = sorted({d.strftime("%Y-%m") for d in finished_dates}, reverse=True)
+
+    month = request.args.get("month")
+    query = db.session.query(Game).filter(Game.is_finished == True)
+    if month:
+        try:
+            start = dt.strptime(month, "%Y-%m")
+        except ValueError:
+            start = None
+        if start:
+            end = dt(start.year + 1, 1, 1) if start.month == 12 else dt(start.year, start.month + 1, 1)
+            query = query.filter(Game.played_at >= start, Game.played_at < end)
+    query = query.order_by(Game.played_at.desc())
+
+    page = request.args.get("page", 1, type=int)
+    pagination = db.paginate(query, page=page, per_page=GAMES_PER_PAGE, error_out=False)
+    finished_games = pagination.items
+
+    all_shown_games = pending_games + finished_games
+    slots_by_game = {
+        g.id: sorted(g.slots, key=lambda s: s.seat_number) for g in all_shown_games
+    }
+    player_ids = {s.player_id for slots in slots_by_game.values() for s in slots}
+    equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+
+    return render_template(
+        "games/list.html",
+        pending_games=pending_games,
+        finished_games=finished_games,
+        pagination=pagination,
+        slots_by_game=slots_by_game,
+        equipped_bulk=equipped_bulk,
+        available_months=available_months,
+        current_month=month,
+    )
 
 
 @games_bp.route("/<int:game_id>")

@@ -1,11 +1,95 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}Игры{% endblock %}
+
+{% block head %}
+<style>
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.game-box {
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  padding: 12px 12px 10px;
+}
+
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.game-meta-small {
+  font-size: 11px;
+  color: var(--ms-muted);
+  margin-bottom: 8px;
+}
+
+.games-grid table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.games-grid th {
+  padding: 5px;
+  background: var(--ms-surface-raised);
+  font-weight: 600;
+  color: var(--ms-muted);
+  text-align: left;
+}
+
+.games-grid td {
+  padding: 5px;
+  border-top: 1px solid var(--ms-border);
+  color: var(--ms-text);
+}
+
+.role-civilian { color: #B0B0B0; }
+.role-sheriff  { color: var(--ms-gold-light); }
+.role-don      { color: #8A7247; }
+.role-mafia    { color: var(--ms-wine-light); }
+
+/* PU — Первый Убиенный */
+.pu-row {
+  background: linear-gradient(90deg, var(--ms-gold-glow), transparent 70%);
+}
+.pu-row td:first-child {
+  position: relative;
+  padding-left: 14px;
+}
+.pu-row td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 4px; top: 0;
+  width: 3px; height: 100%;
+  background: var(--ms-gold-light);
+  border-radius: 2px;
+}
+.pu-mark {
+  margin-right: 4px;
+  cursor: help;
+}
+
+.game-actions {
+  margin-top: 6px;
+  text-align: right;
+}
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h2 class="mb-0 fw-bold">🎮 Игры</h2>
-    <p class="text-muted small mb-0">{{ games|length }} записей</p>
+    <p class="text-muted small mb-0">{{ pagination.total }} завершённых записей</p>
   </div>
   {% if current_user.is_admin %}
   <a href="{{ url_for('games.new_game') }}" class="btn btn-danger">
@@ -14,9 +98,10 @@
   {% endif %}
 </div>
 
-<div class="card">
+{% if pending_games %}
+<div class="card mb-4">
+  <div class="card-header fw-semibold">⏳ В процессе ({{ pending_games|length }})</div>
   <div class="card-body p-0">
-    {% if games %}
     <div class="table-responsive">
       <table class="table table-hover mb-0 align-middle">
         <thead>
@@ -24,59 +109,131 @@
             <th class="ps-4">№</th>
             <th>Дата</th>
             <th class="text-center">Игроков</th>
-            <th class="text-center">Победитель</th>
-            <th class="text-center">Статус</th>
             <th class="text-end pe-4">Действия</th>
           </tr>
         </thead>
         <tbody>
-          {% for game in games %}
+          {% for game in pending_games %}
           <tr>
             <td class="ps-4 text-muted">#{{ game.id }}</td>
             <td class="fw-medium">{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</td>
-            <td class="text-center text-muted">{{ game.player_count }}</td>
-            <td class="text-center">
-              {% if game.win_side.value == 'mafia' %}<span class="badge bg-danger">🔫 Мафия</span>
-              {% elif game.win_side.value == 'city' %}<span class="badge bg-success">🏙 Город</span>
-              {% else %}<span class="badge bg-secondary">—</span>{% endif %}
-            </td>
-            <td class="text-center">
-              {% if game.is_finished %}
-                <span class="badge bg-success-subtle text-success border border-success-subtle">Завершена</span>
-              {% else %}
-                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">В процессе</span>
-              {% endif %}
-            </td>
+            <td class="text-center text-muted">{{ slots_by_game.get(game.id, [])|length }}</td>
             <td class="text-end pe-4">
-              <div class="btn-group btn-group-sm">
-                <a href="{{ url_for('games.game_detail', game_id=game.id) }}"
-                   class="btn btn-outline-secondary">
-                  <i class="bi bi-eye"></i>
-                </a>
-                {% if current_user.is_admin %}
-                <form method="POST" action="{{ url_for('games.delete_game', game_id=game.id) }}"
-                      class="d-inline" onsubmit="return confirm('Удалить игру #{{ game.id }}?')">
-                  <button type="submit" class="btn btn-outline-danger">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </form>
-                {% endif %}
-              </div>
+              <a href="{{ url_for('games.game_detail', game_id=game.id) }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-eye"></i>
+              </a>
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    {% else %}
-    <div class="text-center text-muted py-5">
-      <i class="bi bi-controller fs-1 d-block mb-3 opacity-25"></i>
-      <p class="mb-3">Игр пока нет</p>
-      {% if current_user.is_admin %}
-      <a href="{{ url_for('games.new_game') }}" class="btn btn-danger">Начать первую игру</a>
+  </div>
+</div>
+{% endif %}
+
+{% if available_months %}
+<form method="GET" class="d-flex align-items-center gap-2 mb-3">
+  <label class="text-muted small">Месяц:</label>
+  <select name="month" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()">
+    <option value="">Все</option>
+    {% for m in available_months %}
+    <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ m }}</option>
+    {% endfor %}
+  </select>
+</form>
+{% endif %}
+
+{% if finished_games %}
+<div class="games-grid">
+  {% for game in finished_games %}
+  <div class="game-box">
+    <div class="game-header">
+      <span><i class="bi bi-calendar3 me-1"></i>{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</span>
+      {% if game.win_side.value == 'mafia' %}
+        <span class="badge bg-danger">🔫 Мафия</span>
+      {% elif game.win_side.value == 'city' %}
+        <span class="badge bg-success">🏙 Город</span>
+      {% else %}
+        <span class="badge bg-secondary">—</span>
       {% endif %}
+    </div>
+    <div class="game-meta-small">Игра #{{ game.id }}</div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Игрок</th>
+          <th>Роль</th>
+          <th>Балл</th>
+          <th>ELO</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for slot in slots_by_game.get(game.id, []) %}
+        <tr class="{% if slot.is_pu %}pu-row{% endif %}">
+          <td>{{ slot.seat_number }}</td>
+          <td>
+            {% if slot.is_pu %}<span class="pu-mark" title="Первый убиенный">☠</span>{% endif %}
+            {{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}
+          </td>
+          <td class="role-{{ slot.role.value }}">
+            {% if slot.role.value == 'civilian' %}Мирный
+            {% elif slot.role.value == 'sheriff' %}Шериф
+            {% elif slot.role.value == 'don' %}Дон
+            {% elif slot.role.value == 'mafia' %}Мафия
+            {% endif %}
+          </td>
+          <td>{{ slot.total_score|round(2) }}</td>
+          <td class="{% if slot.elo_after and slot.elo_after > 1000 %}text-success{% elif slot.elo_after and slot.elo_after < 1000 %}text-danger{% else %}text-muted{% endif %}">
+            {{ slot.elo_after|round|int if slot.elo_after is not none else '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if current_user.is_admin %}
+    <div class="game-actions">
+      <a href="{{ url_for('games.game_detail', game_id=game.id) }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-eye"></i>
+      </a>
+      <form method="POST" action="{{ url_for('games.delete_game', game_id=game.id) }}"
+            class="d-inline" onsubmit="return confirm('Удалить игру #{{ game.id }}?')">
+        <button type="submit" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-trash"></i>
+        </button>
+      </form>
     </div>
     {% endif %}
   </div>
+  {% endfor %}
 </div>
+
+{% if pagination.pages > 1 %}
+<nav class="mt-4">
+  <ul class="pagination justify-content-center">
+    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+      <a class="page-link" href="{{ url_for('games.list_games', page=pagination.prev_num, month=current_month) }}">←</a>
+    </li>
+    <li class="page-item disabled">
+      <span class="page-link">{{ pagination.page }} / {{ pagination.pages }}</span>
+    </li>
+    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+      <a class="page-link" href="{{ url_for('games.list_games', page=pagination.next_num, month=current_month) }}">→</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-controller fs-1 d-block mb-3 opacity-25"></i>
+  <p class="mb-3">{% if current_month %}Нет завершённых игр за этот месяц{% else %}Игр пока нет{% endif %}</p>
+  {% if current_user.is_admin and not current_month %}
+  <a href="{{ url_for('games.new_game') }}" class="btn btn-danger">Начать первую игру</a>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}
