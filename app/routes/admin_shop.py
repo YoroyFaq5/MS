@@ -73,6 +73,19 @@ THEMES: list[tuple[str, str]] = [
     ("divine", "👑 Золото императора ULTRA"),
 ]
 
+# Уровни тем — единственное место, где это решается (run.py::_shop_items()
+# читает эти множества, чтобы назначить цену/редкость сгенерированным
+# товарам магазина; ничего не дублируется вручную).
+THEME_ULTRA: set[str] = {
+    "void", "aurora", "event_horizon", "thunder_god", "phoenix",
+    "dragon", "cosmos", "meteor", "arcane", "divine",
+}
+THEME_EPIC_WAVE: set[str] = {
+    "fire", "ice", "electric", "toxic", "shadow", "holy",
+    "rainbow", "galaxy", "diamond", "blood", "glitch", "vortex",
+}
+# Всё остальное в THEMES — "Mythic" волна (второй по цене уровень).
+
 # Известные типы персонализации → (category, subcategory, допустимые
 # "свои" эффекты для режима без темы, доступны ли темы).
 # "custom" — произвольный товар (мерч и т.п.), category/subcategory берутся
