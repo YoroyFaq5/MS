@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-lg-6">
+  <div class="col-lg-7">
     <div class="mb-4">
       <h2 class="fw-bold mb-0">
         {% if item %}✏️ Редактировать товар{% else %}➕ Новый товар{% endif %}
@@ -13,7 +13,7 @@
 
     <div class="card">
       <div class="card-body p-4">
-        <form method="POST">
+        <form method="POST" id="itemForm">
           <div class="mb-3">
             <label class="form-label fw-medium">Название <span class="text-danger">*</span></label>
             <input type="text" name="name" class="form-control" value="{{ item.name if item else '' }}" required>
@@ -24,15 +24,90 @@
             <textarea name="description" class="form-control" rows="2">{{ item.description if item else '' }}</textarea>
           </div>
 
-          <div class="row g-3 mb-3">
+          <div class="mb-3">
+            <label class="form-label fw-medium">Тип персонализации <span class="text-danger">*</span></label>
+            <select name="personalization_type" id="ptype" class="form-select">
+              <option value="frame" {% if initial_type == 'frame' %}selected{% endif %}>🖼️ Рамка профиля</option>
+              <option value="background" {% if initial_type == 'background' %}selected{% endif %}>🌌 Фон профиля</option>
+              <option value="nick_color" {% if initial_type == 'nick_color' %}selected{% endif %}>🎨 Цвет ника</option>
+              <option value="nick_gradient" {% if initial_type == 'nick_gradient' %}selected{% endif %}>🌈 Градиент ника</option>
+              <option value="nick_prefix" {% if initial_type == 'nick_prefix' %}selected{% endif %}>⭐ Префикс ника (значок слева)</option>
+              <option value="nick_suffix" {% if initial_type == 'nick_suffix' %}selected{% endif %}>⭐ Суффикс ника (значок справа)</option>
+              <option value="custom" {% if initial_type == 'custom' %}selected{% endif %}>📦 Другое (мерч и т.п.)</option>
+            </select>
+            <div class="form-text">Определяет, где и как эффект применится — категория и слот экипировки выставляются автоматически.</div>
+          </div>
+
+          {# ── Поля "Другое" (мерч и т.п.) ─────────────────────────────── #}
+          <div id="fields-custom" class="row g-3 mb-3 personalization-fields">
             <div class="col-6">
-              <label class="form-label fw-medium">Категория <span class="text-danger">*</span></label>
-              <select name="category" class="form-select" required>
+              <label class="form-label fw-medium">Категория</label>
+              <select name="category" class="form-select">
                 {% for cat in categories %}
                 <option value="{{ cat.value }}" {% if item and item.category == cat %}selected{% endif %}>{{ cat.value }}</option>
                 {% endfor %}
               </select>
             </div>
+            <div class="col-6">
+              <label class="form-label fw-medium">Подкатегория (слот)</label>
+              <input type="text" name="subcategory_custom" class="form-control"
+                     value="{{ item.subcategory if item and initial_type == 'custom' else '' }}"
+                     placeholder="merch, ticket…">
+            </div>
+          </div>
+
+          {# ── Цвет (рамка, цвет ника) ──────────────────────────────────── #}
+          <div id="fields-color" class="mb-3 personalization-fields">
+            <label class="form-label fw-medium">Цвет</label>
+            <input type="color" name="data_color" class="form-control form-control-color"
+                   value="{{ item.data.color if item and item.data.color else '#C7A552' }}">
+          </div>
+
+          {# ── Градиент (2 цвета) ───────────────────────────────────────── #}
+          <div id="fields-gradient" class="row g-3 mb-3 personalization-fields">
+            <div class="col-6">
+              <label class="form-label fw-medium">Цвет 1</label>
+              <input type="color" name="data_from" class="form-control form-control-color"
+                     value="{{ item.data.from if item and item.data.from else '#C7A552' }}">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-medium">Цвет 2</label>
+              <input type="color" name="data_to" class="form-control form-control-color"
+                     value="{{ item.data.to if item and item.data.to else '#7B0F0F' }}">
+            </div>
+          </div>
+
+          {# ── Текст префикса/суффикса ──────────────────────────────────── #}
+          <div id="fields-text" class="mb-3 personalization-fields">
+            <label class="form-label fw-medium">Текст значка (эмодзи или короткое слово)</label>
+            <input type="text" name="data_text" class="form-control" maxlength="20"
+                   value="{{ item.data.text if item and item.data.text else '' }}" placeholder="👑 или MVP">
+          </div>
+
+          {# ── Фон (URL картинки) ───────────────────────────────────────── #}
+          <div id="fields-background" class="mb-3 personalization-fields">
+            <label class="form-label fw-medium">Ссылка на фоновую картинку</label>
+            <input type="text" name="data_image_url" class="form-control"
+                   value="{{ item.data.image_url if item and item.data.image_url else '' }}"
+                   placeholder="https://…">
+          </div>
+
+          {# ── Эффект (анимация) ────────────────────────────────────────── #}
+          <div id="fields-effect" class="mb-3 personalization-fields">
+            <label class="form-label fw-medium">Эффект</label>
+            <select name="data_effect" id="effectSelect" class="form-select"></select>
+          </div>
+
+          {# ── Живое превью ─────────────────────────────────────────────── #}
+          <div id="previewBox" class="mb-4 p-4 rounded text-center personalization-fields" style="background:var(--ms-surface-raised)">
+            <div class="text-muted small mb-2">Превью</div>
+            <div id="previewFrame" class="avatar-circle mx-auto mb-2" style="width:64px;height:64px;font-size:1.5rem;">
+              П
+            </div>
+            <div id="previewNick" class="fw-bold fs-5">Игрок</div>
+          </div>
+
+          <div class="row g-3 mb-3">
             <div class="col-6">
               <label class="form-label fw-medium">Редкость</label>
               <select name="rarity" class="form-select">
@@ -41,19 +116,6 @@
                 {% endfor %}
               </select>
             </div>
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label fw-medium">Подкатегория (слот) <span class="text-danger">*</span></label>
-            <input type="text" name="subcategory" class="form-control"
-                   value="{{ item.subcategory if item else '' }}"
-                   placeholder="frame, background, nick_color, nick_gradient, merch…" required>
-            <div class="form-text">
-              Определяет equip-слот. Товары с одинаковой категорией+подкатегорией взаимоисключающи при экипировке.
-            </div>
-          </div>
-
-          <div class="row g-3 mb-3">
             <div class="col-6">
               <label class="form-label fw-medium">Цена <span class="text-danger">*</span></label>
               <div class="input-group">
@@ -62,10 +124,11 @@
                 <span class="input-group-text">🪙</span>
               </div>
             </div>
-            <div class="col-6">
-              <label class="form-label fw-medium">Ссылка на изображение</label>
-              <input type="text" name="image_url" class="form-control" value="{{ item.image_url if item else '' }}">
-            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-medium">Ссылка на изображение товара (иконка в магазине)</label>
+            <input type="text" name="image_url" class="form-control" value="{{ item.image_url if item else '' }}">
           </div>
 
           <div class="form-check mb-4">
@@ -87,4 +150,113 @@
     </div>
   </div>
 </div>
+
+<script>
+const PTYPES = {{ personalization_types | tojson }};
+const EFFECT_LABELS = {
+  "": "— без эффекта —",
+  glow: "✨ Свечение (пульсация)",
+  rainbow: "🌈 Радуга (анимация)",
+  shimmer: "💫 Переливание",
+  bounce: "🦘 Подпрыгивание",
+  pulse: "💓 Пульсация",
+  shake: "〰️ Дрожание",
+};
+
+const ptypeSelect = document.getElementById('ptype');
+const effectSelect = document.getElementById('effectSelect');
+const initialData = {{ (item.data | tojson) if item else '{}' }};
+
+function fieldsForType(t) {
+  const groups = {
+    custom:        ['fields-custom'],
+    frame:         ['fields-color', 'fields-effect'],
+    background:    ['fields-background'],
+    nick_color:    ['fields-color', 'fields-effect'],
+    nick_gradient: ['fields-gradient', 'fields-effect'],
+    nick_prefix:   ['fields-text', 'fields-effect'],
+    nick_suffix:   ['fields-text', 'fields-effect'],
+  };
+  return groups[t] || [];
+}
+
+function updateEffectOptions(t) {
+  const spec = PTYPES[t];
+  effectSelect.innerHTML = '';
+  const effects = spec ? spec.effects : [''];
+  effects.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e;
+    opt.textContent = EFFECT_LABELS[e] || e;
+    effectSelect.appendChild(opt);
+  });
+}
+
+function showFields(t) {
+  document.querySelectorAll('.personalization-fields').forEach(el => el.style.display = 'none');
+  fieldsForType(t).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = '';
+  });
+  document.getElementById('previewBox').style.display = (t === 'custom') ? 'none' : '';
+  updateEffectOptions(t);
+}
+
+function updatePreview() {
+  const t = ptypeSelect.value;
+  const frame = document.getElementById('previewFrame');
+  const nick = document.getElementById('previewNick');
+  const effect = effectSelect.value;
+
+  frame.className = 'avatar-circle mx-auto mb-2';
+  frame.style.cssText = 'width:64px;height:64px;font-size:1.5rem;';
+  nick.className = 'fw-bold fs-5';
+  nick.style.cssText = '';
+  nick.textContent = 'Игрок';
+
+  if (t === 'frame') {
+    const color = document.querySelector('input[name=data_color]').value;
+    frame.classList.add('profile-frame');
+    if (effect === 'glow') frame.classList.add('fx-frame-glow');
+    if (effect === 'rainbow') frame.classList.add('fx-frame-rainbow');
+    frame.style.borderColor = color;
+    frame.style.setProperty('--fx-color', color);
+  } else if (t === 'nick_color') {
+    const color = document.querySelector('input[name=data_color]').value;
+    nick.style.color = color;
+    nick.style.setProperty('--fx-color', color);
+    if (effect === 'glow') nick.classList.add('fx-nick-glow');
+  } else if (t === 'nick_gradient') {
+    if (effect === 'rainbow') {
+      nick.classList.add('fx-nick-rainbow');
+    } else {
+      const from = document.querySelector('input[name=data_from]').value;
+      const to = document.querySelector('input[name=data_to]').value;
+      nick.style.background = `linear-gradient(90deg,${from},${to})`;
+      nick.style.webkitBackgroundClip = 'text';
+      nick.style.backgroundClip = 'text';
+      nick.style.color = 'transparent';
+      if (effect === 'shimmer') nick.classList.add('fx-nick-shimmer');
+    }
+  } else if (t === 'nick_prefix' || t === 'nick_suffix') {
+    const text = document.querySelector('input[name=data_text]').value || (t === 'nick_prefix' ? '👑' : 'MVP');
+    const badgeClass = effect ? `fx-badge-${effect}` : '';
+    nick.innerHTML = t === 'nick_prefix'
+      ? `<span class="me-1 ${badgeClass}">${text}</span>Игрок`
+      : `Игрок<span class="ms-1 ${badgeClass}">${text}</span>`;
+  } else if (t === 'background') {
+    const url = document.querySelector('input[name=data_image_url]').value;
+    document.getElementById('previewBox').style.backgroundImage = url ? `url('${url}')` : '';
+    document.getElementById('previewBox').style.backgroundSize = 'cover';
+  }
+}
+
+ptypeSelect.addEventListener('change', () => { showFields(ptypeSelect.value); updatePreview(); });
+document.getElementById('itemForm').addEventListener('input', updatePreview);
+
+// Init on page load (edit mode pre-fills effect select from existing data)
+showFields(ptypeSelect.value);
+if (initialData.effect) effectSelect.value = initialData.effect;
+updatePreview();
+</script>
 {% endblock %}
