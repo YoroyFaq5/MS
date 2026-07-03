@@ -7,6 +7,62 @@ from app.auth_decorators import admin_required
 
 admin_shop_bp = Blueprint("admin_shop", __name__)
 
+# Известные типы персонализации → (category, subcategory, допустимые эффекты).
+# "custom" — произвольный товар (мерч и т.п.), category/subcategory берутся
+# из формы как раньше, data всегда {}.
+PERSONALIZATION_TYPES: dict[str, dict] = {
+    "frame":        {"category": "profile_customization", "subcategory": "frame",
+                      "effects": ["", "glow", "rainbow"]},
+    "background":   {"category": "profile_customization", "subcategory": "background",
+                      "effects": []},
+    "nick_color":   {"category": "nickname", "subcategory": "nick_color",
+                      "effects": ["", "glow"]},
+    "nick_gradient": {"category": "nickname", "subcategory": "nick_gradient",
+                       "effects": ["", "shimmer", "rainbow"]},
+    "nick_prefix":  {"category": "nickname", "subcategory": "nick_prefix",
+                      "effects": ["", "bounce", "pulse", "shake"]},
+    "nick_suffix":  {"category": "nickname", "subcategory": "nick_suffix",
+                      "effects": ["", "bounce", "pulse", "shake"]},
+}
+
+
+def _build_category_subcategory_data(form) -> tuple[ShopCategory, str, dict]:
+    """
+    Собирает (category, subcategory, data) из формы товара. Для известных
+    типов персонализации (frame/background/nick_*) category+subcategory
+    жёстко определены типом — так рендеринг (_macros.html/profile/main.html)
+    гарантированно находит нужный слот по "category:subcategory". Для
+    "custom" (физический товар и т.п.) — свободные category/subcategory,
+    как раньше, data всегда пустая.
+    """
+    ptype = form.get("personalization_type", "custom")
+    effect = (form.get("data_effect") or "").strip() or None
+
+    if ptype == "custom":
+        category = ShopCategory(form.get("category"))
+        subcategory = form.get("subcategory_custom", "").strip()
+        return category, subcategory, {}
+
+    spec = PERSONALIZATION_TYPES[ptype]
+    category = ShopCategory(spec["category"])
+    subcategory = spec["subcategory"]
+
+    if ptype in ("frame", "nick_color"):
+        data = {"color": form.get("data_color") or "#C7A552"}
+    elif ptype == "background":
+        data = {"image_url": form.get("data_image_url", "").strip()}
+    elif ptype == "nick_gradient":
+        data = {
+            "from": form.get("data_from") or "#C7A552",
+            "to": form.get("data_to") or "#7B0F0F",
+        }
+    else:  # nick_prefix / nick_suffix
+        data = {"text": form.get("data_text", "").strip()}
+
+    if effect and effect in spec["effects"]:
+        data["effect"] = effect
+    return category, subcategory, data
+
 
 # ── Shop items ────────────────────────────────────────────────────────────────
 
@@ -23,7 +79,7 @@ def list_items():
 def new_item():
     if request.method == "POST":
         try:
-            category = ShopCategory(request.form.get("category"))
+            category, subcategory, data = _build_category_subcategory_data(request.form)
             rarity = Rarity(request.form.get("rarity", "common"))
             price = float(request.form.get("price", 0))
         except ValueError:
@@ -33,12 +89,13 @@ def new_item():
         result = AdminShopService.create_item(
             name=request.form.get("name", ""),
             category=category,
-            subcategory=request.form.get("subcategory", ""),
+            subcategory=subcategory,
             price=price,
             description=request.form.get("description", ""),
             rarity=rarity,
             image_url=request.form.get("image_url"),
             is_unique_purchase=request.form.get("is_unique_purchase") == "on",
+            data=data,
         )
         flash(result.message, "success" if result.ok else "danger")
         if result.ok:
@@ -55,7 +112,7 @@ def edit_item(item_id: int):
 
     if request.method == "POST":
         try:
-            category = ShopCategory(request.form.get("category"))
+            category, subcategory, data = _build_category_subcategory_data(request.form)
             rarity = Rarity(request.form.get("rarity", "common"))
             price = float(request.form.get("price", 0))
         except ValueError:
@@ -66,12 +123,13 @@ def edit_item(item_id: int):
             item_id,
             name=request.form.get("name"),
             category=category,
-            subcategory=request.form.get("subcategory"),
+            subcategory=subcategory,
             price=price,
             description=request.form.get("description"),
             rarity=rarity,
             image_url=request.form.get("image_url"),
             is_unique_purchase=request.form.get("is_unique_purchase") == "on",
+            data=data,
         )
         flash(result.message, "success" if result.ok else "danger")
         return redirect(url_for("admin_shop.list_items"))

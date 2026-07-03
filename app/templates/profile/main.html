@@ -26,8 +26,8 @@
 <div class="profile-banner mb-4"
      {% if background %}style="background-image:url('{{ background.item.data.image_url or '' }}'); background-size:cover;"{% endif %}>
   <div class="d-flex align-items-center gap-3 flex-wrap">
-    <div class="avatar-circle {% if frame %}profile-frame{% endif %}"
-         {% if frame and frame.item.data.color %}style="border-color:{{ frame.item.data.color }}"{% endif %}>
+    <div class="avatar-circle {% if frame %}profile-frame{% if frame.item.data.effect == 'glow' %} fx-frame-glow{% elif frame.item.data.effect == 'rainbow' %} fx-frame-rainbow{% endif %}{% endif %}"
+         {% if frame and frame.item.data.color %}style="border-color:{{ frame.item.data.color }};--fx-color:{{ frame.item.data.color }}"{% endif %}>
       {% if profile.avatar_url %}
         <img src="{{ profile.avatar_url }}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
       {% else %}
@@ -36,12 +36,17 @@
     </div>
     <div>
       <h2 class="mb-1 fw-bold">
-        {% if nick_prefix %}<span class="me-1">{{ nick_prefix.item.data.text }}</span>{% endif %}
-        <span
-          {% if nick_gradient %}style="background:linear-gradient(90deg,{{ nick_gradient.item.data.from }},{{ nick_gradient.item.data.to }});-webkit-background-clip:text;background-clip:text;color:transparent;"
-          {% elif nick_color %}style="color:{{ nick_color.item.data.color }}"
-          {% endif %}>{{ profile.player.display_name }}</span>
-        {% if nick_suffix %}<span class="ms-1">{{ nick_suffix.item.data.text }}</span>{% endif %}
+        {% if nick_prefix %}<span class="me-1{% if nick_prefix.item.data.effect %} fx-badge-{{ nick_prefix.item.data.effect }}{% endif %}">{{ nick_prefix.item.data.text }}</span>{% endif %}
+        {% if nick_gradient and nick_gradient.item.data.effect == 'rainbow' %}
+        <span class="fx-nick-rainbow">{{ profile.player.display_name }}</span>
+        {% elif nick_gradient %}
+        <span class="{% if nick_gradient.item.data.effect == 'shimmer' %}fx-nick-shimmer{% endif %}" style="background:linear-gradient(90deg,{{ nick_gradient.item.data.from }},{{ nick_gradient.item.data.to }});-webkit-background-clip:text;background-clip:text;color:transparent;">{{ profile.player.display_name }}</span>
+        {% elif nick_color %}
+        <span class="{% if nick_color.item.data.effect == 'glow' %}fx-nick-glow{% endif %}" style="color:{{ nick_color.item.data.color }};--fx-color:{{ nick_color.item.data.color }}">{{ profile.player.display_name }}</span>
+        {% else %}
+        <span>{{ profile.player.display_name }}</span>
+        {% endif %}
+        {% if nick_suffix %}<span class="ms-1{% if nick_suffix.item.data.effect %} fx-badge-{{ nick_suffix.item.data.effect }}{% endif %}">{{ nick_suffix.item.data.text }}</span>{% endif %}
         {% if profile.equipped_title %}
         <span class="badge bg-warning-subtle text-warning border border-warning-subtle ms-2 align-middle">
           {% if profile.equipped_title.title.icon %}<i class="bi {{ profile.equipped_title.title.icon }} me-1"></i>{% endif %}

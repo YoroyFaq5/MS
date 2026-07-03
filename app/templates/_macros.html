@@ -14,7 +14,15 @@
 {%- set nick_gradient = equipped.get('nickname:nick_gradient') -%}
 {%- set nick_prefix = equipped.get('nickname:nick_prefix') -%}
 {%- set nick_suffix = equipped.get('nickname:nick_suffix') -%}
-{%- if nick_prefix %}<span class="me-1">{{ nick_prefix.item.data.text }}</span>{% endif -%}
-<span{% if nick_gradient %} style="background:linear-gradient(90deg,{{ nick_gradient.item.data.from }},{{ nick_gradient.item.data.to }});-webkit-background-clip:text;background-clip:text;color:transparent;"{% elif nick_color %} style="color:{{ nick_color.item.data.color }}"{% endif %}>{{ player.display_name }}</span>
-{%- if nick_suffix %}<span class="ms-1">{{ nick_suffix.item.data.text }}</span>{% endif -%}
+{%- if nick_prefix %}<span class="me-1{% if nick_prefix.item.data.effect %} fx-badge-{{ nick_prefix.item.data.effect }}{% endif %}">{{ nick_prefix.item.data.text }}</span>{% endif -%}
+{%- if nick_gradient and nick_gradient.item.data.effect == 'rainbow' -%}
+<span class="fx-nick-rainbow">{{ player.display_name }}</span>
+{%- elif nick_gradient -%}
+<span class="{% if nick_gradient.item.data.effect == 'shimmer' %}fx-nick-shimmer{% endif %}" style="background:linear-gradient(90deg,{{ nick_gradient.item.data.from }},{{ nick_gradient.item.data.to }});-webkit-background-clip:text;background-clip:text;color:transparent;">{{ player.display_name }}</span>
+{%- elif nick_color -%}
+<span class="{% if nick_color.item.data.effect == 'glow' %}fx-nick-glow{% endif %}" style="color:{{ nick_color.item.data.color }};--fx-color:{{ nick_color.item.data.color }}">{{ player.display_name }}</span>
+{%- else -%}
+<span>{{ player.display_name }}</span>
+{%- endif -%}
+{%- if nick_suffix %}<span class="ms-1{% if nick_suffix.item.data.effect %} fx-badge-{{ nick_suffix.item.data.effect }}{% endif %}">{{ nick_suffix.item.data.text }}</span>{% endif -%}
 {%- endmacro %}
