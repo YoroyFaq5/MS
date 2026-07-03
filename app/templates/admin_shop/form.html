@@ -212,12 +212,13 @@ function showFields(t) {
   });
   document.getElementById('previewBox').style.display = (t === 'custom') ? 'none' : '';
   updateEffectOptions(t);
-  // Тема выбрана — свой цвет/эффект не нужны, прячем их.
-  const hasTheme = !!themeSelect.value && (t === 'frame' || t === 'nick_color' || t === 'nick_gradient');
+  // Тема выбрана — свой цвет/эффект/URL картинки не нужны, прячем их.
+  const hasTheme = !!themeSelect.value && (t === 'frame' || t === 'nick_color' || t === 'nick_gradient' || t === 'background');
   if (hasTheme) {
     document.getElementById('fields-color').style.display = 'none';
     document.getElementById('fields-gradient').style.display = 'none';
     document.getElementById('fields-effect').style.display = 'none';
+    document.getElementById('fields-background').style.display = 'none';
   }
 }
 
