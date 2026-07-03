@@ -503,6 +503,7 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   padding: 3px;
   background: var(--fx-ring, conic-gradient(from 0deg, var(--ms-gold), var(--ms-gold)));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   animation: fx-spin var(--fx-ring-speed, 3s) linear infinite;
@@ -731,20 +732,57 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   animation: fx-glitch-frame 2.5s steps(1) infinite;
 }
 
-/* 🌈 Aurora — slow dreamy flowing pastel-neon (calmer, softer than Rainbow) */
-@keyframes fx-aurora-glow {
-  0%, 100% { box-shadow: 0 0 8px 2px #00ffa2; }
-  33%      { box-shadow: 0 0 14px 3px #00c2ff; }
-  66%      { box-shadow: 0 0 14px 3px #b967ff; }
+/* ⭐⭐⭐⭐⭐ MYTHIC ULTRA — Aurora
+   Три слоя: (1) сам обод — плавная смена цвета северного сияния +
+   редкая "вспышка яркости" (как настоящий всплеск активности
+   сияния); (2) ::before — волнующийся "занавес" света через
+   анимированный clip-path (форма меняется, не просто вращается —
+   имитация живой, колышущейся завесы); (3) ::after — редкие
+   звёздные точки, мерцающие асинхронно на фоне. */
+@keyframes fx-aurora-ultra-flow {
+  0%, 100% { box-shadow: 0 0 8px 2px #00ffa2; border-color: #00ffa2 !important; }
+  33%      { box-shadow: 0 0 14px 3px #00c2ff; border-color: #00c2ff !important; }
+  66%      { box-shadow: 0 0 14px 3px #b967ff; border-color: #b967ff !important; }
+}
+@keyframes fx-aurora-ultra-surge {
+  0%, 88%, 100% { filter: brightness(1); }
+  91%           { filter: brightness(1.6); }
+  94%           { filter: brightness(1); }
+}
+@keyframes fx-aurora-ultra-curtain {
+  0%, 100% { clip-path: polygon(0% 30%, 20% 45%, 40% 25%, 60% 50%, 80% 20%, 100% 40%, 100% 60%, 80% 40%, 60% 70%, 40% 45%, 20% 65%, 0% 50%); transform: rotate(0deg); }
+  50%      { clip-path: polygon(0% 50%, 20% 25%, 40% 55%, 60% 20%, 80% 50%, 100% 25%, 100% 45%, 80% 65%, 60% 40%, 40% 70%, 20% 40%, 0% 65%); transform: rotate(5deg); }
+}
+@keyframes fx-aurora-ultra-twinkle {
+  0%, 100% { opacity: .25; }
+  50%      { opacity: 1; }
 }
 .fx-frame-theme-aurora {
-  --fx-ring: conic-gradient(from 0deg, #00ffa2, #00c2ff, #b967ff, #00ffa2);
-  --fx-ring-speed: 8s;
-  animation: fx-aurora-glow 4s ease-in-out infinite;
+  position: relative;
+  animation: fx-aurora-ultra-flow 4s ease-in-out infinite, fx-aurora-ultra-surge 7s ease-in-out infinite;
+}
+.fx-frame-theme-aurora::before {
+  content: "";
+  position: absolute; inset: -9px; border-radius: 50%;
+  background: conic-gradient(from 0deg, #00ffa2, #00c2ff, #b967ff, #00ffa2);
+  opacity: .65;
+  animation: fx-aurora-ultra-curtain 9s ease-in-out infinite;
+  pointer-events: none;
+}
+.fx-frame-theme-aurora::after {
+  content: "";
+  position: absolute; inset: -11px; border-radius: 50%;
+  background:
+    radial-gradient(circle 1px at 20% 15%, #fff, transparent),
+    radial-gradient(circle 1px at 70% 10%, #fff, transparent),
+    radial-gradient(circle 1px at 45% 90%, #fff, transparent),
+    radial-gradient(circle 1px at 90% 70%, #fff, transparent);
+  animation: fx-aurora-ultra-twinkle 3.2s ease-in-out infinite;
+  pointer-events: none;
 }
 .fx-nick-theme-aurora {
   --fx-text-gradient: linear-gradient(90deg, #00ffa2, #00c2ff, #b967ff, #00ffa2);
-  animation: fx-rainbow-shift 5s ease-in-out infinite;
+  animation: fx-rainbow-shift 5s ease-in-out infinite, fx-aurora-ultra-surge 7s ease-in-out infinite;
   text-shadow: 0 0 8px rgba(0,255,162,.4);
 }
 
@@ -774,41 +812,64 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
    animation at club scale.
    ============================================================ */
 
-/* ⭐⭐⭐⭐⭐ Mythic — Void
-   Слои: пульсирующее сжатие кольца + затягивающиеся внутрь частицы.
-   Ощущение: пространство схлопывается к центру. */
-@keyframes fx-void-collapse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 6px 1px #1a0033; }
-  50%      { transform: scale(.94); box-shadow: 0 0 16px 4px #3d0a5c, inset 0 0 10px 3px #000; }
+/* ⭐⭐⭐⭐⭐ MYTHIC ULTRA — Void
+   Три независимых слоя: (1) сам обод — тяжёлое гравитационное сжатие
+   с настоящим "коллапсом" в середине цикла; (2) ::before — спираль
+   частиц, засасываемых внутрь и исчезающих в нуле (inflow, не
+   декоративное вращение на месте); (3) ::after — тонкая, абсолютно
+   непредсказуемая по времени "трещина реальности" (pulse event) —
+   короткая яркая вспышка на случайном участке обода. */
+@keyframes fx-void-ultra-collapse {
+  0%, 38%   { transform: scale(1);   box-shadow: 0 0 7px 1px #1a0033, inset 0 0 6px 2px #000; border-color: #3d0a5c !important; }
+  50%       { transform: scale(.9);  box-shadow: 0 0 3px 0 #000, inset 0 0 12px 5px #000;     border-color: #0d0018 !important; }
+  62%, 100% { transform: scale(1);   box-shadow: 0 0 11px 2px #3d0a5c, inset 0 0 6px 2px #000; border-color: #3d0a5c !important; }
 }
-@keyframes fx-void-particles {
-  0%   { transform: rotate(0deg) scale(1); opacity: .8; }
-  50%  { transform: rotate(180deg) scale(.7); opacity: .3; }
-  100% { transform: rotate(360deg) scale(1); opacity: .8; }
+@keyframes fx-void-ultra-inflow {
+  0%   { transform: rotate(0deg)   scale(1);   opacity: .9; }
+  65%  { transform: rotate(230deg) scale(.5);  opacity: .5; }
+  100% { transform: rotate(360deg) scale(.15); opacity: 0; }
+}
+@keyframes fx-void-ultra-tear {
+  0%, 89%, 100% { opacity: 0; transform: rotate(15deg) scaleY(.2); }
+  91%  { opacity: 1; transform: rotate(15deg) scaleY(1); }
+  93%  { opacity: .2; }
+  95%  { opacity: 1; transform: rotate(-40deg) scaleY(1); }
+  97%  { opacity: 0; transform: rotate(-40deg) scaleY(.2); }
 }
 .fx-frame-theme-void {
-  --fx-ring: conic-gradient(from 0deg, #000, #3d0a5c, #1a0033, #000);
-  --fx-ring-speed: 5s;
-  animation: fx-void-collapse 2.4s ease-in-out infinite;
+  position: relative;
+  border-color: #1a0033 !important;
+  animation: fx-void-ultra-collapse 3.8s cubic-bezier(.55,0,.45,1) infinite;
+}
+.fx-frame-theme-void::before {
+  content: "";
+  position: absolute; inset: -10px; border-radius: 50%;
+  background:
+    radial-gradient(circle 1.5px at 50% 4%,  #b967ff, transparent),
+    radial-gradient(circle 1px   at 89% 28%, #9d4edd, transparent),
+    radial-gradient(circle 1.5px at 76% 88%, #7000ff, transparent),
+    radial-gradient(circle 1px   at 18% 90%, #b967ff, transparent),
+    radial-gradient(circle 1px   at 6% 38%,  #7000ff, transparent);
+  animation: fx-void-ultra-inflow 3.8s cubic-bezier(.55,0,.45,1) infinite;
+  pointer-events: none;
 }
 .fx-frame-theme-void::after {
   content: "";
-  position: absolute; inset: -9px; border-radius: 50%;
-  background:
-    radial-gradient(circle 1.5px at 15% 40%, #b967ff, transparent),
-    radial-gradient(circle 1px at 80% 25%, #b967ff, transparent),
-    radial-gradient(circle 1.5px at 60% 85%, #7000ff, transparent),
-    radial-gradient(circle 1px at 30% 90%, #7000ff, transparent);
-  animation: fx-void-particles 4s linear infinite;
+  position: absolute; inset: -3px; border-radius: 50%;
+  background: conic-gradient(from 45deg, transparent 0deg, #e0aaff 3deg, #fff 4deg, #e0aaff 5deg, transparent 7deg);
+  filter: blur(.5px);
+  animation: fx-void-ultra-tear 6.5s linear infinite;
   pointer-events: none;
 }
 .fx-nick-theme-void {
-  --fx-text-gradient: linear-gradient(90deg, #3d0a5c, #1a0033, #7000ff, #1a0033);
-  animation: fx-rainbow-shift 3s ease-in-out infinite, fx-void-text 2.4s ease-in-out infinite;
+  --fx-text-gradient: linear-gradient(90deg, #3d0a5c, #1a0033, #7000ff, #1a0033, #3d0a5c);
+  background-size: 300% auto;
+  animation: fx-rainbow-shift 4.5s cubic-bezier(.55,0,.45,1) infinite, fx-void-ultra-text 3.8s cubic-bezier(.55,0,.45,1) infinite;
 }
-@keyframes fx-void-text {
-  0%, 100% { text-shadow: 0 0 4px #1a0033; }
-  50%      { text-shadow: 0 0 12px #7000ff; }
+@keyframes fx-void-ultra-text {
+  0%, 38%   { text-shadow: 0 0 4px #1a0033; }
+  50%       { text-shadow: 0 0 2px #000; }
+  62%, 100% { text-shadow: 0 0 11px #7000ff, 0 0 3px #b967ff; }
 }
 
 /* ⭐⭐⭐⭐⭐ Mythic — Black Hole
@@ -829,22 +890,64 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   text-shadow: 0 0 8px #ff5500;
 }
 
-/* ⭐⭐⭐⭐⭐ Mythic — Event Horizon
-   Тонкий яркий ободок света, "выгибающийся" вокруг тёмного ядра —
-   резкий контраст, а не мягкое свечение. */
-@keyframes fx-horizon-bend {
-  0%, 100% { box-shadow: 0 0 3px 1px #00fff2; filter: brightness(1); }
-  50%      { box-shadow: 0 0 14px 2px #00fff2, 0 0 2px 4px #001a1a inset; filter: brightness(1.3); }
+/* ⭐⭐⭐⭐⭐ MYTHIC ULTRA — Event Horizon (Black Hole)
+   Три слоя: (1) сам обод — тёмное ядро с тяжёлым внутренним
+   давлением (inset shadow), почти неподвижное между вспышками;
+   (2) ::before — быстро вращающийся аккреционный диск
+   (conic-gradient, огненно-оранжевый, отдельная скорость от всего
+   остального в наборе); (3) ::after — тонкая дуга гравитационного
+   линзирования, "выгибающаяся" неравномерно + редкая мощная
+   вспышка-флэр на пределе горизонта (pulse event). */
+@keyframes fx-horizon-core {
+  0%, 85%, 100% { box-shadow: inset 0 0 8px 3px #000, 0 0 4px 1px #1a0d00; }
+  90%           { box-shadow: inset 0 0 10px 4px #000, 0 0 22px 6px #ffcc00, 0 0 8px 3px #ff5500; }
+  95%           { box-shadow: inset 0 0 8px 3px #000, 0 0 10px 3px #ff5500; }
+}
+@keyframes fx-horizon-disk {
+  to { transform: rotate(360deg); }
+}
+@keyframes fx-horizon-lensing {
+  0%   { transform: rotate(0deg);   opacity: .7; }
+  33%  { transform: rotate(140deg); opacity: 1; }
+  66%  { transform: rotate(210deg); opacity: .5; }
+  100% { transform: rotate(360deg); opacity: .7; }
 }
 .fx-frame-theme-event_horizon {
-  --fx-ring: conic-gradient(from 0deg, #001a1a, #00fff2, #001a1a, #00fff2, #001a1a);
-  --fx-ring-speed: 2s;
-  animation: fx-horizon-bend 1.6s ease-in-out infinite;
+  position: relative;
+  border-color: #000 !important;
+  animation: fx-horizon-core 4.2s ease-in-out infinite;
+}
+.fx-frame-theme-event_horizon::before {
+  content: "";
+  position: absolute; inset: -5px; border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(from 0deg, #1a0d00 0%, #ff5500 20%, #ffcc00 30%, #fff6d8 35%, #ffcc00 40%, #ff5500 55%, #1a0d00 75%, #1a0d00 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: fx-horizon-disk .9s linear infinite;
+  pointer-events: none;
+}
+.fx-frame-theme-event_horizon::after {
+  content: "";
+  position: absolute; inset: -9px; border-radius: 50%;
+  border: 1px solid transparent;
+  border-top-color: #00fff2;
+  border-right-color: rgba(0,255,242,.3);
+  filter: blur(.4px);
+  animation: fx-horizon-lensing 3.4s ease-in-out infinite;
+  pointer-events: none;
 }
 .fx-nick-theme-event_horizon {
-  --fx-text-gradient: linear-gradient(90deg, #001a1a, #00fff2, #001a1a);
-  animation: fx-rainbow-shift 1.8s ease-in-out infinite;
-  text-shadow: 0 0 6px #00fff2;
+  --fx-text-gradient: linear-gradient(90deg, #1a0d00, #ff5500, #ffcc00, #fff6d8, #ffcc00, #ff5500, #1a0d00);
+  background-size: 300% auto;
+  animation: fx-rainbow-shift 1.4s linear infinite, fx-horizon-text 4.2s ease-in-out infinite;
+}
+@keyframes fx-horizon-text {
+  0%, 85%, 100% { text-shadow: 0 0 4px #1a0d00; }
+  90%           { text-shadow: 0 0 16px #ffcc00, 0 0 6px #ff5500; }
+  95%           { text-shadow: 0 0 8px #ff5500; }
 }
 
 /* ⭐⭐⭐⭐⭐ Mythic — Nebula
@@ -904,35 +1007,69 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   text-shadow: 0 0 8px rgba(255,230,128,.6);
 }
 
-/* ⭐⭐⭐⭐⭐ Mythic — Cosmos
-   Глубокий космос + периодически пролетающая яркая комета через
-   всё кольцо (не постоянная анимация, а редкий "пролёт"). */
-@keyframes fx-cosmos-comet {
-  0%, 85%, 100% { opacity: 0; transform: rotate(0deg); }
-  87%  { opacity: 1; }
-  95%  { opacity: 1; transform: rotate(320deg); }
-  97%  { opacity: 0; }
+/* ⭐⭐⭐⭐⭐ MYTHIC ULTRA — Cosmos
+   Три слоя: (1) сам обод — глубокий космос, тихий дрейф + редкая
+   "сверхновая" (яркая вспышка, pulse event, наложена ВТОРОЙ
+   анимацией поверх первой); (2) ::before — звёздное поле с
+   неравномерным, "живым" мерцанием (micro variation, не синхронный
+   пульс всех точек разом); (3) ::after — две кометы, пролетающие
+   по кольцу в разные моменты цикла (energy motion). */
+@keyframes fx-cosmos-ultra-drift {
+  0%, 100% { box-shadow: 0 0 6px 1px #1b0b3d; }
+  50%      { box-shadow: 0 0 13px 3px #3d1a6e; }
+}
+@keyframes fx-cosmos-ultra-supernova {
+  0%, 94%, 100% { filter: brightness(1); }
+  96%           { filter: brightness(1.8); }
+}
+@keyframes fx-cosmos-ultra-twinkle {
+  0%, 100% { opacity: .4; }
+  20%      { opacity: 1; }
+  45%      { opacity: .3; }
+  70%      { opacity: .9; }
+  90%      { opacity: .5; }
+}
+@keyframes fx-cosmos-ultra-comets {
+  0%, 40%, 100% { opacity: 0; transform: rotate(0deg); }
+  42%  { opacity: 1; }
+  50%  { opacity: 1; transform: rotate(160deg); }
+  52%  { opacity: 0; }
+  80%, 82% { opacity: 1; transform: rotate(320deg); }
+  90%  { opacity: 1; transform: rotate(400deg); }
+  92%  { opacity: 0; }
 }
 .fx-frame-theme-cosmos {
-  --fx-ring: conic-gradient(from 0deg, #05010f, #1b0b3d, #3d1a6e, #05010f);
-  --fx-ring-speed: 9s;
-  animation: fx-cosmos-base 4s ease-in-out infinite;
+  position: relative;
+  animation: fx-cosmos-ultra-drift 4s ease-in-out infinite, fx-cosmos-ultra-supernova 9s ease-in-out infinite;
 }
-@keyframes fx-cosmos-base {
-  0%, 100% { box-shadow: 0 0 6px 1px #1b0b3d; }
-  50%      { box-shadow: 0 0 12px 3px #3d1a6e; }
+.fx-frame-theme-cosmos::before {
+  content: "";
+  position: absolute; inset: -9px; border-radius: 50%;
+  background:
+    radial-gradient(circle 1px at 15% 20%, #fff, transparent),
+    radial-gradient(circle 1px at 55% 8%,  #fff, transparent),
+    radial-gradient(circle 1px at 85% 30%, #fff, transparent),
+    radial-gradient(circle 1px at 30% 80%, #fff, transparent),
+    radial-gradient(circle 1px at 70% 88%, #fff, transparent);
+  animation: fx-cosmos-ultra-twinkle 3.5s ease-in-out infinite;
+  pointer-events: none;
 }
 .fx-frame-theme-cosmos::after {
   content: "";
   position: absolute; inset: -10px; border-radius: 50%;
-  background: radial-gradient(circle 2px at 90% 10%, #fff, rgba(255,255,255,.4) 3px, transparent 4px);
-  animation: fx-cosmos-comet 4s linear infinite;
+  background: radial-gradient(circle 2px at 92% 8%, #fff, rgba(255,255,255,.5) 3px, transparent 5px);
+  animation: fx-cosmos-ultra-comets 7s linear infinite;
   pointer-events: none;
 }
 .fx-nick-theme-cosmos {
   --fx-text-gradient: linear-gradient(90deg, #1b0b3d, #3d1a6e, #05010f, #3d1a6e);
-  animation: fx-rainbow-shift 5s ease-in-out infinite;
+  background-size: 300% auto;
+  animation: fx-rainbow-shift 5s ease-in-out infinite, fx-cosmos-ultra-supernova-text 9s ease-in-out infinite;
   text-shadow: 0 0 6px #3d1a6e;
+}
+@keyframes fx-cosmos-ultra-supernova-text {
+  0%, 94%, 100% { text-shadow: 0 0 6px #3d1a6e; }
+  96%           { text-shadow: 0 0 18px #fff, 0 0 8px #b967ff; }
 }
 
 /* ⭐⭐⭐⭐⭐ Mythic — Comet
@@ -953,26 +1090,69 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   text-shadow: 0 0 6px #7dd8ff;
 }
 
-/* ⭐⭐⭐⭐⭐ Mythic — Meteor
-   Периодическая яркая вспышка-"падение", резкая и внезапная —
-   контраст между долгим затишьем и коротким импульсом. */
-@keyframes fx-meteor-strike {
-  0%, 92%, 100% { box-shadow: 0 0 4px 1px #4a2600; }
-  93%  { box-shadow: 0 0 20px 6px #ff9d00, 0 0 6px 3px #fff; }
-  95%  { box-shadow: 0 0 8px 2px #ff9d00; }
+/* ⭐⭐⭐⭐⭐ MYTHIC ULTRA — Meteor Shower
+   Три слоя: (1) сам обод — тёмное ночное небо, почти неподвижное
+   между событиями; (2) ::before — ДВА независимых метеора,
+   прочерчивающих след по разным траекториям и с разной скоростью
+   (clip-path полоса + translate, не одна вспышка на месте); (3)
+   ::after — вспышка удара (impact flash) в момент "приземления",
+   и отдельно — редкий "звёздный дождь", где вспышки идут кластером. */
+@keyframes fx-meteor-trail-a {
+  0%   { transform: translate(-30px, -30px) rotate(45deg); opacity: 0; }
+  8%   { opacity: 1; }
+  22%  { transform: translate(30px, 30px) rotate(45deg); opacity: 0; }
+  100% { transform: translate(30px, 30px) rotate(45deg); opacity: 0; }
+}
+@keyframes fx-meteor-trail-b {
+  0%, 40%  { transform: translate(28px, -32px) rotate(-40deg); opacity: 0; }
+  48%      { opacity: 1; }
+  62%      { transform: translate(-28px, 30px) rotate(-40deg); opacity: 0; }
+  100%     { transform: translate(-28px, 30px) rotate(-40deg); opacity: 0; }
+}
+@keyframes fx-meteor-impact {
+  0%, 20%, 100% { opacity: 0; transform: scale(.3); box-shadow: none; }
+  22%  { opacity: 1; transform: scale(1); box-shadow: 0 0 18px 6px #ff9d00, 0 0 6px 3px #fff; }
+  30%  { opacity: 0; transform: scale(1.4); }
+  60%, 62% { opacity: 1; transform: scale(1); box-shadow: 0 0 22px 7px #ffcc00, 0 0 8px 3px #fff; }
+  70%  { opacity: 0; transform: scale(1.4); }
 }
 .fx-frame-theme-meteor {
-  --fx-ring: conic-gradient(from 0deg, #4a2600, #ff9d00, #4a2600);
-  --fx-ring-speed: 3s;
-  animation: fx-meteor-strike 3.2s ease-in-out infinite;
+  position: relative;
+  border-color: #2b1400 !important;
+  animation: fx-meteor-ambient 5s ease-in-out infinite;
+}
+@keyframes fx-meteor-ambient {
+  0%, 100% { box-shadow: 0 0 4px 1px #2b1400; }
+  50%      { box-shadow: 0 0 7px 1px #4a2600; }
+}
+.fx-frame-theme-meteor::before {
+  content: "";
+  position: absolute; inset: -14px; border-radius: 50%;
+  background:
+    linear-gradient(45deg, transparent 46%, #fff 49%, #ff9d00 50%, transparent 53%) no-repeat,
+    linear-gradient(-40deg, transparent 46%, #fff 49%, #ffcc00 50%, transparent 53%) no-repeat;
+  background-size: 60% 3px, 55% 3px;
+  background-position: 20% 20%, 75% 25%;
+  animation: fx-meteor-trail-a 2.6s ease-in infinite, fx-meteor-trail-b 2.6s ease-in infinite;
+  pointer-events: none;
+}
+.fx-frame-theme-meteor::after {
+  content: "";
+  position: absolute; inset: 30%; border-radius: 50%;
+  animation: fx-meteor-impact 2.6s ease-in infinite;
+  pointer-events: none;
 }
 .fx-nick-theme-meteor {
-  --fx-text-gradient: linear-gradient(90deg, #4a2600, #ff9d00, #4a2600);
-  animation: fx-rainbow-shift 3s linear infinite, fx-meteor-text 3.2s ease-in-out infinite;
+  --fx-text-gradient: linear-gradient(90deg, #2b1400, #4a2600, #ff9d00, #4a2600, #2b1400);
+  background-size: 300% auto;
+  animation: fx-rainbow-shift 3s linear infinite, fx-meteor-text 2.6s ease-in infinite;
 }
 @keyframes fx-meteor-text {
-  0%, 92%, 100% { text-shadow: 0 0 3px #4a2600; }
-  93%  { text-shadow: 0 0 14px #ff9d00, 0 0 4px #fff; }
+  0%, 20%, 100% { text-shadow: 0 0 3px #2b1400; }
+  22%  { text-shadow: 0 0 16px #ff9d00, 0 0 4px #fff; }
+  30%  { text-shadow: 0 0 3px #2b1400; }
+  60%, 62% { text-shadow: 0 0 18px #ffcc00, 0 0 5px #fff; }
+  70%  { text-shadow: 0 0 3px #2b1400; }
 }
 
 /* ⭐⭐⭐⭐⭐ Mythic — Inferno
@@ -1012,54 +1192,120 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   animation: fx-rainbow-shift .9s linear infinite, fx-fire-text-glow .9s ease-in-out infinite;
 }
 
-/* ⭐⭐⭐⭐⭐ Mythic — Phoenix
-   Тёплое золотисто-огненное перо: угольки поднимаются медленнее
-   и заметнее, чем в Inferno — эффект возрождения, не разрушения. */
-@keyframes fx-phoenix-glow {
-  0%, 100% { box-shadow: 0 0 8px 2px #ff6a00; }
-  50%      { box-shadow: 0 0 20px 5px #ffd700, 0 0 6px 2px #ff2200; }
+/* ⭐⭐⭐⭐⭐ MYTHIC ULTRA — Phoenix (эволюция Inferno)
+   Три слоя: (1) сам обод — тёплое золотое "дыхание жизни", ровное
+   и живое; (2) ::before — крыло из поднимающихся угольков (5 точек
+   вместо 2, разный размер/задержка/дальность полёта — плотный рой,
+   а не пара частиц); (3) ::after — редкая мощная вспышка
+   "возрождения": элемент на миг гаснет почти до нуля и тут же
+   взрывается ослепительным бело-золотым светом (pulse event). */
+@keyframes fx-phoenix-lifebreath {
+  0%, 100% { box-shadow: 0 0 8px 2px #ff6a00; border-color: #ff6a00 !important; }
+  50%      { box-shadow: 0 0 20px 5px #ffd700, 0 0 6px 2px #ff2200; border-color: #ffd700 !important; }
 }
-@keyframes fx-phoenix-ember {
-  0%   { transform: translateY(4px) scale(.6); opacity: 0; }
-  30%  { opacity: 1; }
-  100% { transform: translateY(-22px) scale(1.1); opacity: 0; }
+@keyframes fx-phoenix-embers {
+  0%   { transform: translateY(6px) scale(.5) rotate(0deg);   opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translateY(-26px) scale(1.15) rotate(20deg); opacity: 0; }
+}
+@keyframes fx-phoenix-rebirth {
+  0%, 78%, 100% { opacity: 0; transform: scale(.4); }
+  80%  { opacity: .2; transform: scale(.2); }
+  84%  { opacity: 1; transform: scale(1.5); box-shadow: 0 0 30px 10px #fff6d8, 0 0 14px 5px #ffd700; }
+  92%  { opacity: 0; transform: scale(2.2); }
 }
 .fx-frame-theme-phoenix {
-  --fx-ring: conic-gradient(from 0deg, #ff2200, #ff6a00, #ffd700, #ff6a00, #ff2200);
-  --fx-ring-speed: 2.2s;
-  animation: fx-phoenix-glow 2s ease-in-out infinite;
+  position: relative;
+  animation: fx-phoenix-lifebreath 2.2s ease-in-out infinite;
+}
+.fx-frame-theme-phoenix::before {
+  content: "";
+  position: absolute; inset: -8px; border-radius: 50%;
+  background:
+    radial-gradient(circle 1.5px at 22% 94%, #ffd700, transparent),
+    radial-gradient(circle 1px   at 40% 90%, #ff6a00, transparent),
+    radial-gradient(circle 1.5px at 58% 95%, #fff6d8, transparent),
+    radial-gradient(circle 1px   at 72% 88%, #ff2200, transparent),
+    radial-gradient(circle 1.5px at 85% 93%, #ffd700, transparent);
+  animation: fx-phoenix-embers 1.8s ease-out infinite;
+  pointer-events: none;
 }
 .fx-frame-theme-phoenix::after {
   content: "";
   position: absolute; inset: -6px; border-radius: 50%;
-  background:
-    radial-gradient(circle 1.5px at 30% 92%, #ffd700, transparent),
-    radial-gradient(circle 1.5px at 65% 90%, #ff6a00, transparent);
-  animation: fx-phoenix-ember 2.2s ease-out infinite;
+  background: radial-gradient(circle, #fff6d8 0%, #ffd700 35%, transparent 70%);
+  animation: fx-phoenix-rebirth 6s ease-in-out infinite;
   pointer-events: none;
 }
 .fx-nick-theme-phoenix {
   --fx-text-gradient: linear-gradient(90deg, #ff2200, #ff6a00, #ffd700, #ff6a00, #ff2200);
-  animation: fx-rainbow-shift 2s linear infinite;
-  text-shadow: 0 0 8px #ffd700;
+  background-size: 300% auto;
+  animation: fx-rainbow-shift 2s linear infinite, fx-phoenix-text-rebirth 6s ease-in-out infinite;
+}
+@keyframes fx-phoenix-text-rebirth {
+  0%, 78%, 100% { text-shadow: 0 0 8px #ffd700; }
+  84%  { text-shadow: 0 0 20px #fff6d8, 0 0 8px #ffd700; }
 }
 
-/* ⭐⭐⭐⭐⭐ Mythic — Dragon
-   Чешуйчатый узор через repeating-conic-gradient + медленный,
-   тяжёлый, "дышащий" пульс — угрожающий, не суетливый. */
-.fx-frame-theme-dragon {
-  --fx-ring: repeating-conic-gradient(from 0deg, #0b3d0b 0deg 8deg, #1a6e1a 8deg 14deg, #ffd700 14deg 16deg);
-  --fx-ring-speed: 10s;
-  animation: fx-dragon-breathe 3.4s ease-in-out infinite;
-}
+/* ⭐⭐⭐⭐⭐ MYTHIC ULTRA — Dragon Soul
+   Три слоя, вращающиеся НЕЗАВИСИМО (counter-rotation): (1) сам
+   обод — тяжёлое, медленное дыхание древнего зверя; (2) ::before —
+   чешуйчатый узор (repeating-conic-gradient), вращается ПО часовой;
+   (3) ::after — душа-энергия дракона, вращается ПРОТИВ часовой на
+   другой скорости — при наложении даёт живое, "дышащее" ощущение
+   двух independent систем, а не одного вращения. Редкий "рык" —
+   резкий вспышка-импульс с лёгким "ударом" по масштабу. */
 @keyframes fx-dragon-breathe {
-  0%, 100% { box-shadow: 0 0 6px 1px #0b3d0b; }
-  50%      { box-shadow: 0 0 16px 4px #1a6e1a, 0 0 4px 2px #ffd700; }
+  0%, 82%, 100% { box-shadow: 0 0 6px 1px #0b3d0b; transform: scale(1); }
+  50%           { box-shadow: 0 0 16px 4px #1a6e1a, 0 0 4px 2px #ffd700; transform: scale(1.015); }
+  86%           { box-shadow: 0 0 26px 8px #ffd700, 0 0 10px 4px #ff6a00; transform: scale(1.06); }
+  90%           { box-shadow: 0 0 10px 2px #1a6e1a; transform: scale(1); }
+}
+@keyframes fx-dragon-scales-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes fx-dragon-soul-spin {
+  to { transform: rotate(-360deg); }
+}
+.fx-frame-theme-dragon {
+  position: relative;
+  border-color: #0b3d0b !important;
+  animation: fx-dragon-breathe 5.5s ease-in-out infinite;
+}
+.fx-frame-theme-dragon::before {
+  content: "";
+  position: absolute; inset: -6px; border-radius: 50%;
+  padding: 3px;
+  background: repeating-conic-gradient(from 0deg, #0b3d0b 0deg 8deg, #1a6e1a 8deg 14deg, #ffd700 14deg 16deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: fx-dragon-scales-spin 14s linear infinite;
+  pointer-events: none;
+}
+.fx-frame-theme-dragon::after {
+  content: "";
+  position: absolute; inset: -11px; border-radius: 50%;
+  padding: 2px;
+  background: conic-gradient(from 90deg, transparent, #39ff6a 15%, transparent 30%, transparent 60%, #ffd700 75%, transparent 90%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  filter: blur(.5px);
+  animation: fx-dragon-soul-spin 8s linear infinite;
+  pointer-events: none;
 }
 .fx-nick-theme-dragon {
   --fx-text-gradient: linear-gradient(90deg, #0b3d0b, #1a6e1a, #ffd700, #1a6e1a, #0b3d0b);
-  animation: fx-rainbow-shift 4s ease-in-out infinite;
-  text-shadow: 0 0 6px #1a6e1a;
+  background-size: 300% auto;
+  animation: fx-rainbow-shift 4s ease-in-out infinite, fx-dragon-roar-text 5.5s ease-in-out infinite;
+}
+@keyframes fx-dragon-roar-text {
+  0%, 82%, 100% { text-shadow: 0 0 6px #1a6e1a; }
+  86%           { text-shadow: 0 0 18px #ffd700, 0 0 6px #ff6a00; }
+  90%           { text-shadow: 0 0 8px #1a6e1a; }
 }
 
 /* ⭐⭐⭐⭐⭐ Mythic — Frozen
@@ -1136,31 +1382,68 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   79%  { text-shadow: 0 0 14px #e8e8ff; }
 }
 
-/* ⭐⭐⭐⭐⭐ Mythic — Thunder God
-   Резкий зигзаг-разряд через clip-path, вспыхивающий поверх
-   кольца — угловатая, а не круглая механика (уникально в наборе). */
+/* ⭐⭐⭐⭐⭐ MYTHIC ULTRA — Thunder God
+   Три слоя: (1) сам обод — тёмное грозовое небо + редкий мощный
+   "удар молнии" на весь элемент (pulse event); (2) ::before —
+   собственное быстро вращающееся электрическое кольцо (energy
+   motion, независимое от общего механизма); (3) ::after — два
+   РАЗНЫХ зигзаг-разряда (clip-path меняет форму между появлениями,
+   не один и тот же контур) в разные моменты цикла. */
+@keyframes fx-thunder-crackle {
+  0%, 76%, 100% { box-shadow: 0 0 6px 1px #1a0033; border-color: #1a0033 !important; }
+  78%  { box-shadow: 0 0 4px 0 #000;                border-color: #00e5ff !important; }
+  80%  { box-shadow: 0 0 20px 5px #00e5ff;          border-color: #00e5ff !important; }
+  82%  { box-shadow: 0 0 6px 1px #1a0033;           border-color: #1a0033 !important; }
+  96%  { box-shadow: 0 0 28px 8px #ffffff, 0 0 10px 4px #00e5ff; border-color: #ffffff !important; }
+  98%  { box-shadow: 0 0 6px 1px #1a0033;           border-color: #1a0033 !important; }
+}
+@keyframes fx-thunder-ring-spin {
+  to { transform: rotate(360deg); }
+}
 @keyframes fx-thunder-bolt {
-  0%, 85%, 100% { opacity: 0; }
-  87%, 89%, 91% { opacity: 1; }
-  88%, 90%      { opacity: .2; }
+  0%, 76%, 100% { opacity: 0; clip-path: polygon(48% 0%, 58% 32%, 50% 38%, 64% 70%, 54% 74%, 62% 100%, 40% 55%, 50% 50%, 38% 30%, 46% 28%); }
+  78%  { opacity: 1; }
+  80%  { opacity: .3; }
+  82%, 93% { opacity: 0; }
+  96%  { opacity: 1; clip-path: polygon(40% 0%, 52% 28%, 44% 32%, 60% 60%, 48% 64%, 58% 100%, 32% 50%, 42% 46%, 30% 26%, 38% 24%); }
+  97%  { opacity: .2; }
+  98%  { opacity: 1; }
+  99%, 100% { opacity: 0; }
 }
 .fx-frame-theme-thunder_god {
-  --fx-ring: conic-gradient(from 0deg, #1a0033, #00e5ff, #1a0033);
-  --fx-ring-speed: 1.5s;
-  animation: fx-electric-flicker 1.4s steps(1) infinite;
+  position: relative;
+  border-color: #1a0033 !important;
+  animation: fx-thunder-crackle 4.5s steps(1) infinite;
+}
+.fx-frame-theme-thunder_god::before {
+  content: "";
+  position: absolute; inset: -6px; border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(from 0deg, #1a0033, #00e5ff, #1a0033, #00e5ff, #1a0033);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: fx-thunder-ring-spin 1.2s linear infinite;
+  pointer-events: none;
 }
 .fx-frame-theme-thunder_god::after {
   content: "";
-  position: absolute; inset: -10px;
-  clip-path: polygon(48% 0%, 58% 35%, 50% 40%, 62% 100%, 42% 55%, 50% 50%);
+  position: absolute; inset: -11px;
   background: linear-gradient(180deg, #ffffff, #00e5ff);
-  animation: fx-thunder-bolt 2.4s steps(1) infinite;
+  animation: fx-thunder-bolt 4.5s steps(1) infinite;
   pointer-events: none;
 }
 .fx-nick-theme-thunder_god {
   --fx-text-gradient: linear-gradient(90deg, #1a0033, #00e5ff, #ffffff, #00e5ff, #1a0033);
-  animation: fx-rainbow-shift 1s linear infinite;
-  text-shadow: 0 0 8px #00e5ff;
+  background-size: 300% auto;
+  animation: fx-rainbow-shift 1s linear infinite, fx-thunder-text-crackle 4.5s steps(1) infinite;
+}
+@keyframes fx-thunder-text-crackle {
+  0%, 76%, 100% { text-shadow: 0 0 8px #00e5ff; }
+  78%  { text-shadow: 0 0 2px #000; }
+  80%  { text-shadow: 0 0 18px #00e5ff; }
+  96%  { text-shadow: 0 0 22px #ffffff, 0 0 8px #00e5ff; }
 }
 
 /* ⭐⭐⭐⭐⭐ Mythic — Ocean
@@ -1295,36 +1578,64 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   text-shadow: 0 0 6px rgba(255,255,255,.5);
 }
 
-/* ⭐⭐⭐⭐⭐ Mythic — Arcane
-   Магические точки-руны, вращающиеся вокруг кольца отдельным
-   слоем (параллакс), на фоне медленного фиолетового пульса. */
+/* ⭐⭐⭐⭐⭐ MYTHIC ULTRA — Arcane Rune Circle
+   Три слоя, вращающиеся В РАЗНЫЕ стороны (counter-rotation —
+   настоящий магический круг, а не одно вращающееся кольцо): (1) сам
+   обод — ровное мистическое свечение + редкая яркая вспышка
+   "произнесённого заклинания" (pulse event); (2) ::before —
+   рунная насечка (repeating-conic-gradient), вращается ПО часовой;
+   (3) ::after — внешние точки-сигилы, вращаются ПРОТИВ часовой,
+   на другой скорости. */
 @keyframes fx-arcane-pulse {
-  0%, 100% { box-shadow: 0 0 6px 2px #4b0082; }
-  50%      { box-shadow: 0 0 16px 4px #9d4edd, 0 0 4px 2px #e0aaff; }
+  0%, 85%, 100% { box-shadow: 0 0 6px 2px #4b0082; border-color: #4b0082 !important; }
+  90%           { box-shadow: 0 0 26px 8px #e0aaff, 0 0 10px 4px #9d4edd; border-color: #e0aaff !important; }
+  95%           { box-shadow: 0 0 10px 3px #9d4edd; border-color: #9d4edd !important; }
 }
-@keyframes fx-arcane-orbit {
+@keyframes fx-arcane-runes-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes fx-arcane-sigils-spin {
   to { transform: rotate(-360deg); }
 }
 .fx-frame-theme-arcane {
-  --fx-ring: conic-gradient(from 0deg, #4b0082, #9d4edd, #e0aaff, #4b0082);
-  --fx-ring-speed: 5s;
-  animation: fx-arcane-pulse 2.6s ease-in-out infinite;
+  position: relative;
+  border-color: #4b0082 !important;
+  animation: fx-arcane-pulse 4.5s ease-in-out infinite;
+}
+.fx-frame-theme-arcane::before {
+  content: "";
+  position: absolute; inset: -6px; border-radius: 50%;
+  padding: 3px;
+  background: repeating-conic-gradient(from 0deg, #4b0082 0deg 10deg, #9d4edd 10deg 16deg, #e0aaff 16deg 18deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: fx-arcane-runes-spin 9s linear infinite;
+  pointer-events: none;
 }
 .fx-frame-theme-arcane::after {
   content: "";
-  position: absolute; inset: -11px; border-radius: 50%;
+  position: absolute; inset: -12px; border-radius: 50%;
   background:
-    radial-gradient(circle 1.5px at 50% 2%, #e0aaff, transparent),
+    radial-gradient(circle 1.5px at 50% 2%,  #e0aaff, transparent),
     radial-gradient(circle 1.5px at 98% 50%, #9d4edd, transparent),
     radial-gradient(circle 1.5px at 50% 98%, #e0aaff, transparent),
-    radial-gradient(circle 1.5px at 2% 50%, #9d4edd, transparent);
-  animation: fx-arcane-orbit 5s linear infinite;
+    radial-gradient(circle 1.5px at 2% 50%,  #9d4edd, transparent),
+    radial-gradient(circle 1px   at 85% 15%, #fff, transparent),
+    radial-gradient(circle 1px   at 15% 85%, #fff, transparent);
+  animation: fx-arcane-sigils-spin 6s linear infinite;
   pointer-events: none;
 }
 .fx-nick-theme-arcane {
   --fx-text-gradient: linear-gradient(90deg, #4b0082, #9d4edd, #e0aaff, #4b0082);
-  animation: fx-rainbow-shift 3s ease-in-out infinite;
-  text-shadow: 0 0 8px #9d4edd;
+  background-size: 300% auto;
+  animation: fx-rainbow-shift 3s ease-in-out infinite, fx-arcane-cast-text 4.5s ease-in-out infinite;
+}
+@keyframes fx-arcane-cast-text {
+  0%, 85%, 100% { text-shadow: 0 0 8px #9d4edd; }
+  90%           { text-shadow: 0 0 20px #e0aaff, 0 0 8px #9d4edd; }
+  95%           { text-shadow: 0 0 10px #9d4edd; }
 }
 
 /* ⭐⭐⭐⭐⭐ Mythic — Runic
@@ -1387,22 +1698,58 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   text-shadow: 0 0 6px #ff0055;
 }
 
-/* ⭐⭐⭐⭐⭐ Mythic — Divine
-   Вращающиеся лучи света (резкие sector-полосы через
-   conic-gradient) поверх ровного, величавого сияния. */
-.fx-frame-theme-divine {
-  --fx-ring: repeating-conic-gradient(from 0deg, #fff8e1 0deg 4deg, transparent 4deg 20deg);
-  --fx-ring-speed: 6s;
-  animation: fx-divine-radiance 3s ease-in-out infinite;
-}
+/* ⭐⭐⭐⭐⭐ MYTHIC ULTRA — Divine Emperor Gold
+   Три слоя, разные механики: (1) сам обод — величавое ровное
+   сияние + редкая мощная вспышка "императорского указа" (pulse
+   event); (2) ::before — медленно вращающиеся лучи света
+   (repeating-conic-gradient — угловая механика); (3) ::after —
+   бегущий блик "жидкого золота" через background-position sweep
+   (линейная механика, принципиально другая от вращения лучей). */
 @keyframes fx-divine-radiance {
-  0%, 100% { box-shadow: 0 0 10px 2px #ffd54f; }
-  50%      { box-shadow: 0 0 22px 6px #fff8e1, 0 0 8px 3px #ffd54f; }
+  0%, 88%, 100% { box-shadow: 0 0 10px 2px #ffd54f; border-color: #ffd54f !important; }
+  92%           { box-shadow: 0 0 30px 10px #fff8e1, 0 0 12px 5px #ffd54f; border-color: #fff8e1 !important; }
+  96%           { box-shadow: 0 0 14px 4px #ffd54f; border-color: #ffd54f !important; }
+}
+@keyframes fx-divine-rays-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes fx-divine-shimmer-sweep {
+  0%   { background-position: -150% 0; }
+  100% { background-position: 250% 0; }
+}
+.fx-frame-theme-divine {
+  position: relative;
+  border-color: #ffd54f !important;
+  animation: fx-divine-radiance 5s ease-in-out infinite;
+}
+.fx-frame-theme-divine::before {
+  content: "";
+  position: absolute; inset: -7px; border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, #fff8e1 0deg 4deg, transparent 4deg 20deg);
+  animation: fx-divine-rays-spin 10s linear infinite;
+  pointer-events: none;
+}
+.fx-frame-theme-divine::after {
+  content: "";
+  position: absolute; inset: -4px; border-radius: 50%;
+  padding: 3px;
+  background: linear-gradient(120deg, #7a5c1e 30%, #fff6d8 48%, #ffffff 50%, #fff6d8 52%, #7a5c1e 70%);
+  background-size: 300% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: fx-divine-shimmer-sweep 2.5s linear infinite;
+  pointer-events: none;
 }
 .fx-nick-theme-divine {
   --fx-text-gradient: linear-gradient(90deg, #fff8e1, #ffd54f, #ffffff, #ffd54f, #fff8e1);
-  animation: fx-rainbow-shift 3s ease-in-out infinite;
-  text-shadow: 0 0 10px rgba(255,213,79,.7);
+  background-size: 300% auto;
+  animation: fx-rainbow-shift 3s ease-in-out infinite, fx-divine-decree-text 5s ease-in-out infinite;
+}
+@keyframes fx-divine-decree-text {
+  0%, 88%, 100% { text-shadow: 0 0 10px rgba(255,213,79,.7); }
+  92%           { text-shadow: 0 0 24px #fff8e1, 0 0 10px #ffd54f; }
 }
 
 /* ⭐⭐⭐⭐⭐ Mythic — Spirit
