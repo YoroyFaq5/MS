@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}{{ season.name }}{% endblock %}
 
 {% block content %}
@@ -28,7 +29,7 @@
     <div class="fs-2">🏆</div>
     <div>
       <div class="text-muted small mb-1">Победитель сезона</div>
-      <div class="fw-bold fs-5">{{ season.winner.display_name }}</div>
+      <div class="fw-bold fs-5">{{ player_name(season.winner, equipped_bulk.get(season.winner.id, {})) }}</div>
     </div>
     <div class="ms-auto text-end">
       <div class="text-muted small">Очки</div>
@@ -58,7 +59,7 @@
     <div class="d-flex flex-wrap gap-2 mb-4">
       {% for r in tiebreak_candidates %}
       <div class="card text-center p-3" style="min-width:140px">
-        <div class="fw-bold">{{ r.display_name }}</div>
+        <div class="fw-bold">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</div>
         <div class="fs-5 text-warning fw-bold">{{ r.season_rating|round(2) }}</div>
         <div class="text-muted small">{{ r.games_played }} игр · {{ (r.win_rate * 100)|round(1) }}%</div>
       </div>
@@ -104,7 +105,7 @@
       <a href="{{ url_for('profile.view_profile', player_id=pt.player_id) }}" class="text-decoration-none">
         <span class="badge bg-body-secondary text-body border">
           {% if pt.title.icon %}<i class="bi {{ pt.title.icon }} me-1"></i>{% endif %}
-          {{ pt.title.name }} — <strong class="ms-1">{{ pt.player.display_name }}</strong>
+          {{ pt.title.name }} — <strong class="ms-1">{{ player_name(pt.player, equipped_bulk.get(pt.player_id, {})) }}</strong>
         </span>
       </a>
       {% endfor %}
@@ -180,7 +181,7 @@
             </td>
             <td>
               <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}"
-                 class="text-decoration-none fw-semibold">{{ r.display_name }}</a>
+                 class="text-decoration-none fw-semibold">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</a>
             </td>
             <td class="text-center text-muted">{{ r.games_played }}</td>
             <td class="text-center text-muted">{{ r.games_won }}</td>

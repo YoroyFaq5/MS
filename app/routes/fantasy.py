@@ -8,6 +8,7 @@ from flask_login import current_user, login_required
 from app import db
 from app.models import FantasyDraft, Tournament, Player
 from app.services import FantasyService, PermissionService, Permission
+from app.services.shop_service import ShopService
 from app.auth_decorators import requires_permission
 
 fantasy_bp = Blueprint("fantasy", __name__)
@@ -50,6 +51,13 @@ def tournament_fantasy(tournament_id: int):
     ).count()
     from app.services.fantasy_service import _allowed_picks
     max_picks = _allowed_picks(participant_count)
+
+    # Персонализация ников — только для реальных Player (пики драфта),
+    # не для leaderboard (там User — участники fantasy, другая сущность).
+    equipped_bulk = ShopService.get_equipped_bulk(
+        [p.player_id for p in my_draft.picks] if my_draft else []
+    )
+
     return render_template(
         "fantasy/tournament.html",
         tournament=t,
@@ -58,6 +66,7 @@ def tournament_fantasy(tournament_id: int):
         my_draft=my_draft,
         available_players=available,
         max_picks=max_picks,
+        equipped_bulk=equipped_bulk,
     )
 
 

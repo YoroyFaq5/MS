@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}Сезоны {{ year }}{% endblock %}
 
 {% block content %}
@@ -70,7 +71,7 @@
         <div class="winner-block d-flex align-items-center gap-2 mb-3">
           <span class="fs-4">🏆</span>
           <div>
-            <div class="fw-semibold text-warning">{{ season.winner.display_name }}</div>
+            <div class="fw-semibold text-warning">{{ player_name(season.winner, equipped_bulk.get(season.winner.id, {})) }}</div>
             <div class="text-muted small">{{ season.winner_score }} очков</div>
           </div>
         </div>
@@ -133,7 +134,7 @@
             </td>
             <td>
               <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}"
-                 class="text-decoration-none fw-semibold">{{ r.display_name }}</a>
+                 class="text-decoration-none fw-semibold">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</a>
             </td>
             <td class="text-center text-muted">{{ r.games_played }}</td>
             <td class="text-center text-muted">{{ r.games_won }}</td>

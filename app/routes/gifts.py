@@ -4,6 +4,7 @@ from flask_login import current_user
 from app import db
 from app.models import Player
 from app.services import GiftService
+from app.services.shop_service import ShopService
 from app.auth_decorators import login_required
 
 gifts_bp = Blueprint("gifts", __name__)
@@ -18,7 +19,8 @@ def incoming():
 
     gifts = GiftService.get_incoming_gifts(current_user.player_id)
     GiftService.mark_seen(current_user.player_id)
-    return render_template("gifts/incoming.html", gifts=gifts)
+    equipped_bulk = ShopService.get_equipped_bulk([g.from_player_id for g in gifts])
+    return render_template("gifts/incoming.html", gifts=gifts, equipped_bulk=equipped_bulk)
 
 
 @gifts_bp.route("/history")
@@ -29,7 +31,12 @@ def history():
         return redirect(url_for("main.index"))
 
     transfers = GiftService.get_transfer_history(current_user.player_id)
-    return render_template("gifts/history.html", transfers=transfers, my_player_id=current_user.player_id)
+    player_ids = {t.from_player_id for t in transfers} | {t.to_player_id for t in transfers}
+    equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+    return render_template(
+        "gifts/history.html", transfers=transfers, my_player_id=current_user.player_id,
+        equipped_bulk=equipped_bulk,
+    )
 
 
 @gifts_bp.route("/send", methods=["POST"])

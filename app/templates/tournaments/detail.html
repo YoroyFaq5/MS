@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}{{ tournament.name }}{% endblock %}
 
 {% block content %}
@@ -121,7 +122,7 @@
           <tbody>
             {% for p in tournament.participants %}
             <tr>
-              <td class="ps-3">{{ p.player.display_name if p.player else '—' }}</td>
+              <td class="ps-3">{{ player_name(p.player, equipped_bulk.get(p.player_id, {})) if p.player else '—' }}</td>
               {% if tournament.type.value == 'team' %}
               <td class="text-muted">{{ p.team.name if p.team else '—' }}</td>
               {% endif %}
@@ -194,7 +195,7 @@
           <div class="d-flex flex-wrap gap-1 mb-2">
             {% for m in team.members %}
             <span class="badge bg-body-secondary text-body border d-flex align-items-center gap-1">
-              {{ m.player.display_name if m.player else '?' }}
+              {{ player_name(m.player, equipped_bulk.get(m.player_id, {})) if m.player else '?' }}
               {% if tournament.status != 'finished' and current_user.is_authenticated and current_user.is_admin %}
               <form method="POST"
                     action="{{ url_for('tournaments.remove_team_player', team_id=team.id, player_id=m.player_id) }}"
@@ -274,7 +275,7 @@
             {% for r in player_ratings[:8] %}
             <tr>
               <td class="ps-3 text-muted">{{ r.rank }}</td>
-              <td class="fw-medium">{{ r.display_name }}</td>
+              <td class="fw-medium">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
               <td class="text-center text-muted">{{ r.games_played }}</td>
               <td class="text-end pe-3 fw-semibold text-success">{{ r.total_score }}</td>
             </tr>

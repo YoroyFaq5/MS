@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}История подарков{% endblock %}
 
 {% block content %}
@@ -32,11 +33,11 @@
             <td>{{ t.shop_item.name if t.shop_item else '—' }}</td>
             <td>
               <a href="{{ url_for('profile.view_profile', player_id=t.from_player_id) }}"
-                 class="{% if t.from_player_id == my_player_id %}fw-semibold{% endif %}">{{ t.from_player.display_name }}</a>
+                 class="{% if t.from_player_id == my_player_id %}fw-semibold{% endif %}">{{ player_name(t.from_player, equipped_bulk.get(t.from_player_id, {})) }}</a>
             </td>
             <td>
               <a href="{{ url_for('profile.view_profile', player_id=t.to_player_id) }}"
-                 class="{% if t.to_player_id == my_player_id %}fw-semibold{% endif %}">{{ t.to_player.display_name }}</a>
+                 class="{% if t.to_player_id == my_player_id %}fw-semibold{% endif %}">{{ player_name(t.to_player, equipped_bulk.get(t.to_player_id, {})) }}</a>
             </td>
             <td class="pe-4 text-muted small fst-italic">{{ t.message or '' }}</td>
           </tr>

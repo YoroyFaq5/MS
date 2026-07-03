@@ -272,7 +272,7 @@ def admin_economy_reset_all():
     from app.services.economy_service import EconomyService
 
     confirm = request.form.get("confirm_reset", "")
-    if confirm != "ОБНУЛИТЬ":
+    if confirm != "СБРОСИТЬ":
         flash("Сброс не выполнен — подтверждение не совпало.", "danger")
         return redirect(url_for("auth.admin_economy"))
 

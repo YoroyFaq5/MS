@@ -122,6 +122,30 @@ class ShopService:
         )
         return {inv.item.slot_key: inv for inv in rows}
 
+    @staticmethod
+    def get_equipped_bulk(player_ids: List[int]) -> Dict[int, Dict[str, InventoryItem]]:
+        """
+        Batched get_equipped() for many players at once — one query instead
+        of N. Used when rendering a list of player names (leaderboards,
+        game rosters, tournament pages, …) so personalization doesn't turn
+        into an N+1 query storm.
+        Returns {player_id: {'category:subcategory': InventoryItem, ...}, ...}
+        — every requested player_id is present as a key, even with an empty
+        dict, so callers can safely do `.get(pid, {})`.
+        """
+        result: Dict[int, Dict[str, InventoryItem]] = {pid: {} for pid in player_ids}
+        if not player_ids:
+            return result
+        rows = (
+            db.session.query(InventoryItem)
+            .join(ShopItem)
+            .filter(InventoryItem.player_id.in_(player_ids), InventoryItem.is_equipped == True)
+            .all()
+        )
+        for inv in rows:
+            result[inv.player_id][inv.item.slot_key] = inv
+        return result
+
     # ── Equip / Unequip ──────────────────────────────────────────────────────
 
     @staticmethod

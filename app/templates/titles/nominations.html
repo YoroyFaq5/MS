@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}Номинации{% endblock %}
 
 {% block content %}
@@ -25,7 +26,7 @@
           </div>
           <div class="text-muted small mb-2">{{ pt.title.description or '' }}</div>
           <a href="{{ url_for('profile.view_profile', player_id=pt.player_id) }}" class="fw-bold text-warning text-decoration-none">
-            {{ pt.player.display_name }}
+            {{ player_name(pt.player, equipped_bulk.get(pt.player_id, {})) }}
           </a>
         </div>
       </div>
@@ -55,7 +56,7 @@
           </div>
           {% if entry.player %}
           <a href="{{ url_for('profile.view_profile', player_id=entry.player.id) }}" class="stat-value fs-5 text-decoration-none">
-            {{ entry.player.display_name }}
+            {{ player_name(entry.player, equipped_bulk.get(entry.player.id, {})) }}
           </a>
           {% else %}
           <div class="stat-value fs-6 text-muted">—</div>
@@ -88,7 +89,7 @@
               {% for award in h.awards %}
               <span class="badge bg-body-secondary text-body border">
                 {% if award.title.icon %}<i class="bi {{ award.title.icon }} me-1"></i>{% endif %}
-                {{ award.title.name }} — <strong class="ms-1">{{ award.player_name }}</strong>
+                {{ award.title.name }} — <strong class="ms-1">{{ player_name({'display_name': award.player_name}, equipped_bulk.get(award.player_id, {})) }}</strong>
               </span>
               {% endfor %}
             </div>

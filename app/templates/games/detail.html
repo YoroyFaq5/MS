@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}Игра #{{ game.id }}{% endblock %}
 
 {% block content %}
@@ -71,7 +72,7 @@
             </td>
             <td class="fw-medium">
               <a href="{{ url_for('profile.view_profile', player_id=slot.player_id) }}"
-                 class="text-decoration-none">{{ slot.player.display_name }}
+                 class="text-decoration-none">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}
                   {% if slot.is_pu %}
                     <span class="ms-1" title="Первый убиенный">💀</span>
                   {% endif %}
@@ -151,7 +152,7 @@
             </td>
             <td class="fw-medium">
               <a href="{{ url_for('profile.view_profile', player_id=slot.player_id) }}"
-                 class="text-decoration-none">{{ slot.player.display_name }}
+                 class="text-decoration-none">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}
                   {% if slot.is_pu %}
                     <span class="ms-1" title="Первый убиенный">💀</span>
                   {% endif %}

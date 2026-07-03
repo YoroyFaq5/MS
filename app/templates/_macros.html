@@ -1,0 +1,20 @@
+{# Общие переиспользуемые макросы. #}
+
+{#
+  Рендерит имя игрока с учётом экипированной персонализации ника
+  (цвет/градиент/префикс/суффикс) — та же логика, что в profile/main.html.
+
+  player:   объект Player (или dict с .display_name / ['display_name'])
+  equipped: dict {"category:subcategory": InventoryItem, ...} для ЭТОГО
+            игрока — обычно результат ShopService.get_equipped_bulk(ids).get(player.id, {})
+            Если не передан или пуст — просто display_name без стилей.
+#}
+{% macro player_name(player, equipped={}) -%}
+{%- set nick_color = equipped.get('nickname:nick_color') -%}
+{%- set nick_gradient = equipped.get('nickname:nick_gradient') -%}
+{%- set nick_prefix = equipped.get('nickname:nick_prefix') -%}
+{%- set nick_suffix = equipped.get('nickname:nick_suffix') -%}
+{%- if nick_prefix %}<span class="me-1">{{ nick_prefix.item.data.text }}</span>{% endif -%}
+<span{% if nick_gradient %} style="background:linear-gradient(90deg,{{ nick_gradient.item.data.from }},{{ nick_gradient.item.data.to }});-webkit-background-clip:text;background-clip:text;color:transparent;"{% elif nick_color %} style="color:{{ nick_color.item.data.color }}"{% endif %}>{{ player.display_name }}</span>
+{%- if nick_suffix %}<span class="ms-1">{{ nick_suffix.item.data.text }}</span>{% endif -%}
+{%- endmacro %}

@@ -4,6 +4,7 @@ from flask_login import current_user
 from app import db
 from app.models import Player
 from app.services import ProfileService, AchievementService, PermissionService, TitleService, ChartDataService
+from app.services.shop_service import ShopService
 from app.auth_decorators import login_required
 
 profile_bp = Blueprint("profile", __name__)
@@ -52,6 +53,15 @@ def statistics(player_id: int):
         "economy": ChartDataService.get_economy_timeline(player_id),
     }
 
+    # Персонализация — сам игрок страницы + все упомянутые в статистике
+    # партнёры/соперники (partner_stats/rivalry_stats — dict-записи с
+    # player_id, см. ProfileService.get_partner_statistics).
+    other_ids = {
+        e["player_id"] for e in list(partner_stats.values()) + list(rivalry_stats.values())
+        if isinstance(e, dict) and "player_id" in e
+    }
+    equipped_bulk = ShopService.get_equipped_bulk(list(other_ids) + [player_id])
+
     return render_template(
         "profile/statistics.html",
         player=player,
@@ -63,6 +73,7 @@ def statistics(player_id: int):
         tournament_summary=tournament_summary,
         fantasy_summary=fantasy_summary,
         chart_data=chart_data,
+        equipped_bulk=equipped_bulk,
     )
 
 
@@ -74,6 +85,7 @@ def achievements(player_id: int):
     total_count = len(items)
     completion_pct = round(unlocked_count / total_count * 100, 1) if total_count else 0.0
     is_own = current_user.is_authenticated and current_user.player_id == player_id
+    equipped = ShopService.get_equipped(player_id)
     return render_template(
         "profile/achievements.html",
         player=player,
@@ -83,6 +95,7 @@ def achievements(player_id: int):
         total_count=total_count,
         completion_pct=completion_pct,
         is_own=is_own,
+        equipped=equipped,
     )
 
 
@@ -113,10 +126,12 @@ def customization(player_id: int):
     player = db.session.get(Player, player_id) or abort(404)
     data = ProfileService.get_profile_customization(player_id)
     is_own = current_user.is_authenticated and current_user.player_id == player_id
+    equipped = ShopService.get_equipped(player_id)
     return render_template(
         "profile/customization.html",
         player=player,
         player_id=player_id,
         customization=data,
         is_own=is_own,
+        equipped=equipped,
     )

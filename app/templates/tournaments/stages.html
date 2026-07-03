@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}Этапы — {{ tournament.name }}{% endblock %}
 
 {% block content %}
@@ -104,7 +105,7 @@
               {% elif r.rank == 3 %}🥉
               {% else %}<span class="text-muted">{{ r.rank }}</span>{% endif %}
             </td>
-            <td class="fw-medium">{{ r.display_name }}</td>
+            <td class="fw-medium">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
             <td class="text-center text-muted">{{ r.games_played }}</td>
             <td class="text-center text-muted">{{ r.games_won }}</td>
             <td class="text-center text-muted">{{ r.avg_score }}</td>

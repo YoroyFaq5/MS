@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}Статистика — {{ player.display_name }}{% endblock %}
 
 {% set ROLE_LABELS = {'civilian': '👤 Мирный', 'mafia': '🔫 Мафия', 'don': '🎩 Дон', 'sheriff': '🔍 Шериф'} %}
@@ -6,7 +7,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h2 class="mb-0 fw-bold">📊 Статистика — {{ player.display_name }}</h2>
+    <h2 class="mb-0 fw-bold">📊 Статистика — {{ player_name(player, equipped_bulk.get(player_id, {})) }}</h2>
     <a href="{{ url_for('profile.view_profile', player_id=player_id) }}" class="text-muted small">← К профилю</a>
   </div>
 </div>
@@ -131,27 +132,27 @@
         <dl class="mb-0 small" style="display:grid;grid-template-columns:1fr auto;gap:.5rem 1rem">
           <dt class="text-muted">Лучший напарник</dt>
           <dd class="mb-0 text-end">
-            {% if partner_stats.best_partner %}{{ partner_stats.best_partner.display_name }} ({{ partner_stats.best_partner.wins_as_ally }} побед){% else %}—{% endif %}
+            {% if partner_stats.best_partner %}{{ player_name(partner_stats.best_partner, equipped_bulk.get(partner_stats.best_partner.player_id, {})) }} ({{ partner_stats.best_partner.wins_as_ally }} побед){% else %}—{% endif %}
           </dd>
           <dt class="text-muted">Худший напарник</dt>
           <dd class="mb-0 text-end">
-            {% if partner_stats.worst_partner %}{{ partner_stats.worst_partner.display_name }} ({{ partner_stats.worst_partner.losses_as_ally }} поражений){% else %}—{% endif %}
+            {% if partner_stats.worst_partner %}{{ player_name(partner_stats.worst_partner, equipped_bulk.get(partner_stats.worst_partner.player_id, {})) }} ({{ partner_stats.worst_partner.losses_as_ally }} поражений){% else %}—{% endif %}
           </dd>
           <dt class="text-muted">Самый частый союзник</dt>
           <dd class="mb-0 text-end">
-            {% if partner_stats.most_frequent_ally %}{{ partner_stats.most_frequent_ally.display_name }} ({{ partner_stats.most_frequent_ally.times_ally }} игр){% else %}—{% endif %}
+            {% if partner_stats.most_frequent_ally %}{{ player_name(partner_stats.most_frequent_ally, equipped_bulk.get(partner_stats.most_frequent_ally.player_id, {})) }} ({{ partner_stats.most_frequent_ally.times_ally }} игр){% else %}—{% endif %}
           </dd>
           <dt class="text-muted">Самый частый соперник</dt>
           <dd class="mb-0 text-end">
-            {% if partner_stats.most_frequent_opponent %}{{ partner_stats.most_frequent_opponent.display_name }} ({{ partner_stats.most_frequent_opponent.times_opponent }} игр){% else %}—{% endif %}
+            {% if partner_stats.most_frequent_opponent %}{{ player_name(partner_stats.most_frequent_opponent, equipped_bulk.get(partner_stats.most_frequent_opponent.player_id, {})) }} ({{ partner_stats.most_frequent_opponent.times_opponent }} игр){% else %}—{% endif %}
           </dd>
           <dt class="text-muted">Лучший WR против</dt>
           <dd class="mb-0 text-end">
-            {% if partner_stats.best_wr_opponent %}{{ partner_stats.best_wr_opponent.display_name }} ({{ partner_stats.best_wr_opponent.win_rate_vs }}%){% else %}—{% endif %}
+            {% if partner_stats.best_wr_opponent %}{{ player_name(partner_stats.best_wr_opponent, equipped_bulk.get(partner_stats.best_wr_opponent.player_id, {})) }} ({{ partner_stats.best_wr_opponent.win_rate_vs }}%){% else %}—{% endif %}
           </dd>
           <dt class="text-muted">Худший WR против</dt>
           <dd class="mb-0 text-end">
-            {% if partner_stats.worst_wr_opponent %}{{ partner_stats.worst_wr_opponent.display_name }} ({{ partner_stats.worst_wr_opponent.win_rate_vs }}%){% else %}—{% endif %}
+            {% if partner_stats.worst_wr_opponent %}{{ player_name(partner_stats.worst_wr_opponent, equipped_bulk.get(partner_stats.worst_wr_opponent.player_id, {})) }} ({{ partner_stats.worst_wr_opponent.win_rate_vs }}%){% else %}—{% endif %}
           </dd>
         </dl>
         <div class="text-muted small mt-2">Минимум {{ partner_stats.min_shared_games }} совместных игр для рейтинга WR</div>
@@ -173,7 +174,7 @@
             <div class="stat-card card p-3 text-center h-100">
               <div class="stat-label mb-1">Немезида</div>
               {% if rivalry_stats.nemesis %}
-              <div class="fw-bold">{{ rivalry_stats.nemesis.display_name }}</div>
+              <div class="fw-bold">{{ player_name(rivalry_stats.nemesis, equipped_bulk.get(rivalry_stats.nemesis.player_id, {})) }}</div>
               <div class="text-danger small">{{ rivalry_stats.nemesis.win_rate_vs }}% WR против</div>
               {% else %}<div class="text-muted small">—</div>{% endif %}
             </div>
@@ -182,7 +183,7 @@
             <div class="stat-card card p-3 text-center h-100">
               <div class="stat-label mb-1">Любимая жертва</div>
               {% if rivalry_stats.favorite_victim %}
-              <div class="fw-bold">{{ rivalry_stats.favorite_victim.display_name }}</div>
+              <div class="fw-bold">{{ player_name(rivalry_stats.favorite_victim, equipped_bulk.get(rivalry_stats.favorite_victim.player_id, {})) }}</div>
               <div class="text-success small">{{ rivalry_stats.favorite_victim.win_rate_vs }}% WR против</div>
               {% else %}<div class="text-muted small">—</div>{% endif %}
             </div>
@@ -191,7 +192,7 @@
             <div class="stat-card card p-3 text-center h-100">
               <div class="stat-label mb-1">Лучший тиммейт (WR)</div>
               {% if rivalry_stats.best_teammate_wr %}
-              <div class="fw-bold">{{ rivalry_stats.best_teammate_wr.display_name }}</div>
+              <div class="fw-bold">{{ player_name(rivalry_stats.best_teammate_wr, equipped_bulk.get(rivalry_stats.best_teammate_wr.player_id, {})) }}</div>
               <div class="text-success small">{{ rivalry_stats.best_teammate_wr.win_rate_ally }}% WR вместе</div>
               {% else %}<div class="text-muted small">—</div>{% endif %}
             </div>
@@ -200,7 +201,7 @@
             <div class="stat-card card p-3 text-center h-100">
               <div class="stat-label mb-1">Худший тиммейт (WR)</div>
               {% if rivalry_stats.worst_teammate_wr %}
-              <div class="fw-bold">{{ rivalry_stats.worst_teammate_wr.display_name }}</div>
+              <div class="fw-bold">{{ player_name(rivalry_stats.worst_teammate_wr, equipped_bulk.get(rivalry_stats.worst_teammate_wr.player_id, {})) }}</div>
               <div class="text-danger small">{{ rivalry_stats.worst_teammate_wr.win_rate_ally }}% WR вместе</div>
               {% else %}<div class="text-muted small">—</div>{% endif %}
             </div>
@@ -213,7 +214,7 @@
           <div class="col-md-6">
             <div class="card bg-body-secondary p-3">
               <div class="text-muted small mb-1">🔫 Дуэт мафии</div>
-              <div class="fw-bold">{{ rivalry_stats.mafia_duo.display_name }}</div>
+              <div class="fw-bold">{{ player_name(rivalry_stats.mafia_duo, equipped_bulk.get(rivalry_stats.mafia_duo.player_id, {})) }}</div>
               <div class="small text-muted">
                 {{ rivalry_stats.mafia_duo.mafia_duo_games }} игр вместе за мафию · WR {{ rivalry_stats.mafia_duo.duo_win_rate }}%
               </div>
@@ -227,7 +228,7 @@
                 🔍 Шериф vs 🎩 Дон
                 {% if rivalry_stats.sheriff_vs_don.as_role == 'sheriff' %}(вы — шериф){% else %}(вы — дон){% endif %}
               </div>
-              <div class="fw-bold">{{ rivalry_stats.sheriff_vs_don.opponent }}</div>
+              <div class="fw-bold">{{ player_name({'display_name': rivalry_stats.sheriff_vs_don.opponent}, equipped_bulk.get(rivalry_stats.sheriff_vs_don.player_id, {})) }}</div>
               <div class="small text-muted">
                 {{ rivalry_stats.sheriff_vs_don.games }} игр · WR {{ rivalry_stats.sheriff_vs_don.win_rate }}%
               </div>

@@ -15,6 +15,7 @@ from app import db
 from app.models import Season, SeasonStatus
 from app.services.season_service import SeasonService
 from app.services.rating_service import RatingService
+from app.services.shop_service import ShopService
 from app.auth_decorators import admin_required
 
 seasons_bp = Blueprint("seasons", __name__)
@@ -44,6 +45,12 @@ def index():
     # Year rating
     year_ratings = RatingService.get_year_rating(year)
 
+    # Персонализация ников — один bulk-запрос на все имена этой страницы
+    # (year_ratings + победители сезонов года).
+    player_ids = {r.player_id for r in year_ratings}
+    player_ids.update(s.winner_player_id for s in seasons if s.winner_player_id)
+    equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+
     return render_template(
         "seasons/index.html",
         seasons=seasons,
@@ -51,6 +58,7 @@ def index():
         year=year,
         available_years=available_years,
         year_ratings=year_ratings,
+        equipped_bulk=equipped_bulk,
     )
 
 
@@ -84,6 +92,15 @@ def detail(season_id: int):
     from app.services import TitleService
     season_nominations = TitleService.get_season_nominations(season_id)
 
+    # Персонализация ников — один bulk-запрос на все имена этой страницы.
+    # GG-панель ниже не в счёт — она видна только админам (простой текст).
+    player_ids = {r.player_id for r in ratings}
+    player_ids.update(c.player_id for c in tiebreak_candidates)
+    player_ids.update(pt.player_id for pt in season_nominations)
+    if season.winner_player_id:
+        player_ids.add(season.winner_player_id)
+    equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+
     return render_template(
         "seasons/detail.html",
         season=season,
@@ -92,6 +109,7 @@ def detail(season_id: int):
         recent_games=recent_games,
         gg_entries=gg_entries,
         season_nominations=season_nominations,
+        equipped_bulk=equipped_bulk,
     )
 
 

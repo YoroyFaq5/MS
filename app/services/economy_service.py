@@ -74,6 +74,10 @@ DAILY_GAME_REWARD_CAP   = 200.0
 # Стартовый бонус, начисляемый при создании нового Player.
 WELCOME_BONUS_AMOUNT = 100.0
 
+# Значение, до которого EconomyService.reset_all_balances() выставляет
+# баланс каждому игроку (не 0 — по явному запросу администратора).
+DEFAULT_RESET_BALANCE = 75.0
+
 # ---------------------------------------------------------------------------
 # Result DTO
 # ---------------------------------------------------------------------------
@@ -230,16 +234,17 @@ class EconomyService:
     def reset_all_balances() -> EconomyResult:
         """
         Полный сброс экономики: удаляет ВСЮ историю CoinTransaction и
-        обнуляет Player.coins у всех игроков. Необратимо (в отличие от
-        остальной логики сервиса, которая ведёт неизменяемый леджер) —
-        осознанное решение по явному запросу администратора, не
-        вызывается автоматически ниоткуда.
+        выставляет Player.coins в DEFAULT_RESET_BALANCE у всех игроков.
+        Необратимо (в отличие от остальной логики сервиса, которая ведёт
+        неизменяемый леджер) — осознанное решение по явному запросу
+        администратора, не вызывается автоматически ниоткуда.
         """
         tx_count = db.session.query(CoinTransaction).delete()
-        player_count = db.session.query(Player).update({Player.coins: 0.0})
+        player_count = db.session.query(Player).update({Player.coins: DEFAULT_RESET_BALANCE})
         db.session.commit()
         return EconomyResult.success(
-            f"Баланс обнулён у {player_count} игроков, удалено записей истории: {tx_count}."
+            f"Баланс сброшен до {DEFAULT_RESET_BALANCE} у {player_count} игроков, "
+            f"удалено записей истории: {tx_count}."
         )
 
     @staticmethod

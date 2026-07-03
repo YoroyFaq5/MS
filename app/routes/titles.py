@@ -6,6 +6,7 @@ from app.models import Title, Player
 from app.services import TitleService, NominationService
 from app.services.nomination_service import SEASONAL_ROLE_TITLES
 from app.services.season_service import SeasonService
+from app.services.shop_service import ShopService
 from app.auth_decorators import login_required
 
 titles_bp = Blueprint("titles", __name__)
@@ -38,12 +39,18 @@ def nominations():
 
     history = TitleService.get_seasonal_history()
 
+    player_ids = {pt.player_id for pt in global_holders}
+    player_ids.update(e["player"].id for e in current_leaders if e["player"])
+    player_ids.update(award["player_id"] for h in history for award in h["awards"])
+    equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+
     return render_template(
         "titles/nominations.html",
         global_holders=global_holders,
         current_season=current_season,
         current_leaders=current_leaders,
         history=history,
+        equipped_bulk=equipped_bulk,
     )
 
 

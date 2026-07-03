@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}Рейтинг{% endblock %}
 
 {% block content %}
@@ -17,7 +18,7 @@
   <div class="col-4 col-md-3 order-1 order-md-0">
     <div class="card text-center podium podium-2 h-100 py-3">
       <div class="fs-2 mb-1">🥈</div>
-      <div class="fw-bold">{{ ratings[1].display_name }}</div>
+      <div class="fw-bold">{{ player_name(ratings[1], equipped_bulk.get(ratings[1].player_id, {})) }}</div>
       <div class="text-muted small">{{ ratings[1].games_played }} игр</div>
       <div class="fs-5 fw-bold text-secondary mt-1">{{ ratings[1].total_score }}</div>
     </div>
@@ -26,7 +27,7 @@
   <div class="col-4 col-md-3 order-0 order-md-1">
     <div class="card text-center podium podium-1 h-100 py-4">
       <div class="fs-1 mb-1">🥇</div>
-      <div class="fw-bold fs-5">{{ ratings[0].display_name }}</div>
+      <div class="fw-bold fs-5">{{ player_name(ratings[0], equipped_bulk.get(ratings[0].player_id, {})) }}</div>
       <div class="text-muted small">{{ ratings[0].games_played }} игр</div>
       <div class="fs-4 fw-bold text-warning mt-1">{{ ratings[0].total_score }}</div>
     </div>
@@ -35,7 +36,7 @@
   <div class="col-4 col-md-3 order-2">
     <div class="card text-center podium podium-3 h-100 py-3">
       <div class="fs-2 mb-1">🥉</div>
-      <div class="fw-bold">{{ ratings[2].display_name }}</div>
+      <div class="fw-bold">{{ player_name(ratings[2], equipped_bulk.get(ratings[2].player_id, {})) }}</div>
       <div class="text-muted small">{{ ratings[2].games_played }} игр</div>
       <div class="fs-5 fw-bold mt-1" style="color:#cd7f32">{{ ratings[2].total_score }}</div>
     </div>
@@ -70,7 +71,7 @@
             </td>
             <td>
               <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}"
-                 class="text-decoration-none fw-semibold">{{ r.display_name }}</a>
+                 class="text-decoration-none fw-semibold">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</a>
               {% set title = equipped_titles.get(r.player_id) %}
               {% if title %}
               <span class="badge bg-warning-subtle text-warning border border-warning-subtle ms-1">

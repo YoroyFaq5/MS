@@ -12,6 +12,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from app import db
 from app.models import Player, TournamentSeries
 from app.services import SeriesTournamentService
+from app.services.shop_service import ShopService
 from app.auth_decorators import admin_required
 
 series_tournaments_bp = Blueprint("series_tournaments", __name__)
@@ -60,6 +61,9 @@ def series_tournament_detail(series_tournament_id: int):
     registered_ids = {p.player_id for p in st.tournament.participants}
     available_players = [p for p in all_players if p.id not in registered_ids]
 
+    player_ids = {e.player_id for e in overall[:10]} | registered_ids
+    equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+
     return render_template(
         "series_tournaments/detail.html",
         series_tournament=st,
@@ -67,6 +71,7 @@ def series_tournament_detail(series_tournament_id: int):
         series_list=sorted(st.series, key=lambda s: s.order),
         overall_top=overall[:10],
         available_players=available_players,
+        equipped_bulk=equipped_bulk,
     )
 
 
@@ -112,6 +117,8 @@ def series_detail(series_tournament_id: int, series_id: int):
     leaderboard = SeriesTournamentService.get_series_leaderboard(series_id)
     games = sorted(series.stage.games, key=lambda g: g.played_at, reverse=True) if series.stage else []
 
+    equipped_bulk = ShopService.get_equipped_bulk([r.player_id for r in leaderboard])
+
     return render_template(
         "series_tournaments/series_detail.html",
         series_tournament=st,
@@ -119,6 +126,7 @@ def series_detail(series_tournament_id: int, series_id: int):
         series=series,
         leaderboard=leaderboard,
         games=games,
+        equipped_bulk=equipped_bulk,
     )
 
 
@@ -152,9 +160,11 @@ def cancel_series(series_id: int):
 def leaderboard(series_tournament_id: int):
     st = _get_series_tournament_or_404(series_tournament_id)
     overall = SeriesTournamentService.get_overall_leaderboard(series_tournament_id)
+    equipped_bulk = ShopService.get_equipped_bulk([e.player_id for e in overall])
     return render_template(
         "series_tournaments/leaderboard.html",
         series_tournament=st, tournament=st.tournament, overall=overall,
+        equipped_bulk=equipped_bulk,
     )
 
 
@@ -165,9 +175,10 @@ def player_stats(series_tournament_id: int, player_id: int):
     breakdown = SeriesTournamentService.get_player_series_breakdown(series_tournament_id, player_id)
     overall = SeriesTournamentService.get_overall_leaderboard(series_tournament_id)
     overall_entry = next((e for e in overall if e.player_id == player_id), None)
+    equipped = ShopService.get_equipped(player_id)
 
     return render_template(
         "series_tournaments/player_stats.html",
         series_tournament=st, tournament=st.tournament, player=player,
-        breakdown=breakdown, overall_entry=overall_entry,
+        breakdown=breakdown, overall_entry=overall_entry, equipped=equipped,
     )

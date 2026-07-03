@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}{{ tournament.name }}{% endblock %}
 
 {% set STATUS_LABELS = {'pending': ('⏳ Идёт', 'bg-warning text-dark'), 'active': ('🟢 Активен', 'bg-success'), 'finished': ('✅ Завершён', 'bg-secondary')} %}
@@ -117,7 +118,7 @@
         {% if tournament.participants %}
         <div class="d-flex flex-wrap gap-2 p-3">
           {% for p in tournament.participants %}
-          <span class="badge bg-body-secondary text-body border">{{ p.player.display_name if p.player else '—' }}</span>
+          <span class="badge bg-body-secondary text-body border">{{ player_name(p.player, equipped_bulk.get(p.player_id, {})) if p.player else '—' }}</span>
           {% endfor %}
         </div>
         {% else %}
@@ -157,7 +158,7 @@
               <td class="ps-3 text-muted">{{ e.rank }}</td>
               <td>
                 <a href="{{ url_for('series_tournaments.player_stats', series_tournament_id=series_tournament.id, player_id=e.player_id) }}"
-                   class="text-decoration-none fw-medium">{{ e.display_name }}</a>
+                   class="text-decoration-none fw-medium">{{ player_name(e, equipped_bulk.get(e.player_id, {})) }}</a>
               </td>
               <td class="text-center text-muted">{{ e.series_played }}</td>
               <td class="text-end pe-3 fw-semibold text-success">{{ e.total_score }}</td>

@@ -10,6 +10,17 @@ def inject_now():
     return {"now": datetime.utcnow()}
 
 
+@app.context_processor
+def inject_current_user_customization():
+    """Стилизованное имя текущего юзера в шапке (base.html) — один лёгкий
+    запрос на страницу, только если юзер залогинен и привязан к игроку."""
+    from flask_login import current_user
+    if current_user.is_authenticated and current_user.player_id:
+        from app.services.shop_service import ShopService
+        return {"current_user_equipped": ShopService.get_equipped(current_user.player_id)}
+    return {"current_user_equipped": {}}
+
+
 @app.cli.command("init-db")
 def init_db():
     """Create all tables."""

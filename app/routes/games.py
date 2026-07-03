@@ -6,6 +6,7 @@ from app import db
 from app.models import Game, GameSlot, Player, Role, WinSide, Tournament, TournamentStage, StageType, Team, TeamPlayer, TournamentParticipant
 from app.services import RatingService
 from app.services.season_service import SeasonService
+from app.services.shop_service import ShopService
 from app.auth_decorators import admin_required
 
 games_bp = Blueprint("games", __name__)
@@ -77,8 +78,9 @@ def game_detail(game_id: int):
         all(s.role.value == "civilian" for s in slots) and
         len(slots) == 10
     )
+    equipped_bulk = ShopService.get_equipped_bulk([s.player_id for s in slots])
     return render_template("games/detail.html", game=game, slots=slots,
-                           roles_editable=roles_editable)
+                           roles_editable=roles_editable, equipped_bulk=equipped_bulk)
 
 
 @games_bp.route("/api/<int:game_id>")

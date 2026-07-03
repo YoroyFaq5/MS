@@ -15,6 +15,7 @@ from app.models import (
     TournamentType, StageType,
 )
 from app.services import TournamentService, RatingService
+from app.services.shop_service import ShopService
 from app.auth_decorators import admin_required
 
 tournaments_bp = Blueprint("tournaments", __name__)
@@ -81,10 +82,18 @@ def tournament_detail(tournament_id: int):
     # Players not yet in this tournament
     registered_ids = {p.player_id for p in summary["tournament"].participants}
     available_players = [p for p in all_players if p.id not in registered_ids]
+
+    player_ids = set(registered_ids)
+    player_ids.update(r.player_id for r in summary["player_ratings"])
+    for team in summary["tournament"].teams:
+        player_ids.update(m.player_id for m in team.members)
+    equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+
     return render_template(
         "tournaments/detail.html",
         **summary,
         available_players=available_players,
+        equipped_bulk=equipped_bulk,
     )
 
 
@@ -169,11 +178,16 @@ def stages(tournament_id: int):
     stage_ratings = {}
     for s in sorted_stages:
         stage_ratings[s.id] = RatingService.get_stage_rating(s.id)
+
+    player_ids = {r.player_id for ratings in stage_ratings.values() for r in ratings}
+    equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+
     return render_template(
         "tournaments/stages.html",
         tournament=t,
         stages=sorted_stages,
         stage_ratings=stage_ratings,
+        equipped_bulk=equipped_bulk,
     )
 
 
@@ -233,7 +247,9 @@ def leaderboard(tournament_id: int):
     final_ids = {p.player_id for p in final_participants}
 
     from app.services import TitleService
-    equipped_titles = TitleService.get_equipped_titles_bulk([r.player_id for r in player_ratings])
+    player_ids = [r.player_id for r in player_ratings]
+    equipped_titles = TitleService.get_equipped_titles_bulk(player_ids)
+    equipped_bulk = ShopService.get_equipped_bulk(player_ids)
 
     return render_template(
         "tournaments/leaderboard.html",
@@ -242,6 +258,7 @@ def leaderboard(tournament_id: int):
         team_ratings=team_ratings,
         final_ids=final_ids,
         equipped_titles=equipped_titles,
+        equipped_bulk=equipped_bulk,
     )
 
 
@@ -263,6 +280,10 @@ def final_view(tournament_id: int):
     final_games = sorted(final_stage.games, key=lambda g: g.played_at, reverse=True)
     final_participants = TournamentService.get_final_stage_participants(tournament_id)
 
+    player_ids = {r.player_id for r in final_ratings}
+    player_ids.update(fp.player_id for fp in final_participants)
+    equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+
     return render_template(
         "tournaments/final.html",
         tournament=t,
@@ -270,6 +291,7 @@ def final_view(tournament_id: int):
         final_ratings=final_ratings,
         final_games=final_games,
         final_participants=final_participants,
+        equipped_bulk=equipped_bulk,
     )
 
 

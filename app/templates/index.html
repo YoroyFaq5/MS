@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}Главная{% endblock %}
 
 {% block content %}
@@ -47,7 +48,7 @@
                 </td>
                 <td>
                   <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}"
-                     class="text-decoration-none fw-medium">{{ r.display_name }}</a>
+                     class="text-decoration-none fw-medium">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</a>
                 </td>
                 <td class="text-center text-muted">{{ r.games_played }}</td>
                 <td class="text-end pe-3 fw-semibold text-success">{{ r.total_score }}</td>
@@ -128,7 +129,7 @@
       <a href="{{ url_for('profile.view_profile', player_id=pt.player_id) }}" class="text-decoration-none">
         <span class="badge bg-body-secondary text-body border">
           {% if pt.title.icon %}<i class="bi {{ pt.title.icon }} me-1"></i>{% endif %}
-          {{ pt.title.name }} — <strong class="ms-1">{{ pt.player.display_name }}</strong>
+          {{ pt.title.name }} — <strong class="ms-1">{{ player_name(pt.player, equipped_bulk.get(pt.player_id, {})) }}</strong>
         </span>
       </a>
       {% endfor %}
@@ -167,7 +168,7 @@
                 </td>
                 <td>
                   <a href="{{ url_for('profile.view_profile', player_id=p.id) }}"
-                     class="text-decoration-none fw-medium">{{ p.display_name }}</a>
+                     class="text-decoration-none fw-medium">{{ player_name(p, equipped_bulk.get(p.id, {})) }}</a>
                 </td>
                 <td class="text-end pe-3 fw-semibold text-warning">{{ (p.coins or 0) | int }} 🪙</td>
               </tr>

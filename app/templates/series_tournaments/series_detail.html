@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}{{ series.name }} — {{ tournament.name }}{% endblock %}
 
 {% set SERIES_STATUS = {'pending': ('Ожидает', 'bg-secondary-subtle text-secondary border border-secondary-subtle'),
@@ -66,7 +67,7 @@
               </td>
               <td>
                 <a href="{{ url_for('series_tournaments.player_stats', series_tournament_id=series_tournament.id, player_id=r.player_id) }}"
-                   class="text-decoration-none fw-medium">{{ r.display_name }}</a>
+                   class="text-decoration-none fw-medium">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</a>
               </td>
               <td class="text-center text-muted">{{ r.games_played }}</td>
               <td class="text-center text-muted">{{ r.games_won }}</td>

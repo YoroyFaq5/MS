@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}Fantasy — {{ tournament.name }}{% endblock %}
 
 {% block content %}
@@ -43,7 +44,7 @@
             <tbody>
               {% for pick in my_draft.picks %}
               <tr>
-                <td class="ps-4 fw-medium">{{ pick.player.display_name if pick.player else '?' }}</td>
+                <td class="ps-4 fw-medium">{{ player_name(pick.player, equipped_bulk.get(pick.player_id, {})) if pick.player else '?' }}</td>
                 <td class="text-end pe-4">
                   {% if my_draft.status.value == 'scored' %}
                   <span class="fw-bold {% if pick.points_earned > 0 %}text-success{% else %}text-muted{% endif %}">

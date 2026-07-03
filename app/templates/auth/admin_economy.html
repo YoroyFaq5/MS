@@ -63,20 +63,20 @@
       <div class="card-header fw-semibold text-danger">⚠️ Опасная зона</div>
       <div class="card-body">
         <p class="text-muted small">
-          Обнуляет баланс <strong>всех</strong> игроков и безвозвратно удаляет
-          <strong>всю историю транзакций</strong>. Отменить нельзя.
+          Сбрасывает баланс <strong>всех</strong> игроков до 75 монет и безвозвратно
+          удаляет <strong>всю историю транзакций</strong>. Отменить нельзя.
         </p>
         <form method="POST" action="{{ url_for('auth.admin_economy_reset_all') }}"
-              onsubmit="return confirm('Точно обнулить балансы ВСЕХ игроков и удалить ВСЮ историю транзакций? Это необратимо.');">
+              onsubmit="return confirm('Точно сбросить баланс ВСЕХ игроков до 75 и удалить ВСЮ историю транзакций? Это необратимо.');">
           <div class="mb-3">
             <label class="form-label small fw-medium">
-              Для подтверждения введите <code>ОБНУЛИТЬ</code>
+              Для подтверждения введите <code>СБРОСИТЬ</code>
             </label>
             <input type="text" name="confirm_reset" class="form-control" required
-                   placeholder="ОБНУЛИТЬ" autocomplete="off">
+                   placeholder="СБРОСИТЬ" autocomplete="off">
           </div>
           <button type="submit" class="btn btn-outline-danger w-100">
-            <i class="bi bi-exclamation-triangle me-1"></i>Обнулить балансы у всех
+            <i class="bi bi-exclamation-triangle me-1"></i>Сбросить баланс у всех до 75
           </button>
         </form>
       </div>
