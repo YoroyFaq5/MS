@@ -56,14 +56,26 @@
             </div>
           </div>
 
-          {# ── Цвет (рамка, цвет ника) ──────────────────────────────────── #}
+          {# ── Тема оформления (готовый пресет — заменяет цвет/эффект) ──── #}
+          <div id="fields-theme" class="mb-3 personalization-fields">
+            <label class="form-label fw-medium">Оформление</label>
+            <select name="data_theme" id="themeSelect" class="form-select">
+              <option value="">🎨 Свой цвет (настроить ниже)</option>
+              {% for code, label in themes %}
+              <option value="{{ code }}" {% if item and item.data.theme == code %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Готовые темы — цвет и анимация зашиты заранее, выглядят одинаково у всех, кто их выберет.</div>
+          </div>
+
+          {# ── Цвет (рамка, цвет ника) — только в режиме "свой цвет" ────── #}
           <div id="fields-color" class="mb-3 personalization-fields">
             <label class="form-label fw-medium">Цвет</label>
             <input type="color" name="data_color" class="form-control form-control-color"
                    value="{{ item.data.color if item and item.data.color else '#C7A552' }}">
           </div>
 
-          {# ── Градиент (2 цвета) ───────────────────────────────────────── #}
+          {# ── Градиент (2 цвета) — только в режиме "свой цвет" ──────────── #}
           <div id="fields-gradient" class="row g-3 mb-3 personalization-fields">
             <div class="col-6">
               <label class="form-label fw-medium">Цвет 1</label>
@@ -92,7 +104,7 @@
                    placeholder="https://…">
           </div>
 
-          {# ── Эффект (анимация) ────────────────────────────────────────── #}
+          {# ── Эффект (анимация) — только в режиме "свой цвет" ───────────── #}
           <div id="fields-effect" class="mb-3 personalization-fields">
             <label class="form-label fw-medium">Эффект</label>
             <select name="data_effect" id="effectSelect" class="form-select"></select>
@@ -156,7 +168,6 @@ const PTYPES = {{ personalization_types | tojson }};
 const EFFECT_LABELS = {
   "": "— без эффекта —",
   glow: "✨ Свечение (пульсация)",
-  rainbow: "🌈 Радуга (анимация)",
   shimmer: "💫 Переливание",
   bounce: "🦘 Подпрыгивание",
   pulse: "💓 Пульсация",
@@ -164,16 +175,17 @@ const EFFECT_LABELS = {
 };
 
 const ptypeSelect = document.getElementById('ptype');
+const themeSelect = document.getElementById('themeSelect');
 const effectSelect = document.getElementById('effectSelect');
 const initialData = {{ (item.data | tojson) if item else '{}' }};
 
 function fieldsForType(t) {
   const groups = {
     custom:        ['fields-custom'],
-    frame:         ['fields-color', 'fields-effect'],
+    frame:         ['fields-theme', 'fields-color', 'fields-effect'],
     background:    ['fields-background'],
-    nick_color:    ['fields-color', 'fields-effect'],
-    nick_gradient: ['fields-gradient', 'fields-effect'],
+    nick_color:    ['fields-theme', 'fields-color', 'fields-effect'],
+    nick_gradient: ['fields-theme', 'fields-gradient', 'fields-effect'],
     nick_prefix:   ['fields-text', 'fields-effect'],
     nick_suffix:   ['fields-text', 'fields-effect'],
   };
@@ -200,6 +212,13 @@ function showFields(t) {
   });
   document.getElementById('previewBox').style.display = (t === 'custom') ? 'none' : '';
   updateEffectOptions(t);
+  // Тема выбрана — свой цвет/эффект не нужны, прячем их.
+  const hasTheme = !!themeSelect.value && (t === 'frame' || t === 'nick_color' || t === 'nick_gradient');
+  if (hasTheme) {
+    document.getElementById('fields-color').style.display = 'none';
+    document.getElementById('fields-gradient').style.display = 'none';
+    document.getElementById('fields-effect').style.display = 'none';
+  }
 }
 
 function updatePreview() {
@@ -207,6 +226,7 @@ function updatePreview() {
   const frame = document.getElementById('previewFrame');
   const nick = document.getElementById('previewNick');
   const effect = effectSelect.value;
+  const theme = themeSelect.value;
 
   frame.className = 'avatar-circle mx-auto mb-2';
   frame.style.cssText = 'width:64px;height:64px;font-size:1.5rem;';
@@ -215,20 +235,27 @@ function updatePreview() {
   nick.textContent = 'Игрок';
 
   if (t === 'frame') {
-    const color = document.querySelector('input[name=data_color]').value;
-    frame.classList.add('profile-frame');
-    if (effect === 'glow') frame.classList.add('fx-frame-glow');
-    if (effect === 'rainbow') frame.classList.add('fx-frame-rainbow');
-    frame.style.borderColor = color;
-    frame.style.setProperty('--fx-color', color);
+    if (theme) {
+      frame.classList.add('fx-frame-themed', `fx-frame-theme-${theme}`);
+    } else {
+      const color = document.querySelector('input[name=data_color]').value;
+      frame.classList.add('profile-frame');
+      if (effect === 'glow') frame.classList.add('fx-frame-glow');
+      frame.style.borderColor = color;
+      frame.style.setProperty('--fx-color', color);
+    }
   } else if (t === 'nick_color') {
-    const color = document.querySelector('input[name=data_color]').value;
-    nick.style.color = color;
-    nick.style.setProperty('--fx-color', color);
-    if (effect === 'glow') nick.classList.add('fx-nick-glow');
+    if (theme) {
+      nick.classList.add('fx-nick-themed', `fx-nick-theme-${theme}`);
+    } else {
+      const color = document.querySelector('input[name=data_color]').value;
+      nick.style.color = color;
+      nick.style.setProperty('--fx-color', color);
+      if (effect === 'glow') nick.classList.add('fx-nick-glow');
+    }
   } else if (t === 'nick_gradient') {
-    if (effect === 'rainbow') {
-      nick.classList.add('fx-nick-rainbow');
+    if (theme) {
+      nick.classList.add('fx-nick-themed', `fx-nick-theme-${theme}`);
     } else {
       const from = document.querySelector('input[name=data_from]').value;
       const to = document.querySelector('input[name=data_to]').value;
@@ -252,6 +279,7 @@ function updatePreview() {
 }
 
 ptypeSelect.addEventListener('change', () => { showFields(ptypeSelect.value); updatePreview(); });
+themeSelect.addEventListener('change', () => { showFields(ptypeSelect.value); updatePreview(); });
 document.getElementById('itemForm').addEventListener('input', updatePreview);
 
 // Init on page load (edit mode pre-fills effect select from existing data)
