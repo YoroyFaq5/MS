@@ -7,22 +7,40 @@ from app.auth_decorators import admin_required
 
 admin_shop_bp = Blueprint("admin_shop", __name__)
 
-# Известные типы персонализации → (category, subcategory, допустимые эффекты).
+# Готовые тематические пресеты (см. .fx-frame-theme-*/.fx-nick-theme-* в
+# main.css) — у каждой своя палитра И характер анимации (огонь мерцает
+# рвано, лёд — спокойный чёткий блеск, электричество дёргается и т.д.), а
+# не один и тот же generic pulse под разным цветом. Доступны на слотах,
+# где это осмысленно (рамка, цвет/градиент ника) — цвета админом не
+# настраиваются, это и есть весь смысл темы: "🔥 Огонь" всегда выглядит
+# как огонь.
+THEMES: list[tuple[str, str]] = [
+    ("fire", "🔥 Огонь"),
+    ("ice", "❄️ Лёд"),
+    ("electric", "⚡ Электричество"),
+    ("toxic", "☠️ Яд"),
+    ("shadow", "🌑 Тьма"),
+    ("holy", "✨ Свет"),
+    ("rainbow", "🌈 Радуга"),
+]
+
+# Известные типы персонализации → (category, subcategory, допустимые
+# "свои" эффекты для режима без темы, доступны ли темы).
 # "custom" — произвольный товар (мерч и т.п.), category/subcategory берутся
 # из формы как раньше, data всегда {}.
 PERSONALIZATION_TYPES: dict[str, dict] = {
     "frame":        {"category": "profile_customization", "subcategory": "frame",
-                      "effects": ["", "glow", "rainbow"]},
+                      "effects": ["", "glow"], "themes": True},
     "background":   {"category": "profile_customization", "subcategory": "background",
-                      "effects": []},
+                      "effects": [], "themes": False},
     "nick_color":   {"category": "nickname", "subcategory": "nick_color",
-                      "effects": ["", "glow"]},
+                      "effects": ["", "glow"], "themes": True},
     "nick_gradient": {"category": "nickname", "subcategory": "nick_gradient",
-                       "effects": ["", "shimmer", "rainbow"]},
+                       "effects": ["", "shimmer"], "themes": True},
     "nick_prefix":  {"category": "nickname", "subcategory": "nick_prefix",
-                      "effects": ["", "bounce", "pulse", "shake"]},
+                      "effects": ["", "bounce", "pulse", "shake"], "themes": False},
     "nick_suffix":  {"category": "nickname", "subcategory": "nick_suffix",
-                      "effects": ["", "bounce", "pulse", "shake"]},
+                      "effects": ["", "bounce", "pulse", "shake"], "themes": False},
 }
 
 
@@ -34,9 +52,12 @@ def _build_category_subcategory_data(form) -> tuple[ShopCategory, str, dict]:
     гарантированно находит нужный слот по "category:subcategory". Для
     "custom" (физический товар и т.п.) — свободные category/subcategory,
     как раньше, data всегда пустая.
+
+    Если выбрана тема (data_theme) — она полностью заменяет цвет/градиент/
+    эффект: data = {"theme": "..."}, ничего больше (палитра темы жёстко
+    зашита в CSS, не в БД).
     """
     ptype = form.get("personalization_type", "custom")
-    effect = (form.get("data_effect") or "").strip() or None
 
     if ptype == "custom":
         category = ShopCategory(form.get("category"))
@@ -46,6 +67,12 @@ def _build_category_subcategory_data(form) -> tuple[ShopCategory, str, dict]:
     spec = PERSONALIZATION_TYPES[ptype]
     category = ShopCategory(spec["category"])
     subcategory = spec["subcategory"]
+
+    theme = (form.get("data_theme") or "").strip()
+    if spec["themes"] and theme and theme in dict(THEMES):
+        return category, subcategory, {"theme": theme}
+
+    effect = (form.get("data_effect") or "").strip() or None
 
     if ptype in ("frame", "nick_color"):
         data = {"color": form.get("data_color") or "#C7A552"}
@@ -104,7 +131,7 @@ def new_item():
 
     return render_template(
         "admin_shop/form.html", item=None, categories=list(ShopCategory), rarities=list(Rarity),
-        initial_type="custom", personalization_types=PERSONALIZATION_TYPES,
+        initial_type="custom", personalization_types=PERSONALIZATION_TYPES, themes=THEMES,
     )
 
 
@@ -145,7 +172,7 @@ def edit_item(item_id: int):
 
     return render_template(
         "admin_shop/form.html", item=item, categories=list(ShopCategory), rarities=list(Rarity),
-        initial_type=initial_type, personalization_types=PERSONALIZATION_TYPES,
+        initial_type=initial_type, personalization_types=PERSONALIZATION_TYPES, themes=THEMES,
     )
 
 
