@@ -22,6 +22,12 @@ THEMES: list[tuple[str, str]] = [
     ("shadow", "🌑 Тьма"),
     ("holy", "✨ Свет"),
     ("rainbow", "🌈 Радуга"),
+    ("galaxy", "🌌 Галактика"),
+    ("diamond", "💎 Алмаз"),
+    ("blood", "🩸 Кровь"),
+    ("glitch", "🐛 Глитч"),
+    ("aurora", "🌈 Аврора"),
+    ("vortex", "🌀 Портал"),
 ]
 
 # Известные типы персонализации → (category, subcategory, допустимые
