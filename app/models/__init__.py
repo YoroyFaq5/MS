@@ -842,6 +842,8 @@ class Rarity(PyEnum):
     RARE      = "rare"
     EPIC      = "epic"
     LEGENDARY = "legendary"
+    MYTHIC    = "mythic"    # уникальные предметы — см. ShopService.buyout_item()
+    ULTRA     = "ultra"     # уникальные предметы — см. ShopService.buyout_item()
 
 
 class AchievementCategory(PyEnum):
