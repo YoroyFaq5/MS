@@ -261,6 +261,47 @@ class AuthService:
             f"Пользователь «{target_user.username}» разблокирован."
         )
 
+    @staticmethod
+    def admin_change_username(target_user: User, new_username: str, actor: User) -> AuthResult:
+        """Admin renames a login. Same format rules as self-registration."""
+        if not actor.is_admin:
+            return AuthResult.fail("Недостаточно прав.")
+        new_username = new_username.strip()
+        if not USERNAME_RE.match(new_username):
+            return AuthResult.fail("Логин: 3–32 символа, только буквы, цифры и '_'.")
+        if new_username == target_user.username:
+            return AuthResult.fail("Это и есть текущий логин.")
+        conflict = db.session.query(User).filter_by(username=new_username).first()
+        if conflict:
+            return AuthResult.fail(f"Логин «{new_username}» уже занят.")
+
+        old_username = target_user.username
+        target_user.username = new_username
+        db.session.commit()
+        return AuthResult.success(
+            f"Логин изменён: «{old_username}» → «{new_username}»."
+        )
+
+    @staticmethod
+    def admin_reset_password(target_user: User, new_password: str, actor: User) -> AuthResult:
+        """
+        Admin sets a new password directly — unlike change_password(), does
+        NOT require knowing the current one (пароли хешированы, посмотреть
+        существующий пароль невозможно в принципе — это и есть смысл
+        хеширования; сброс на новый — единственный безопасный вариант
+        "восстановить доступ" для админа).
+        """
+        if not actor.is_admin:
+            return AuthResult.fail("Недостаточно прав.")
+        if len(new_password) < PASSWORD_MIN:
+            return AuthResult.fail(f"Пароль должен быть не менее {PASSWORD_MIN} символов.")
+
+        target_user.set_password(new_password)
+        db.session.commit()
+        return AuthResult.success(
+            f"Пароль пользователя «{target_user.username}» сброшен на новый."
+        )
+
     # ── OAuth stub (future Telegram / Google) ─────────────────────────────────
 
     @staticmethod
