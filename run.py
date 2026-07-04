@@ -455,6 +455,62 @@ def update_shop_prices():
             print(f"Не найдено в БД (запустите сначала seed-shop): {', '.join(missing)}")
 
 
+@app.cli.command("update-shop-rarity")
+def update_shop_rarity():
+    """
+    Обновляет ТОЛЬКО rarity у уже существующих ShopItem (сверяет по имени
+    с _shop_items()) — нужно после того, как в коде поменялась привязка
+    темы к уровню редкости (появление Mythic/Ultra), чтобы уже созданные
+    товары получили правильный уровень редкости задним числом.
+    Ничего не создаёт и не трогает остальные поля (price/data/description).
+
+    Mythic/Ultra — ГЛОБАЛЬНО уникальные предметы для ShopService (см.
+    UNIQUE_RARITIES/get_current_owner в shop_service.py — не более одного
+    владельца на весь клуб). Пока предмет был обычным is_unique_purchase
+    (макс. 1 на игрока), его вполне могли купить НЕСКОЛЬКО разных игроков
+    по отдельности. Если так — rarity для него НЕ трогается автоматически:
+    печатается предупреждение, чтобы админ вручную решил, кто из
+    владельцев остаётся (остальным — компенсация/удаление записи), не
+    полагаясь молча на "единственного владельца", которого на самом деле
+    ещё нет.
+    """
+    from app.models import ShopItem, InventoryItem, Rarity
+
+    UNIQUE_RARITIES = {Rarity.MYTHIC, Rarity.ULTRA}
+    items = _shop_items()
+    with app.app_context():
+        updated = 0
+        unchanged = 0
+        missing = []
+        skipped_multi_owner = []
+        for spec in items:
+            item = db.session.query(ShopItem).filter_by(name=spec["name"]).first()
+            if not item:
+                missing.append(spec["name"])
+                continue
+            if item.rarity == spec["rarity"]:
+                unchanged += 1
+                continue
+            if spec["rarity"] in UNIQUE_RARITIES:
+                owners = (
+                    db.session.query(InventoryItem).filter_by(item_id=item.id).count()
+                )
+                if owners > 1:
+                    skipped_multi_owner.append((spec["name"], owners))
+                    continue
+            print(f"  {spec['name']}: {item.rarity.value} -> {spec['rarity'].value}")
+            item.rarity = spec["rarity"]
+            updated += 1
+        db.session.commit()
+        print(f"OK: обновлено редкости {updated}, без изменений {unchanged}.")
+        if missing:
+            print(f"Не найдено в БД (запустите сначала seed-shop): {', '.join(missing)}")
+        if skipped_multi_owner:
+            print("ПРОПУЩЕНО (у предмета больше 1 владельца — решите вручную перед переводом в Mythic/Ultra):")
+            for name, count in skipped_multi_owner:
+                print(f"  {name}: {count} владельцев")
+
+
 @app.cli.command("seed-achievements")
 def seed_achievements():
     """Seed example Achievement rows across all 9 categories. Re-run-safe.
