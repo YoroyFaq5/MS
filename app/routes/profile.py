@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, abort, request
 from flask_login import current_user
 
 from app import db
@@ -75,6 +75,38 @@ def statistics(player_id: int):
         fantasy_summary=fantasy_summary,
         comparison_stats=comparison_stats,
         chart_data=chart_data,
+        equipped_bulk=equipped_bulk,
+    )
+
+
+@profile_bp.route("/compare")
+def compare():
+    a_id = request.args.get("a", type=int)
+    b_id = request.args.get("b", type=int)
+
+    comparison = None
+    if a_id and b_id:
+        if a_id == b_id:
+            flash("Выберите двух разных игроков для сравнения.", "warning")
+        else:
+            comparison = ProfileService.compare_players(a_id, b_id)
+            if not comparison:
+                abort(404)
+
+    players = (
+        db.session.query(Player)
+        .filter_by(is_active=True)
+        .order_by(Player.name)
+        .all()
+    )
+    equipped_bulk = ShopService.get_equipped_bulk([a_id, b_id]) if comparison else {}
+
+    return render_template(
+        "profile/compare.html",
+        players=players,
+        a_id=a_id,
+        b_id=b_id,
+        comparison=comparison,
         equipped_bulk=equipped_bulk,
     )
 

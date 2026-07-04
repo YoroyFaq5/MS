@@ -10,6 +10,9 @@
     <h2 class="mb-0 fw-bold">📊 Статистика — {{ player_name(player, equipped_bulk.get(player_id, {})) }}</h2>
     <a href="{{ url_for('profile.view_profile', player_id=player_id) }}" class="text-muted small">← К профилю</a>
   </div>
+  <a href="{{ url_for('profile.compare', a=player_id) }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left-right me-1"></i>Сравнить с игроком
+  </a>
 </div>
 
 {% if not stats or stats.total_games == 0 %}
@@ -82,6 +85,12 @@
     <div class="stat-card card p-3 text-center h-100">
       <div class="stat-value text-danger">{{ stats.pu_sheriff_count }}</div>
       <div class="stat-label">ПУ в роли Шерифа</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <div class="stat-value">{{ stats.pu_accuracy if stats.pu_accuracy is not none else '—' }}<span class="text-muted small">{% if stats.pu_accuracy is not none %} / 3{% endif %}</span></div>
+      <div class="stat-label">Точность ПУ (мафий из 3)</div>
     </div>
   </div>
 </div>

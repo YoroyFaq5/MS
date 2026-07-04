@@ -8,11 +8,16 @@
     <h2 class="mb-0 fw-bold">👥 Игроки</h2>
     <p class="text-muted small mb-0">{{ players|length }} игроков</p>
   </div>
-  {% if current_user.is_authenticated and current_user.is_admin %}
-  <a href="{{ url_for('players.add_player') }}" class="btn btn-danger">
-    <i class="bi bi-person-plus me-1"></i>Добавить
-  </a>
-  {% endif %}
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('profile.compare') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left-right me-1"></i>Сравнить игроков
+    </a>
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    <a href="{{ url_for('players.add_player') }}" class="btn btn-danger">
+      <i class="bi bi-person-plus me-1"></i>Добавить
+    </a>
+    {% endif %}
+  </div>
 </div>
 
 <div class="card">

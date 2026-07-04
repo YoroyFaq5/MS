@@ -63,6 +63,7 @@ class PlayerExtendedStats:
     season_wins: int = 0
     pu_count: int = 0            # раз был ПУ (первым убитым)
     pu_sheriff_count: int = 0    # из них — играя за шерифа
+    pu_accuracy: Optional[float] = None  # ср. кол-во угаданных мафий из 3 (pu_mafia_count) за игру в роли ПУ
     best_day_wins: Optional[dict] = None    # {"date": "YYYY-MM-DD", "wins": N, "games": M}
     best_day_bonus: Optional[dict] = None   # {"date": "YYYY-MM-DD", "bonus": X}
 
@@ -87,6 +88,7 @@ class PlayerExtendedStats:
             "season_wins": self.season_wins,
             "pu_count": self.pu_count,
             "pu_sheriff_count": self.pu_sheriff_count,
+            "pu_accuracy": self.pu_accuracy,
             "best_day_wins": self.best_day_wins,
             "best_day_bonus": self.best_day_bonus,
             "role_breakdown": [r.to_dict() for r in self.role_breakdown],
@@ -187,6 +189,8 @@ class ProfileService:
         day_games: Dict[str, int] = {}
         day_bonus: Dict[str, float] = {}
 
+        pu_mafia_total = 0  # сумма pu_mafia_count по всем играм в роли ПУ — для точности ПУ
+
         for slot in slots:
             game = slot.game
             won = (
@@ -214,6 +218,7 @@ class ProfileService:
             # обычно убивают первым, если мафия его вычислила.
             if slot.is_pu:
                 stats.pu_count += 1
+                pu_mafia_total += slot.pu_mafia_count or 0
                 if slot.role == Role.SHERIFF:
                     stats.pu_sheriff_count += 1
 
@@ -252,6 +257,9 @@ class ProfileService:
             best_day, bonus_that_day = max(day_bonus.items(), key=lambda kv: kv[1])
             if bonus_that_day > 0:
                 stats.best_day_bonus = {"date": best_day, "bonus": round(bonus_that_day, 2)}
+
+        if stats.pu_count > 0:
+            stats.pu_accuracy = round(pu_mafia_total / stats.pu_count, 2)
 
         if stats.total_games > 0:
             stats.win_rate = round(stats.total_wins / stats.total_games * 100, 1)
@@ -524,6 +532,40 @@ class ProfileService:
             "avg_score_percentile": percentile(mine.avg_score, scores),
             "games_played": mine.games_played,
             "club_avg_games": round(sum(games) / n, 1),
+        }
+
+    @staticmethod
+    def compare_players(player_id_a: int, player_id_b: int) -> Optional[dict]:
+        """
+        Прямое сравнение двух ЛЮБЫХ игроков (не обязательно текущего
+        пользователя) по одному и тому же набору метрик, что и остальная
+        статистика — переиспользует get_statistics/get_role_statistics/
+        get_comparison_stats/head_to_head для каждого вместо отдельного
+        агрегирующего запроса. "Кто лучше" по каждой строке решает шаблон
+        (простое сравнение чисел для подсветки — не бизнес-логика).
+        """
+        player_a = db.session.get(Player, player_id_a)
+        player_b = db.session.get(Player, player_id_b)
+        if not player_a or not player_b:
+            return None
+
+        stats_a = ProfileService.get_statistics(player_id_a)
+        stats_b = ProfileService.get_statistics(player_id_b)
+        if not stats_a or not stats_b:
+            return None
+
+        h2h = ProfileService.head_to_head(player_id_a, player_id_b)
+
+        return {
+            "player_a": player_a,
+            "player_b": player_b,
+            "stats_a": stats_a.to_dict(),
+            "stats_b": stats_b.to_dict(),
+            "role_a": ProfileService.get_role_statistics(player_id_a),
+            "role_b": ProfileService.get_role_statistics(player_id_b),
+            "rating_a": ProfileService.get_comparison_stats(player_id_a),
+            "rating_b": ProfileService.get_comparison_stats(player_id_b),
+            "head_to_head": h2h if h2h["shared_games"] > 0 else None,
         }
 
     # ── Shared aggregation (used by both get_partner_statistics and

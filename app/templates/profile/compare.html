@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% from "_macros.html" import player_name %}
+{% block title %}Сравнение игроков{% endblock %}
+
+{% set ROLE_LABELS = {'civilian': '👤 Мирный', 'mafia': '🔫 Мафия', 'don': '🎩 Дон', 'sheriff': '🔍 Шериф'} %}
+
+{% macro cmp_row(label, a, b, higher_better=true, suffix='') -%}
+<tr>
+  <td class="text-muted">{{ label }}</td>
+  <td class="text-center {% if a is not none and b is not none and a != b and ((higher_better and a > b) or (not higher_better and a < b)) %}fw-bold text-success{% endif %}">
+    {{ (a ~ suffix) if a is not none else '—' }}
+  </td>
+  <td class="text-center {% if a is not none and b is not none and a != b and ((higher_better and b > a) or (not higher_better and b < a)) %}fw-bold text-success{% endif %}">
+    {{ (b ~ suffix) if b is not none else '—' }}
+  </td>
+</tr>
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold">⚖️ Сравнение игроков</h2>
+    <p class="text-muted small mb-0">Выберите двух игроков, чтобы сравнить их статистику</p>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="GET" class="row g-2 align-items-center">
+      <div class="col-12 col-md-5">
+        <select name="a" class="form-select" onchange="this.form.submit()">
+          <option value="">— игрок A —</option>
+          {% for p in players %}
+          <option value="{{ p.id }}" {% if p.id == a_id %}selected{% endif %}>{{ p.display_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-2 text-center text-muted fw-bold">против</div>
+      <div class="col-12 col-md-5">
+        <select name="b" class="form-select" onchange="this.form.submit()">
+          <option value="">— игрок B —</option>
+          {% for p in players %}
+          <option value="{{ p.id }}" {% if p.id == b_id %}selected{% endif %}>{{ p.display_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if comparison %}
+{% set a = comparison.stats_a %}
+{% set b = comparison.stats_b %}
+{% set ra = comparison.rating_a %}
+{% set rb = comparison.rating_b %}
+
+<div class="row g-3 mb-4 text-center">
+  <div class="col-6">
+    <div class="fs-4 fw-bold">{{ player_name(comparison.player_a, equipped_bulk.get(comparison.player_a.id, {})) }}</div>
+    {% if ra %}<div class="text-muted small">Место в рейтинге: #{{ ra.rank }} из {{ ra.total_ranked_players }}</div>{% endif %}
+  </div>
+  <div class="col-6">
+    <div class="fs-4 fw-bold">{{ player_name(comparison.player_b, equipped_bulk.get(comparison.player_b.id, {})) }}</div>
+    {% if rb %}<div class="text-muted small">Место в рейтинге: #{{ rb.rank }} из {{ rb.total_ranked_players }}</div>{% endif %}
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">📊 Общая статистика</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead>
+        <tr>
+          <th></th>
+          <th class="text-center">{{ comparison.player_a.display_name }}</th>
+          <th class="text-center">{{ comparison.player_b.display_name }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ cmp_row('ELO', ra.elo if ra else none, rb.elo if rb else none) }}
+        {{ cmp_row('Винрейт', a.win_rate, b.win_rate, suffix='%') }}
+        {{ cmp_row('Ср. баллы за игру', a.avg_score, b.avg_score) }}
+        {{ cmp_row('Игр сыграно', a.total_games, b.total_games, higher_better=false) }}
+        {{ cmp_row('Побед', a.total_wins, b.total_wins) }}
+        {{ cmp_row('Лучший результат', a.best_score, b.best_score) }}
+        {{ cmp_row('Худший результат', a.worst_score, b.worst_score) }}
+        {{ cmp_row('Лучшая серия побед', a.longest_streak, b.longest_streak) }}
+        {{ cmp_row('Худшая серия поражений', a.longest_loss_streak, b.longest_loss_streak, higher_better=false) }}
+        {{ cmp_row('Раз был ПУ', a.pu_count, b.pu_count, higher_better=false) }}
+        {{ cmp_row('ПУ в роли Шерифа', a.pu_sheriff_count, b.pu_sheriff_count, higher_better=false) }}
+        {{ cmp_row('Точность ПУ (мафий из 3)', a.pu_accuracy, b.pu_accuracy) }}
+        {{ cmp_row('Турниров', a.tournament_count, b.tournament_count) }}
+        {{ cmp_row('Побед в сезонах', a.season_wins, b.season_wins) }}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">🎭 Эффективность по ролям</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead>
+        <tr>
+          <th>Роль</th>
+          <th class="text-center" colspan="2">{{ comparison.player_a.display_name }}</th>
+          <th class="text-center" colspan="2">{{ comparison.player_b.display_name }}</th>
+        </tr>
+        <tr class="small text-muted">
+          <th></th>
+          <th class="text-center">Игр</th><th class="text-center">WR</th>
+          <th class="text-center">Игр</th><th class="text-center">WR</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set role_a_map = {} %}
+        {% for r in comparison.role_a.role_breakdown %}{% if role_a_map.update({r.role: r}) %}{% endif %}{% endfor %}
+        {% set role_b_map = {} %}
+        {% for r in comparison.role_b.role_breakdown %}{% if role_b_map.update({r.role: r}) %}{% endif %}{% endfor %}
+        {% for role_key in ROLE_LABELS.keys() %}
+        {% set ra_role = role_a_map.get(role_key) %}
+        {% set rb_role = role_b_map.get(role_key) %}
+        {% if ra_role or rb_role %}
+        <tr>
+          <td>{{ ROLE_LABELS[role_key] }}</td>
+          <td class="text-center">{{ ra_role.games if ra_role else 0 }}</td>
+          <td class="text-center">{{ (ra_role.win_rate ~ '%') if ra_role else '—' }}</td>
+          <td class="text-center">{{ rb_role.games if rb_role else 0 }}</td>
+          <td class="text-center">{{ (rb_role.win_rate ~ '%') if rb_role else '—' }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+{% if comparison.head_to_head %}
+<div class="card">
+  <div class="card-header fw-semibold">⚔️ Личные встречи</div>
+  <div class="card-body">
+    <div class="row g-3 text-center">
+      <div class="col-4">
+        <div class="fw-bold fs-4">{{ comparison.head_to_head.wins }}</div>
+        <div class="text-muted small">Победил(а) {{ comparison.player_a.display_name }}</div>
+      </div>
+      <div class="col-4">
+        <div class="fw-bold fs-4">{{ comparison.head_to_head.draws }}</div>
+        <div class="text-muted small">Одна команда / ничья</div>
+      </div>
+      <div class="col-4">
+        <div class="fw-bold fs-4">{{ comparison.head_to_head.losses }}</div>
+        <div class="text-muted small">Победил(а) {{ comparison.player_b.display_name }}</div>
+      </div>
+    </div>
+    <div class="text-muted small mt-3 text-center">
+      Игр вместе (где оба участвовали): {{ comparison.head_to_head.shared_games }}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% elif a_id or b_id %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
+    Выберите второго игрока для сравнения
+  </div>
+</div>
+{% endif %}
+{% endblock %}
