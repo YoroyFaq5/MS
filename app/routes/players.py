@@ -3,6 +3,7 @@ from app import db
 from app.models import Player
 from app.services import RatingService
 from app.services.economy_service import EconomyService
+from app.services.shop_service import ShopService
 from app.auth_decorators import admin_required
 
 players_bp = Blueprint("players", __name__)
@@ -11,7 +12,8 @@ players_bp = Blueprint("players", __name__)
 @players_bp.route("/")
 def list_players():
     players = db.session.query(Player).order_by(Player.name).all()
-    return render_template("players/list.html", players=players)
+    equipped_bulk = ShopService.get_equipped_bulk([p.id for p in players])
+    return render_template("players/list.html", players=players, equipped_bulk=equipped_bulk)
 
 
 @players_bp.route("/add", methods=["GET", "POST"])

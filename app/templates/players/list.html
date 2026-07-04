@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}Игроки{% endblock %}
 
 {% block content %}
@@ -35,7 +36,15 @@
           <tr>
             <td class="ps-4 text-muted">{{ loop.index }}</td>
             <td class="fw-semibold">{{ player.name }}</td>
-            <td class="text-muted">{{ player.nickname or '—' }}</td>
+            <td>
+              {% if player.nickname %}
+              <a href="{{ url_for('profile.view_profile', player_id=player.id) }}" class="text-decoration-none">
+                {{ player_name(player, equipped_bulk.get(player.id, {})) }}
+              </a>
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
             <td class="text-center">
               <span class="{% if player.elo > 1000 %}text-success{% elif player.elo < 1000 %}text-danger{% else %}text-muted{% endif %} small fw-medium">
                 {{ player.elo|round|int }}

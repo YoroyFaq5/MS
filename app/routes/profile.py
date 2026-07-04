@@ -43,6 +43,7 @@ def statistics(player_id: int):
     rivalry_stats = ProfileService.get_rivalry_statistics(player_id)
     tournament_summary = ProfileService.get_tournament_summary(player_id)
     fantasy_summary = ProfileService.get_fantasy_summary(player_id)
+    comparison_stats = ProfileService.get_comparison_stats(player_id)
 
     # Датасеты для Chart.js — считаются только на этой (тяжёлой) подстранице.
     chart_data = {
@@ -72,6 +73,7 @@ def statistics(player_id: int):
         rivalry_stats=rivalry_stats,
         tournament_summary=tournament_summary,
         fantasy_summary=fantasy_summary,
+        comparison_stats=comparison_stats,
         chart_data=chart_data,
         equipped_bulk=equipped_bulk,
     )

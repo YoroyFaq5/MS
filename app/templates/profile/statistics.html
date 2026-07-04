@@ -72,6 +72,18 @@
       <div class="stat-label">Побед в сезонах</div>
     </div>
   </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <div class="stat-value text-danger">{{ stats.pu_count }}</div>
+      <div class="stat-label">Раз был ПУ</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <div class="stat-value text-danger">{{ stats.pu_sheriff_count }}</div>
+      <div class="stat-label">ПУ в роли Шерифа</div>
+    </div>
+  </div>
 </div>
 
 <div class="row g-4 mb-4">
@@ -239,6 +251,80 @@
         {% endif %}
 
         <div class="text-muted small mt-3">Минимум {{ rivalry_stats.min_shared_games }} совместных игр для рейтинга WR</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Best days -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">📅 Лучшие дни</div>
+      <div class="card-body">
+        <div class="row g-3 text-center">
+          <div class="col-6">
+            <div class="text-muted small mb-1">По победам</div>
+            {% if stats.best_day_wins %}
+            <div class="fw-bold fs-5">{{ stats.best_day_wins.wins }} побед</div>
+            <div class="text-muted small">{{ stats.best_day_wins.date }} ({{ stats.best_day_wins.games }} игр)</div>
+            {% else %}<div class="text-muted small">—</div>{% endif %}
+          </div>
+          <div class="col-6">
+            <div class="text-muted small mb-1">По бонусным баллам</div>
+            {% if stats.best_day_bonus %}
+            <div class="fw-bold fs-5">+{{ stats.best_day_bonus.bonus }}</div>
+            <div class="text-muted small">{{ stats.best_day_bonus.date }}</div>
+            {% else %}<div class="text-muted small">—</div>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Club comparison -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">📈 Сравнение с клубом</div>
+      <div class="card-body">
+        {% if comparison_stats %}
+        <div class="text-muted small mb-2">
+          Место в общем рейтинге: <strong>#{{ comparison_stats.rank }}</strong> из {{ comparison_stats.total_ranked_players }}
+        </div>
+        <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th></th><th class="text-end">Вы</th><th class="text-end">Клуб (ср.)</th><th class="text-end">Перцентиль</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>ELO</td>
+              <td class="text-end">{{ comparison_stats.elo }}</td>
+              <td class="text-end">{{ comparison_stats.club_avg_elo }}</td>
+              <td class="text-end">{{ comparison_stats.elo_percentile }}%</td>
+            </tr>
+            <tr>
+              <td>Винрейт</td>
+              <td class="text-end">{{ comparison_stats.win_rate }}%</td>
+              <td class="text-end">{{ comparison_stats.club_avg_win_rate }}%</td>
+              <td class="text-end">{{ comparison_stats.win_rate_percentile }}%</td>
+            </tr>
+            <tr>
+              <td>Ср. баллы</td>
+              <td class="text-end">{{ comparison_stats.avg_score }}</td>
+              <td class="text-end">{{ comparison_stats.club_avg_score }}</td>
+              <td class="text-end">{{ comparison_stats.avg_score_percentile }}%</td>
+            </tr>
+            <tr>
+              <td>Игр сыграно</td>
+              <td class="text-end">{{ comparison_stats.games_played }}</td>
+              <td class="text-end">{{ comparison_stats.club_avg_games }}</td>
+              <td class="text-end">—</td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-3 small">Недостаточно данных для сравнения</div>
         {% endif %}
       </div>
     </div>

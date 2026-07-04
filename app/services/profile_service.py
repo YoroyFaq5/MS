@@ -61,6 +61,10 @@ class PlayerExtendedStats:
     monthly_games: Dict[str, int] = field(default_factory=dict)  # "YYYY-MM" → count
     tournament_count: int = 0
     season_wins: int = 0
+    pu_count: int = 0            # раз был ПУ (первым убитым)
+    pu_sheriff_count: int = 0    # из них — играя за шерифа
+    best_day_wins: Optional[dict] = None    # {"date": "YYYY-MM-DD", "wins": N, "games": M}
+    best_day_bonus: Optional[dict] = None   # {"date": "YYYY-MM-DD", "bonus": X}
 
     def to_dict(self) -> dict:
         return {
@@ -81,6 +85,10 @@ class PlayerExtendedStats:
             "current_streak_signed": self.current_streak_signed,
             "tournament_count": self.tournament_count,
             "season_wins": self.season_wins,
+            "pu_count": self.pu_count,
+            "pu_sheriff_count": self.pu_sheriff_count,
+            "best_day_wins": self.best_day_wins,
+            "best_day_bonus": self.best_day_bonus,
             "role_breakdown": [r.to_dict() for r in self.role_breakdown],
             "monthly_games": self.monthly_games,
         }
@@ -174,6 +182,11 @@ class ProfileService:
         max_loss_streak = 0
         stats.worst_score = None  # sentinel until first slot seen
 
+        # По календарным дням (не месяцам) — для "самых успешных дней".
+        day_wins: Dict[str, int] = {}
+        day_games: Dict[str, int] = {}
+        day_bonus: Dict[str, float] = {}
+
         for slot in slots:
             game = slot.game
             won = (
@@ -196,6 +209,14 @@ class ProfileService:
                 max_loss_streak = max(max_loss_streak, loss_streak)
                 win_streak = 0
 
+            # ПУ (первым убитый) — считается "страшным" для мафии: его убивают
+            # в первую же ночь. Отдельно считаем комбо ПУ+Шериф — шерифа
+            # обычно убивают первым, если мафия его вычислила.
+            if slot.is_pu:
+                stats.pu_count += 1
+                if slot.role == Role.SHERIFF:
+                    stats.pu_sheriff_count += 1
+
             # Role breakdown
             rname = slot.role.value
             if rname not in role_data:
@@ -209,11 +230,28 @@ class ProfileService:
             month_key = game.played_at.strftime("%Y-%m")
             stats.monthly_games[month_key] = stats.monthly_games.get(month_key, 0) + 1
 
+            # Daily activity (для "лучших дней")
+            day_key = game.played_at.strftime("%Y-%m-%d")
+            day_games[day_key] = day_games.get(day_key, 0) + 1
+            if won:
+                day_wins[day_key] = day_wins.get(day_key, 0) + 1
+            day_bonus[day_key] = day_bonus.get(day_key, 0.0) + (slot.bonus_score or 0.0)
+
         stats.current_streak = win_streak
         stats.longest_streak = max_win_streak
         stats.longest_loss_streak = max_loss_streak
         stats.current_streak_signed = win_streak if win_streak > 0 else -loss_streak
         stats.worst_score = stats.worst_score or 0.0
+
+        if day_wins:
+            best_day, wins_that_day = max(day_wins.items(), key=lambda kv: kv[1])
+            stats.best_day_wins = {
+                "date": best_day, "wins": wins_that_day, "games": day_games[best_day],
+            }
+        if day_bonus:
+            best_day, bonus_that_day = max(day_bonus.items(), key=lambda kv: kv[1])
+            if bonus_that_day > 0:
+                stats.best_day_bonus = {"date": best_day, "bonus": round(bonus_that_day, 2)}
 
         if stats.total_games > 0:
             stats.win_rate = round(stats.total_wins / stats.total_games * 100, 1)
@@ -443,6 +481,51 @@ class ProfileService:
             "worst_score": stats.worst_score,
         }
 
+    @staticmethod
+    def get_comparison_stats(player_id: int) -> Optional[dict]:
+        """
+        Сравнение игрока с клубом: средние по клубу значения + перцентиль
+        (какой % ранжированных игроков этот игрок обходит) по ELO/винрейту/
+        среднему баллу. Переиспользует RatingService.compute_all_ratings()
+        (тот же расчёт, что и общий рейтинг/лидерборд) вместо отдельного
+        агрегирующего запроса — один и тот же источник правды.
+        """
+        from app.services.rating_service import RatingService
+
+        ratings = RatingService.compute_all_ratings()
+        if not ratings:
+            return None
+        mine = next((r for r in ratings if r.player_id == player_id), None)
+        if not mine:
+            return None
+
+        n = len(ratings)
+
+        def percentile(value: float, values: List[float]) -> float:
+            below = sum(1 for v in values if v < value)
+            return round(below / len(values) * 100, 1)
+
+        elos = [r.elo for r in ratings]
+        wrs = [r.win_rate for r in ratings]
+        scores = [r.avg_score for r in ratings]
+        games = [r.games_played for r in ratings]
+
+        return {
+            "total_ranked_players": n,
+            "rank": mine.rank,
+            "elo": round(mine.elo, 1),
+            "club_avg_elo": round(sum(elos) / n, 1),
+            "elo_percentile": percentile(mine.elo, elos),
+            "win_rate": round(mine.win_rate, 1),
+            "club_avg_win_rate": round(sum(wrs) / n, 1),
+            "win_rate_percentile": percentile(mine.win_rate, wrs),
+            "avg_score": round(mine.avg_score, 2),
+            "club_avg_score": round(sum(scores) / n, 2),
+            "avg_score_percentile": percentile(mine.avg_score, scores),
+            "games_played": mine.games_played,
+            "club_avg_games": round(sum(games) / n, 1),
+        }
+
     # ── Shared aggregation (used by both get_partner_statistics and
     #    get_rivalry_statistics — the query + Python pass is identical,
     #    only the derived "top N" picks differ) ─────────────────────────────
@@ -554,16 +637,26 @@ class ProfileService:
 
         entries = [make_entry(pid, d) for pid, d in agg.items()]
 
-        def top(seq, key, min_val=1):
-            best = max(seq, key=key, default=None)
-            return best if best and key(best) >= min_val else None
-
-        best_partner = top(entries, lambda e: e["wins_as_ally"])
-        worst_partner = top(entries, lambda e: e["losses_as_ally"])
-        most_frequent_ally = top(entries, lambda e: e["times_ally"])
-        most_frequent_opponent = top(entries, lambda e: e["times_opponent"])
-
+        # min_shared_games отсекает случайные пары от шума — без этого порога
+        # единственная сыгранная вместе игра (тем более выигранная) тривиально
+        # "побеждает" по любому счётчику/проценту и подписывается как "лучший
+        # напарник", хотя это статистический шум, а не реальная сыгранность.
+        # Применяем один и тот же порог ко ВСЕМ частотным полям этой функции,
+        # не только к WR-метрикам, которые уже были им защищены.
+        eligible_allies = [e for e in entries if e["times_ally"] >= min_shared_games]
         eligible_opponents = [e for e in entries if e["times_opponent"] >= min_shared_games]
+
+        best_partner = max(
+            (e for e in eligible_allies if e["wins_as_ally"] > 0),
+            key=lambda e: e["wins_as_ally"], default=None,
+        )
+        worst_partner = max(
+            (e for e in eligible_allies if e["losses_as_ally"] > 0),
+            key=lambda e: e["losses_as_ally"], default=None,
+        )
+        most_frequent_ally = max(eligible_allies, key=lambda e: e["times_ally"], default=None)
+        most_frequent_opponent = max(eligible_opponents, key=lambda e: e["times_opponent"], default=None)
+
         best_wr_opponent = max(eligible_opponents, key=lambda e: e["win_rate_vs"], default=None)
         worst_wr_opponent = min(eligible_opponents, key=lambda e: e["win_rate_vs"], default=None)
 
@@ -616,10 +709,15 @@ class ProfileService:
         best_teammate_wr = max(eligible_allies, key=lambda e: e["win_rate_ally"], default=None)
         worst_teammate_wr = min(eligible_allies, key=lambda e: e["win_rate_ally"], default=None)
 
-        most_played_against = max(entries, key=lambda e: e["times_opponent"], default=None)
-        most_played_against = most_played_against if most_played_against and most_played_against["times_opponent"] > 0 else None
+        most_played_against = max(eligible_opponents, key=lambda e: e["times_opponent"], default=None)
 
-        mafia_candidates = [e for e in entries if e["mafia_duo_games"] > 0]
+        # Дуэт мафии / Шериф-vs-Дон — узкие подкатегории (пересечение роли И
+        # стороны), где полный min_shared_games (обычно 3) был бы слишком
+        # строг — но 1 совместная игра точно так же остаётся шумом, как и
+        # для общих напарников/соперников выше. MIN_DUO_GAMES — отдельный,
+        # более мягкий порог именно для этих узких событий.
+        MIN_DUO_GAMES = 2
+        mafia_candidates = [e for e in entries if e["mafia_duo_games"] >= MIN_DUO_GAMES]
         mafia_duo = max(mafia_candidates, key=lambda e: e["mafia_duo_games"], default=None)
         if mafia_duo:
             mafia_duo = {
@@ -628,8 +726,8 @@ class ProfileService:
             }
 
         # Sheriff vs Don: показываем ту сторону, где у игрока реально есть игры
-        sheriff_candidates = [e for e in entries if e["sheriff_vs_don_games"] > 0]
-        don_candidates = [e for e in entries if e["don_vs_sheriff_games"] > 0]
+        sheriff_candidates = [e for e in entries if e["sheriff_vs_don_games"] >= MIN_DUO_GAMES]
+        don_candidates = [e for e in entries if e["don_vs_sheriff_games"] >= MIN_DUO_GAMES]
         sheriff_vs_don = None
         if sheriff_candidates:
             best = max(sheriff_candidates, key=lambda e: e["sheriff_vs_don_games"])
