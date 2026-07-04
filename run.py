@@ -355,6 +355,17 @@ def _shop_items() -> list:
     # единственным источником правды о том, какие темы вообще существуют.
     from app.routes.admin_shop import THEMES, THEME_ULTRA, THEME_EPIC_WAVE
 
+    # Mythic/Ultra — не просто "дороже Legendary": это отдельные уровни
+    # редкости (см. Rarity), которые ShopService трактует как ГЛОБАЛЬНО
+    # уникальные предметы (один экземпляр на весь клуб, перекупаемый дороже
+    # прежнего владельца — ShopService.buyout_item()). Обычные Legendary-
+    # товары (Золотая рамка и т.п.) это правило не затрагивает.
+    THEME_TIER_RARITY = {
+        "epic_wave": Rarity.EPIC,
+        "mythic": Rarity.MYTHIC,
+        "ultra": Rarity.ULTRA,
+    }
+
     for code, label in THEMES:
         if code in THEME_ULTRA:
             tier = "ultra"
@@ -363,25 +374,23 @@ def _shop_items() -> list:
         else:
             tier = "mythic"
         price = THEME_TIER_PRICE[tier]
+        rarity = THEME_TIER_RARITY[tier]
 
         items.append(dict(
             name=f"Рамка «{label}»", category=ShopCategory.PROFILE_CUSTOMIZATION,
-            subcategory="frame", rarity=Rarity.LEGENDARY if tier != "epic_wave" else Rarity.EPIC,
-            price=price,
+            subcategory="frame", rarity=rarity, price=price,
             description=f"Анимированная тематическая рамка профиля — {label}.",
             data={"theme": code},
         ))
         items.append(dict(
             name=f"Ник «{label}»", category=ShopCategory.NICKNAME,
-            subcategory="nick_gradient", rarity=Rarity.LEGENDARY if tier != "epic_wave" else Rarity.EPIC,
-            price=price,
+            subcategory="nick_gradient", rarity=rarity, price=price,
             description=f"Анимированное тематическое оформление никнейма — {label}.",
             data={"theme": code},
         ))
         items.append(dict(
             name=f"Фон «{label}»", category=ShopCategory.PROFILE_CUSTOMIZATION,
-            subcategory="background", rarity=Rarity.LEGENDARY if tier != "epic_wave" else Rarity.EPIC,
-            price=price,
+            subcategory="background", rarity=rarity, price=price,
             description=f"Анимированный тематический фон профиля — {label}.",
             data={"theme": code},
         ))
