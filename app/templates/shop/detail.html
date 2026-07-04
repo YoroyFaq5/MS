@@ -4,8 +4,9 @@
 
 {% block content %}
 {% set CATEGORY_LABELS = {'profile_customization': '🖼️ Кастомизация профиля', 'nickname': '✨ Никнейм', 'physical': '📦 Физический товар'} %}
-{% set RARITY_LABELS = {'common': 'Обычная', 'rare': 'Редкая', 'epic': 'Эпическая', 'legendary': 'Легендарная'} %}
-{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark'} %}
+{% set RARITY_LABELS = {'common': 'Обычная', 'rare': 'Редкая', 'epic': 'Эпическая', 'legendary': 'Легендарная', 'mythic': 'Мифическая', 'ultra': 'Ультра'} %}
+{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark', 'mythic': 'bg-danger', 'ultra': 'bg-warning text-dark'} %}
+{% set is_unique = item.rarity.value in ('mythic', 'ultra') %}
 
 <div class="mb-3">
   <a href="{{ url_for('shop.list_items') }}" class="text-muted small">← Назад в магазин</a>
@@ -32,8 +33,24 @@
         <p class="mb-4">{{ item.description }}</p>
         {% endif %}
 
+        {% if is_unique %}
+        <div class="alert alert-warning-subtle border border-warning-subtle small mb-3">
+          <i class="bi bi-gem me-1"></i>
+          Уникальный предмет — существует только один экземпляр на весь клуб.
+          {% if owner_inv %}
+            Текущий владелец: <strong>{{ owner_inv.player.display_name }}</strong>,
+            заплатил <strong>{{ owner_inv.price_paid | int }}</strong> монет.
+            Перекупить можно только дороже (шаг не менее {{ min_buyout_increment | int }}).
+          {% else %}
+            Пока никем не куплен — можно купить по стартовой цене.
+          {% endif %}
+        </div>
+        {% endif %}
+
         <div class="d-flex align-items-center justify-content-between mb-4">
-          <span class="fw-bold fs-4 text-warning"><i class="bi bi-coin me-1"></i>{{ item.price | int }}</span>
+          <span class="fw-bold fs-4 text-warning"><i class="bi bi-coin me-1"></i>
+            {{ (owner_inv.price_paid + min_buyout_increment) | int if (is_unique and owner_inv) else item.price | int }}
+          </span>
           {% if item.category.value == 'physical' %}
           <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
             Выдаётся вручную администратором
@@ -43,6 +60,22 @@
 
         {% if not player %}
         <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary w-100">Войдите, чтобы купить</a>
+        {% elif is_unique and owner_inv and owner_inv.player_id == player.id %}
+        <button class="btn btn-outline-secondary w-100" disabled>Уже у вас</button>
+        {% elif is_unique and owner_inv %}
+        <form method="POST" action="{{ url_for('shop.buyout_item', item_id=item.id) }}"
+              onsubmit="return confirm('Перекупить «{{ item.name }}» у {{ owner_inv.player.display_name }}?')">
+          <div class="input-group mb-2">
+            <span class="input-group-text">🪙</span>
+            <input type="number" name="offer_price" class="form-control"
+                   min="{{ (owner_inv.price_paid + min_buyout_increment) | int }}"
+                   step="{{ min_buyout_increment | int }}"
+                   value="{{ (owner_inv.price_paid + min_buyout_increment) | int }}" required>
+          </div>
+          <button type="submit" class="btn btn-danger w-100">
+            <i class="bi bi-gem me-1"></i>Перекупить
+          </button>
+        </form>
         {% elif validation and validation.ok %}
         <form method="POST" action="{{ url_for('shop.purchase_item', item_id=item.id) }}"
               onsubmit="return confirm('Купить «{{ item.name }}» за {{ item.price | int }} монет?')">

@@ -358,6 +358,19 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 .rarity-rare      { border-top: 3px solid #B8B8B8 !important; }
 .rarity-epic      { border-top: 3px solid var(--ms-wine-light) !important; }
 .rarity-legendary { border-top: 3px solid var(--ms-gold-light) !important; background: rgba(212,176,106,.06) !important; }
+.rarity-mythic    { border-top: 3px solid #9d4edd !important; background: rgba(157,78,221,.07) !important; }
+
+/* Ultra — единственная редкость с анимированным акцентом, отражает
+   её премиальный статус (уникальный, перекупаемый предмет). */
+@keyframes rarity-ultra-pulse {
+  0%, 100% { border-top-color: #ffd700; }
+  50%      { border-top-color: #ff3b3b; }
+}
+.rarity-ultra {
+  border-top: 3px solid #ffd700 !important;
+  background: rgba(255,215,0,.07) !important;
+  animation: rarity-ultra-pulse 2.5s ease-in-out infinite;
+}
 
 .achievement-locked { opacity: .45; filter: grayscale(1); }
 

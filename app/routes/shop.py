@@ -4,6 +4,7 @@ from flask_login import current_user
 from app import db
 from app.models import ShopItem, ShopCategory
 from app.services import ShopService, PermissionService, Permission
+from app.services.shop_service import MIN_BUYOUT_INCREMENT
 from app.auth_decorators import requires_permission
 
 shop_bp = Blueprint("shop", __name__)
@@ -42,7 +43,11 @@ def item_detail(item_id: int):
     item = db.session.get(ShopItem, item_id) or abort(404)
     player = current_user.player if current_user.is_authenticated else None
     validation = ShopService.validate_purchase(player, item) if player else None
-    return render_template("shop/detail.html", item=item, player=player, validation=validation)
+    owner_inv = ShopService.get_current_owner(item.id)
+    return render_template(
+        "shop/detail.html", item=item, player=player, validation=validation,
+        owner_inv=owner_inv, min_buyout_increment=MIN_BUYOUT_INCREMENT,
+    )
 
 
 @shop_bp.route("/<int:item_id>/purchase", methods=["POST"])
@@ -53,5 +58,23 @@ def purchase_item(item_id: int):
         return redirect(url_for("shop.item_detail", item_id=item_id))
 
     result = ShopService.purchase(current_user.player, item_id)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("shop.item_detail", item_id=item_id))
+
+
+@shop_bp.route("/<int:item_id>/buyout", methods=["POST"])
+@requires_permission(Permission.PURCHASE_ITEM)
+def buyout_item(item_id: int):
+    if not current_user.player_id:
+        flash("Для перекупа нужен привязанный профиль игрока.", "warning")
+        return redirect(url_for("shop.item_detail", item_id=item_id))
+
+    try:
+        offer_price = float(request.form.get("offer_price", 0))
+    except ValueError:
+        flash("Некорректная сумма ставки.", "danger")
+        return redirect(url_for("shop.item_detail", item_id=item_id))
+
+    result = ShopService.buyout_item(current_user.player, item_id, offer_price)
     flash(result.message, "success" if result.ok else "danger")
     return redirect(url_for("shop.item_detail", item_id=item_id))

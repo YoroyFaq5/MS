@@ -296,7 +296,13 @@ class ShopService:
         to show whether a purchase button should be enabled."""
         if not item.is_active:
             return ShopResult.fail("Товар недоступен.")
-        if item.is_unique_purchase:
+        if item.rarity in UNIQUE_RARITIES:
+            existing = ShopService.get_current_owner(item.id)
+            if existing:
+                if existing.player_id == player.id:
+                    return ShopResult.fail("Уже у вас.")
+                return ShopResult.fail("Занято — доступен только перекуп.")
+        elif item.is_unique_purchase:
             owned = (
                 db.session.query(InventoryItem)
                 .filter_by(player_id=player.id, item_id=item.id)
