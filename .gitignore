@@ -6,6 +6,9 @@ __pycache__/
 instance/
 .claude
 
+# Локальная память проекта между сессиями Claude Code — не для репозитория.
+PROJECT_CONTEXT.md
+
 # Содержит пароли пользователей открытым текстом (см. extract_legacy_to_json.py) —
 # переносить на PythonAnywhere отдельно (Files, не git), удалить после импорта.
 legacy_export/
