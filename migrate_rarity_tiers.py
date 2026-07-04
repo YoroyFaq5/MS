@@ -17,13 +17,25 @@ What it does:
    the database becomes mythic/ultra automatically. Run `flask
    update-shop-prices` (or re-seed) afterwards to actually create/update
    the new mythic/ultra items themselves.
+
+IMPORTANT: labels must be UPPERCASE (matching the Rarity enum's *member
+names* — COMMON/RARE/EPIC/LEGENDARY/MYTHIC/ULTRA), not its lowercase
+`.value`s. None of the Enum(...) columns in app/models/__init__.py set
+`values_callable`, so SQLAlchemy's default convention applies: it
+persists/reads the enum member's `.name`, not `.value`. A previous version
+of this script used lowercase labels here, which silently corrupted the
+mapping for every EXISTING row (MySQL's native ENUM returns the label
+string as currently defined at a row's stored ordinal position, not the
+string originally inserted — so flipping the defined label list to
+lowercase made old 'LEGENDARY' rows read back as 'legendary', which
+SQLAlchemy could no longer match to a Rarity member -> LookupError).
 """
 from app import create_app, db
 from sqlalchemy import text
 
 app = create_app("development")
 
-RARITY_VALUES = "'common','rare','epic','legendary','mythic','ultra'"
+RARITY_VALUES = "'COMMON','RARE','EPIC','LEGENDARY','MYTHIC','ULTRA'"
 
 with app.app_context():
     with db.engine.connect() as conn:
