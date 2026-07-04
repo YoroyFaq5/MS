@@ -89,7 +89,7 @@
         {{ cmp_row('Худшая серия поражений', a.longest_loss_streak, b.longest_loss_streak, higher_better=false) }}
         {{ cmp_row('Раз был ПУ', a.pu_count, b.pu_count, higher_better=false) }}
         {{ cmp_row('ПУ в роли Шерифа', a.pu_sheriff_count, b.pu_sheriff_count, higher_better=false) }}
-        {{ cmp_row('Точность ПУ (мафий из 3)', a.pu_accuracy, b.pu_accuracy) }}
+        {{ cmp_row('Точность ПУ', a.pu_accuracy, b.pu_accuracy, suffix='%') }}
         {{ cmp_row('Турниров', a.tournament_count, b.tournament_count) }}
         {{ cmp_row('Побед в сезонах', a.season_wins, b.season_wins) }}
       </tbody>

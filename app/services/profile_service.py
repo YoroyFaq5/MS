@@ -63,7 +63,7 @@ class PlayerExtendedStats:
     season_wins: int = 0
     pu_count: int = 0            # раз был ПУ (первым убитым)
     pu_sheriff_count: int = 0    # из них — играя за шерифа
-    pu_accuracy: Optional[float] = None  # ср. кол-во угаданных мафий из 3 (pu_mafia_count) за игру в роли ПУ
+    pu_accuracy: Optional[float] = None  # % угаданных мафий (из 3 названных подозреваемых) за игры в роли ПУ
     best_day_wins: Optional[dict] = None    # {"date": "YYYY-MM-DD", "wins": N, "games": M}
     best_day_bonus: Optional[dict] = None   # {"date": "YYYY-MM-DD", "bonus": X}
 
@@ -259,7 +259,9 @@ class ProfileService:
                 stats.best_day_bonus = {"date": best_day, "bonus": round(bonus_that_day, 2)}
 
         if stats.pu_count > 0:
-            stats.pu_accuracy = round(pu_mafia_total / stats.pu_count, 2)
+            # Каждая ПУ-игра — ровно 3 названных подозреваемых, так что доля
+            # угаданных из них — валидный процент точности (не "средний улов").
+            stats.pu_accuracy = round(pu_mafia_total / (stats.pu_count * 3) * 100, 1)
 
         if stats.total_games > 0:
             stats.win_rate = round(stats.total_wins / stats.total_games * 100, 1)

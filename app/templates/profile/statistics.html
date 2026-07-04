@@ -89,8 +89,8 @@
   </div>
   <div class="col-6 col-lg-3">
     <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value">{{ stats.pu_accuracy if stats.pu_accuracy is not none else '—' }}<span class="text-muted small">{% if stats.pu_accuracy is not none %} / 3{% endif %}</span></div>
-      <div class="stat-label">Точность ПУ (мафий из 3)</div>
+      <div class="stat-value">{{ (stats.pu_accuracy ~ '%') if stats.pu_accuracy is not none else '—' }}</div>
+      <div class="stat-label">Точность ПУ</div>
     </div>
   </div>
 </div>
