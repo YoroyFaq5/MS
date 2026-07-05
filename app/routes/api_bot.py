@@ -81,6 +81,19 @@ def _result_response(result) -> tuple:
     return _ok(data, result.message)
 
 
+# ── Поиск игроков (для инлайн-режима бота) ───────────────────────────────────
+
+@api_bot_bp.route("/players/search")
+def players_search():
+    from app.services.player_search_service import PlayerSearchService
+
+    query = request.args.get("q", "").strip()
+    if not query:
+        return _ok([])
+    results = PlayerSearchService.find_similar_players(query, limit=10)
+    return _ok([{"id": p.id, "display_name": p.display_name, "elo": p.elo} for p in results])
+
+
 # ── Резолв привязки ──────────────────────────────────────────────────────────
 
 @api_bot_bp.route("/resolve")
