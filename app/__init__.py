@@ -30,6 +30,20 @@ def create_app(config_name: str = "default") -> Flask:
         from .models.user import User
         return db.session.get(User, int(user_id))
 
+    # current_user_equipped — используется в base.html навбаре (аватар/ник
+    # текущего пользователя через player_name()) для ЛЮБОЙ страницы, но ни
+    # один роут его не передавал явно — базовый шаблон крашился для любого
+    # залогиненного пользователя (equipped.get(...) на Undefined). Один
+    # глобальный context_processor вместо "не забыть добавить в каждый
+    # render_template" — тот же принцип, что get_equipped_bulk для списков.
+    @app.context_processor
+    def inject_current_user_equipped():
+        from flask_login import current_user as _current_user
+        if _current_user.is_authenticated and _current_user.player_id:
+            from .services.shop_service import ShopService
+            return {"current_user_equipped": ShopService.get_equipped(_current_user.player_id)}
+        return {"current_user_equipped": {}}
+
     # Blueprints
     from .routes.main import main_bp
     from .routes.players import players_bp
