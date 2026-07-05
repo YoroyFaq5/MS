@@ -233,6 +233,15 @@ def run_cutoff(stage_id: int):
     return redirect(url_for("tournaments.leaderboard", tournament_id=stage.tournament_id))
 
 
+@tournaments_bp.route("/stages/<int:stage_id>/next-round", methods=["POST"])
+@admin_required
+def generate_next_round(stage_id: int):
+    stage = _get_stage_or_404(stage_id)
+    result = TournamentService.generate_next_round(stage_id)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("tournaments.tournament_games", tournament_id=stage.tournament_id))
+
+
 # ── Leaderboard ───────────────────────────────────────────────────────────────
 
 @tournaments_bp.route("/<int:tournament_id>/leaderboard")

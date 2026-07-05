@@ -65,6 +65,10 @@
       </form>
       {% endif %}
       {% if stage.status == 'active' %}
+        <form method="POST" action="{{ url_for('tournaments.generate_next_round', stage_id=stage.id) }}"
+              onsubmit="return confirm('Сгенерировать следующий раунд рассадки для этапа «{{ stage.name }}»?')">
+          <button class="btn btn-sm btn-outline-primary">🎲 Следующий раунд</button>
+        </form>
         {% if stage.type != 'final' %}
         <form method="POST" action="{{ url_for('tournaments.run_cutoff', stage_id=stage.id) }}"
               onsubmit="return confirm('Запустить cutoff? Топ-{{ tournament.cutoff_size }} игроков пройдут в финал.')">

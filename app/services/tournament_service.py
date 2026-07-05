@@ -593,6 +593,184 @@ class TournamentService:
             data={"game_ids": created_ids, "count": len(created_ids)},
         )
 
+    # ── Авторассадка следующего раунда (правила клуба) ──────────────────────────
+    # (1) минимизировать попадание игрока на тот же слот, где он уже сидел
+    #     (в рамках турнира); (2) минимизировать повторение состава стола,
+    #     если играющих в раунде ≥ 20 (при одном столе выбора состава нет);
+    # (3) если участников не кратно 10 — remainder игроков отдыхают этот
+    #     раунд, ротация честная (в т.ч. общий случай для турнира "Стол
+    #     года" с 11 участниками — не частный случай, а remainder=1).
+
+    @staticmethod
+    def _group_into_tables(player_ids: list[int], n_tables: int, pairing_count) -> list[list[int]]:
+        """
+        Разбивка играющих на n_tables столов по 10, минимизируя суммарное
+        число повторных пар (кто уже играл с кем вместе в этом турнире).
+        NP-трудная в общем виде задача («social golfer problem») — практичная
+        эвристика: случайная стартовая раскладка + локальный поиск (пробуем
+        поменять местами двух игроков из разных столов, оставляем обмен,
+        только если он уменьшает суммарный счёт повторов).
+        """
+        import random
+
+        shuffled = list(player_ids)
+        random.shuffle(shuffled)
+        tables = [shuffled[i * 10:(i + 1) * 10] for i in range(n_tables)]
+
+        def total_cost() -> int:
+            cost = 0
+            for table in tables:
+                for i in range(len(table)):
+                    for j in range(i + 1, len(table)):
+                        cost += pairing_count[frozenset((table[i], table[j]))]
+            return cost
+
+        best_cost = total_cost()
+        for _ in range(500):
+            if best_cost == 0:
+                break
+            ta, tb = random.sample(range(n_tables), 2)
+            ia, ib = random.randrange(10), random.randrange(10)
+            tables[ta][ia], tables[tb][ib] = tables[tb][ib], tables[ta][ia]
+            new_cost = total_cost()
+            if new_cost < best_cost:
+                best_cost = new_cost
+            else:
+                tables[ta][ia], tables[tb][ib] = tables[tb][ib], tables[ta][ia]
+        return tables
+
+    @staticmethod
+    def generate_next_round(stage_id: int) -> ServiceResult:
+        """
+        Создаёт игры следующего раунда стадии турнира с рассадкой по
+        правилам клуба (см. блок выше). История пар/мест считается на лету
+        по уже существующим слотам этого ТУРНИРА (не всей карьеры игрока,
+        не только этой стадии) — включая ещё не сыгранные, ранее
+        сгенерированные раунды. Идемпотентно в том смысле, что каждый
+        вызов создаёт СЛЕДУЮЩИЙ раунд (по max(round_number) в стадии) —
+        повторный вызов без завершения текущего раунда просто создаст ещё
+        один раунд поверх, ничего не перезаписывая.
+        """
+        from app.models import GameSlot, Role
+        from collections import Counter, defaultdict
+        from sqlalchemy import func
+
+        stage = db.session.get(TournamentStage, stage_id)
+        if not stage:
+            return ServiceResult.fail("Этап не найден.")
+        tournament = stage.tournament
+        if stage.status != "active":
+            return ServiceResult.fail(f"Этап «{stage.name}» не активен.")
+
+        if stage.type == StageType.FINAL:
+            eligible_ids = [p.player_id for p in tournament.participants if p.advanced_to_final]
+        else:
+            eligible_ids = [p.player_id for p in tournament.participants]
+
+        if len(eligible_ids) < 10:
+            return ServiceResult.fail(
+                f"Недостаточно участников для раунда: {len(eligible_ids)} (нужно ≥10)."
+            )
+
+        current_round = (
+            db.session.query(func.max(Game.round_number))
+            .filter(Game.stage_id == stage_id, Game.round_number.isnot(None))
+            .scalar()
+        ) or 0
+        next_round = current_round + 1
+
+        existing_slots = (
+            db.session.query(GameSlot.player_id, GameSlot.seat_number, GameSlot.game_id)
+            .join(Game)
+            .filter(Game.tournament_id == tournament.id)
+            .all()
+        )
+        seat_usage: dict[int, Counter] = defaultdict(Counter)
+        games_played_count: dict[int, int] = defaultdict(int)
+        slots_by_game: dict[int, list[int]] = defaultdict(list)
+        for player_id, seat_number, game_id in existing_slots:
+            seat_usage[player_id][seat_number] += 1
+            games_played_count[player_id] += 1
+            slots_by_game[game_id].append(player_id)
+
+        pairing_count: Counter = Counter()
+        for players_in_game in slots_by_game.values():
+            for i in range(len(players_in_game)):
+                for j in range(i + 1, len(players_in_game)):
+                    pairing_count[frozenset((players_in_game[i], players_in_game[j]))] += 1
+
+        # Кто отдыхает этот раунд, если участников не кратно 10 — отдыхают
+        # те, кто уже сыграл БОЛЬШЕ всех (честная ротация, зеркально
+        # generate_games, который отдаёт приоритет играющим МЕНЬШЕ всех).
+        remainder = len(eligible_ids) % 10
+        resting_ids: list[int] = []
+        if remainder:
+            resting_ids = sorted(
+                eligible_ids, key=lambda pid: (-games_played_count[pid], pid)
+            )[:remainder]
+        playing_ids = [pid for pid in eligible_ids if pid not in resting_ids]
+
+        n_tables = len(playing_ids) // 10
+        if n_tables == 0:
+            return ServiceResult.fail("Недостаточно играющих для стола после ротации отдыха.")
+
+        tables = (
+            [list(playing_ids)] if n_tables == 1
+            else TournamentService._group_into_tables(playing_ids, n_tables, pairing_count)
+        )
+
+        created_games = []
+        assignments = []  # для будущего уведомления бота (см. MS-TelegramBot)
+        for table_idx, table_players in enumerate(tables, start=1):
+            remaining = list(table_players)
+            seat_assignment: dict[int, int] = {}
+            for seat in range(1, 11):
+                remaining.sort(key=lambda pid: (seat_usage[pid][seat], sum(seat_usage[pid].values())))
+                chosen = remaining.pop(0)
+                seat_assignment[seat] = chosen
+                seat_usage[chosen][seat] += 1
+
+            game = Game(
+                win_side=WinSide.NONE,
+                is_finished=False,
+                is_ranked=tournament.is_ranked,
+                tournament_id=tournament.id,
+                stage_id=stage_id,
+                round_number=next_round,
+                notes=f"Раунд {next_round}, стол {table_idx}",
+            )
+            db.session.add(game)
+            db.session.flush()
+
+            for seat_num, player_id in seat_assignment.items():
+                db.session.add(GameSlot(
+                    game_id=game.id, player_id=player_id,
+                    seat_number=seat_num, role=Role.CIVILIAN,
+                    base_score=0.0, bonus_score=0.0,
+                ))
+                assignments.append({
+                    "player_id": player_id, "game_id": game.id,
+                    "table_number": table_idx, "seat_number": seat_num,
+                    "round_number": next_round,
+                })
+            created_games.append(game.id)
+
+        db.session.commit()
+        logger.info(
+            f"Раунд {next_round} стадии {stage_id}: создано {len(created_games)} игр, "
+            f"отдыхают {len(resting_ids)} игроков."
+        )
+        return ServiceResult.success(
+            f"Раунд {next_round} создан: {len(created_games)} стол(ов)"
+            + (f", отдыхают {len(resting_ids)} игроков" if resting_ids else "") + ".",
+            data={
+                "round_number": next_round,
+                "game_ids": created_games,
+                "resting_player_ids": resting_ids,
+                "assignments": assignments,
+            },
+        )
+
     # ── Summary / context builders ────────────────────────────────────────────
 
     @staticmethod

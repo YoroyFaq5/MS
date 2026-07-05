@@ -373,6 +373,11 @@ class Game(db.Model):
     # Snapshot: is this game's result counted towards global rating?
     is_ranked = Column(Boolean, default=True, nullable=False)
 
+    # Номер раунда внутри стадии турнира (NULL — не турнирная/ручная игра
+    # без концепции раундов). Группирует игры, сыгранные "параллельно" за
+    # разными столами одного раунда — см. TournamentService.generate_next_round.
+    round_number = Column(Integer, nullable=True)
+
     # Season linkage (auto-assigned on game creation)
     season_id = Column(
         Integer, ForeignKey("seasons.id", ondelete="SET NULL"), nullable=True

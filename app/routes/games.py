@@ -374,6 +374,30 @@ def finish_game(game_id: int):
     else:
         flash("Игра завершена! Рейтинг и монеты обновлены.", "success")
 
+    # Авторассадка: если это была последняя незавершённая игра своего
+    # раунда данной стадии — сразу же генерируем следующий раунд. Только
+    # для игр, реально созданных через generate_next_round/generate_games
+    # (у них round_number проставлен) — обычные ручные/не турнирные игры
+    # (round_number is None) этот механизм не трогает.
+    if game.stage_id and game.round_number is not None:
+        remaining = (
+            db.session.query(Game)
+            .filter(
+                Game.stage_id == game.stage_id,
+                Game.round_number == game.round_number,
+                Game.is_finished == False,
+            )
+            .count()
+        )
+        if remaining == 0:
+            from app.services.tournament_service import TournamentService
+            next_round_result = TournamentService.generate_next_round(game.stage_id)
+            if next_round_result.ok:
+                flash(f"Раунд {game.round_number} завершён — {next_round_result.message}", "info")
+            # Отсутствие следующего раунда (например, стадия почти закончена,
+            # участников не хватает) — не ошибка самого finish_game, поэтому
+            # неудачу generate_next_round здесь не показываем как danger.
+
     if game.tournament_id:
         return redirect(url_for("tournaments.tournament_detail", tournament_id=game.tournament_id))
     return redirect(url_for("games.game_detail", game_id=game_id))
