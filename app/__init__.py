@@ -53,6 +53,7 @@ def create_app(config_name: str = "default") -> Flask:
     from .routes.auth import auth_bp
     from .routes.seasons import seasons_bp
     from .routes.api import api_bp
+    from .routes.api_bot import api_bot_bp
     from .routes.fantasy import fantasy_bp
     from .routes.shop import shop_bp
     from .routes.inventory import inventory_bp
@@ -72,6 +73,7 @@ def create_app(config_name: str = "default") -> Flask:
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(seasons_bp, url_prefix="/seasons")
     app.register_blueprint(api_bp, url_prefix="/api")
+    app.register_blueprint(api_bot_bp, url_prefix="/api/v1/bot")
     app.register_blueprint(fantasy_bp, url_prefix="/fantasy")
     app.register_blueprint(shop_bp, url_prefix="/shop")
     app.register_blueprint(inventory_bp, url_prefix="/inventory")

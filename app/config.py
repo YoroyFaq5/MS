@@ -40,6 +40,12 @@ class Config:
     BOT_EVENTS_URL = os.environ.get("BOT_EVENTS_URL")  # напр. https://<бот>.pythonanywhere.com
     INCOMING_EVENT_SECRET = os.environ.get("INCOMING_EVENT_SECRET")
 
+    # Серверный токен, которым бот авторизуется к /api/v1/bot/* (Authorization:
+    # Bearer <это значение>) — опционально по тому же принципу: без него
+    # весь блюпринт отвечает 503, а не 401 (явно "не настроено", а не
+    # "неверный токен" — чтобы не путать при первом деплое).
+    MAIN_API_SERVICE_TOKEN = os.environ.get("MAIN_API_SERVICE_TOKEN")
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
