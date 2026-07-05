@@ -24,6 +24,16 @@ class Config:
         "pool_recycle": 280,
     }
 
+    # Telegram Login Widget (привязка аккаунта к боту-клиенту) — опционально,
+    # без него сайт работает как обычно, просто кнопка привязки не
+    # показывается (тот же принцип, что MIGRATION_API_ENABLED: отсутствие
+    # переменной выключает фичу, а не роняет приложение).
+    # TELEGRAM_BOT_TOKEN нужен здесь для проверки HMAC-подписи виджета
+    # (см. AuthService.verify_telegram_login_data) — это требование
+    # протокола Login Widget, не только бот его использует.
+    TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+    TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME")
+
 
 class DevelopmentConfig(Config):
     DEBUG = True

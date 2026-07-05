@@ -173,6 +173,45 @@ def unlink_player():
     return redirect(url_for("auth.link_player_page"))
 
 
+# ── Telegram Login Widget (привязка к Telegram-боту) ───────────────────────────
+# Виджет (data-auth-url) редиректит браузер сюда же с query-параметрами —
+# это обычная навигация в том же браузере, сессионная кука Flask-Login при
+# этом сохраняется, поэтому @login_required работает как обычно.
+
+@auth_bp.route("/telegram/callback")
+@login_required
+def telegram_callback():
+    from flask import current_app
+
+    if not current_user.player_id:
+        flash("Сначала привяжите аккаунт к игроку.", "warning")
+        return redirect(url_for("auth.link_player_page"))
+
+    bot_token = current_app.config.get("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        flash("Привязка Telegram сейчас недоступна на сервере.", "danger")
+        return redirect(url_for("profile.view_profile", player_id=current_user.player_id))
+
+    data = request.args.to_dict()
+    if not AuthService.verify_telegram_login_data(data, bot_token):
+        flash("Не удалось проверить данные от Telegram — попробуйте ещё раз.", "danger")
+        return redirect(url_for("profile.view_profile", player_id=current_user.player_id))
+
+    result = AuthService.link_telegram(current_user.player, data["id"])
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("profile.view_profile", player_id=current_user.player_id))
+
+
+@auth_bp.route("/telegram/unlink", methods=["POST"])
+@login_required
+def telegram_unlink():
+    if not current_user.player_id:
+        abort(404)
+    result = AuthService.unlink_telegram(current_user.player)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("profile.view_profile", player_id=current_user.player_id))
+
+
 # ── Admin: user list ──────────────────────────────────────────────────────────
 
 @auth_bp.route("/admin/users")

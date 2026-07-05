@@ -70,6 +70,11 @@ class Player(db.Model):
     bio        = Column(Text, nullable=True)
     coins      = Column(Float, default=0.0, nullable=False, server_default="0")
 
+    # Telegram-аккаунт, привязанный через Login Widget (см. AuthService.
+    # link_telegram) — используется отдельным Telegram-ботом для резолва
+    # "кто это" через API; сам бот эту связь у себя не хранит.
+    telegram_id = Column(String(32), nullable=True, unique=True, index=True)
+
     game_slots = relationship("GameSlot", back_populates="player", lazy="dynamic")
     tournament_participations = relationship("TournamentParticipant", back_populates="player", lazy="dynamic")
     team_memberships = relationship("TeamPlayer", back_populates="player", lazy="dynamic")

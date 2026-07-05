@@ -224,6 +224,59 @@ class AuthService:
         db.session.commit()
         return AuthResult.success(f"Игрок «{player_name}» отвязан.")
 
+    # ── Telegram Login Widget ──────────────────────────────────────────────────
+    # https://core.telegram.org/widgets/login — данные, полученные от виджета
+    # (id, first_name, username, photo_url, auth_date, hash), подписаны
+    # HMAC-SHA256 секретом SHA256(bot_token). Проверка обязательна — иначе
+    # кто угодно может прислать произвольный telegram_id.
+
+    MAX_AUTH_AGE_SECONDS = 86400  # сутки — защита от повторного использования старого ответа
+
+    @staticmethod
+    def verify_telegram_login_data(data: dict, bot_token: str) -> bool:
+        import hashlib
+        import hmac
+        import time
+
+        received_hash = data.get("hash")
+        if not received_hash:
+            return False
+
+        auth_date = data.get("auth_date")
+        if not auth_date or time.time() - int(auth_date) > AuthService.MAX_AUTH_AGE_SECONDS:
+            return False
+
+        fields = {k: v for k, v in data.items() if k != "hash"}
+        data_check_string = "\n".join(f"{k}={fields[k]}" for k in sorted(fields))
+        secret_key = hashlib.sha256(bot_token.encode("utf-8")).digest()
+        computed_hash = hmac.new(
+            secret_key, data_check_string.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(computed_hash, received_hash)
+
+    @staticmethod
+    def link_telegram(player: Player, telegram_id: str) -> AuthResult:
+        conflict = (
+            db.session.query(Player)
+            .filter(Player.telegram_id == telegram_id, Player.id != player.id)
+            .first()
+        )
+        if conflict:
+            return AuthResult.fail(
+                f"Этот Telegram-аккаунт уже привязан к игроку «{conflict.display_name}»."
+            )
+        player.telegram_id = telegram_id
+        db.session.commit()
+        return AuthResult.success("Telegram успешно привязан.")
+
+    @staticmethod
+    def unlink_telegram(player: Player) -> AuthResult:
+        if not player.telegram_id:
+            return AuthResult.fail("Telegram не привязан.")
+        player.telegram_id = None
+        db.session.commit()
+        return AuthResult.success("Telegram отвязан.")
+
     # ── Admin: user management ────────────────────────────────────────────────
 
     @staticmethod

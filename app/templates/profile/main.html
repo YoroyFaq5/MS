@@ -67,13 +67,28 @@
       </div>
     </div>
     {% if is_own %}
-    <div class="ms-auto">
+    <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
       <a href="{{ url_for('inventory.list_inventory') }}" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-backpack4 me-1"></i>Инвентарь
       </a>
       <a href="{{ url_for('titles.nominations') }}" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-patch-check me-1"></i>Номинации
       </a>
+      {% if telegram_linked %}
+      <form method="POST" action="{{ url_for('auth.telegram_unlink') }}" class="d-inline"
+            onsubmit="return confirm('Отвязать Telegram-аккаунт?')">
+        <button type="submit" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-telegram me-1"></i>Telegram привязан · отвязать
+        </button>
+      </form>
+      {% elif telegram_bot_username %}
+      <script async src="https://telegram.org/js/telegram-widget.js?22"
+              data-telegram-login="{{ telegram_bot_username }}"
+              data-size="large"
+              data-radius="8"
+              data-auth-url="{{ url_for('auth.telegram_callback', _external=True) }}"
+              data-request-access="write"></script>
+      {% endif %}
     </div>
     {% endif %}
   </div>

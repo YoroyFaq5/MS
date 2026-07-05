@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, abort, request
+from flask import Blueprint, render_template, redirect, url_for, flash, abort, request, current_app
 from flask_login import current_user
 
 from app import db
@@ -28,9 +28,19 @@ def view_profile(player_id: int):
     # Список наград владельца нужен только ему самому — для управления
     # экипировкой прямо на странице профиля.
     own_titles = TitleService.list_player_titles(player_id) if is_own else []
+
+    # Статус привязки Telegram — только владельцу, отдельно от to_dict()
+    # (telegram_id намеренно не публикуется в общем JSON/профиле).
+    telegram_linked = False
+    if is_own:
+        player = db.session.get(Player, player_id)
+        telegram_linked = bool(player and player.telegram_id)
+
     return render_template(
         "profile/main.html", profile=profile, player_id=player_id,
         is_own=is_own, own_titles=own_titles,
+        telegram_linked=telegram_linked,
+        telegram_bot_username=current_app.config.get("TELEGRAM_BOT_USERNAME"),
     )
 
 
