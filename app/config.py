@@ -34,6 +34,12 @@ class Config:
     TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
     TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME")
 
+    # Fire-and-forget уведомления сайта -> бота (см. BotNotifyService) —
+    # опционально по тому же принципу: без обеих переменных уведомления
+    # просто не отправляются (тихо логируется), остальной сайт не ломается.
+    BOT_EVENTS_URL = os.environ.get("BOT_EVENTS_URL")  # напр. https://<бот>.pythonanywhere.com
+    INCOMING_EVENT_SECRET = os.environ.get("INCOMING_EVENT_SECRET")
+
 
 class DevelopmentConfig(Config):
     DEBUG = True

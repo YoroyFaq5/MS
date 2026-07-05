@@ -27,6 +27,48 @@ def _active_tournaments():
     )
 
 
+def _notify_next_slot(round_data: dict) -> None:
+    """
+    Fire-and-forget уведомление боту о новой рассадке — только для
+    игроков, у которых привязан Telegram (Player.telegram_id). Отсутствие
+    привязки у части/всех игроков — не ошибка, их просто пропускаем.
+    """
+    assignments = round_data.get("assignments") or []
+    if not assignments:
+        return
+
+    player_ids = {a["player_id"] for a in assignments}
+    telegram_ids = {
+        p.id: p.telegram_id
+        for p in db.session.query(Player).filter(Player.id.in_(player_ids)).all()
+        if p.telegram_id
+    }
+    if not telegram_ids:
+        return
+
+    tournament = None
+    game = db.session.get(Game, assignments[0]["game_id"])
+    if game and game.tournament:
+        tournament = game.tournament
+
+    players_payload = [
+        {
+            "telegram_id": telegram_ids[a["player_id"]],
+            "tournament_name": tournament.name if tournament else None,
+            "round_number": a["round_number"],
+            "table_number": a["table_number"],
+            "seat_number": a["seat_number"],
+        }
+        for a in assignments
+        if a["player_id"] in telegram_ids
+    ]
+    if not players_payload:
+        return
+
+    from app.services.bot_notify_service import BotNotifyService
+    BotNotifyService.send_event("next-slot", {"players": players_payload})
+
+
 def _new_game_form_context(tournaments, preselect_tournament=None, preselect_stage=None) -> dict:
     """
     Общий контекст для games/new.html — используется и на GET, и во всех
@@ -394,6 +436,7 @@ def finish_game(game_id: int):
             next_round_result = TournamentService.generate_next_round(game.stage_id)
             if next_round_result.ok:
                 flash(f"Раунд {game.round_number} завершён — {next_round_result.message}", "info")
+                _notify_next_slot(next_round_result.data)
             # Отсутствие следующего раунда (например, стадия почти закончена,
             # участников не хватает) — не ошибка самого finish_game, поэтому
             # неудачу generate_next_round здесь не показываем как danger.
