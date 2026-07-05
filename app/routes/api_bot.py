@@ -17,7 +17,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from app import db
 from app.models import Player, Tournament, WinSide
-from app.services import ProfileService, RatingService, TournamentService
+from app.services import ProfileService, RatingService, TournamentService, FantasyService
 from app.services.auth_service import AuthService
 
 api_bot_bp = Blueprint("api_bot", __name__)
@@ -57,6 +57,28 @@ def _resolve_player(telegram_id: str):
     if not telegram_id:
         return None
     return db.session.query(Player).filter_by(telegram_id=telegram_id).first()
+
+
+def _resolve_user(telegram_id: str):
+    """
+    FantasyService оперирует User (не Player) — вход в фэнтези-драфт
+    списывает монеты с Player, но сам драфт принадлежит User.id. Раз
+    Login Widget привязывает Telegram только залогиненному User (см.
+    /auth/telegram/callback), у любого Player с telegram_id гарантированно
+    есть ровно один User с этим player_id — обратная связь всегда цела.
+    """
+    player = _resolve_player(telegram_id)
+    if not player:
+        return None
+    from app.models.user import User
+    return db.session.query(User).filter_by(player_id=player.id).first()
+
+
+def _result_response(result) -> tuple:
+    if not result.ok:
+        return _fail(result.message)
+    data = result.data.to_dict() if hasattr(result.data, "to_dict") else None
+    return _ok(data, result.message)
 
 
 # ── Резолв привязки ──────────────────────────────────────────────────────────
@@ -274,6 +296,83 @@ def tournament_detail(tournament_id: int):
         "team_ratings": [r.to_dict() for r in summary["team_ratings"]],
         "active_stage": summary["active_stage"].to_dict() if summary["active_stage"] else None,
     })
+
+
+# ── Fantasy (полное управление драфтом из бота, по решению из
+#    согласования функционала) ───────────────────────────────────────────────
+
+@api_bot_bp.route("/fantasy/my")
+def fantasy_my():
+    user = _resolve_user(request.args.get("telegram_id", ""))
+    if not user:
+        return _fail("Игрок не привязан.", 404)
+    tournament_id = request.args.get("tournament_id", type=int)
+    if not tournament_id:
+        return _fail("tournament_id обязателен.")
+    draft = FantasyService.get_user_draft(user.id, tournament_id)
+    if not draft:
+        return _fail("У вас нет драфта для этого турнира.", 404)
+    return _ok(draft.to_dict())
+
+
+@api_bot_bp.route("/fantasy/draft", methods=["POST"])
+def fantasy_create_draft():
+    data = request.get_json(silent=True) or {}
+    user = _resolve_user(data.get("telegram_id", ""))
+    if not user:
+        return _fail("Игрок не привязан.", 404)
+    tournament_id = data.get("tournament_id")
+    if not tournament_id:
+        return _fail("tournament_id обязателен.")
+    result = FantasyService.create_draft(user, int(tournament_id))
+    return _result_response(result)
+
+
+@api_bot_bp.route("/fantasy/pick", methods=["POST"])
+def fantasy_add_pick():
+    data = request.get_json(silent=True) or {}
+    user = _resolve_user(data.get("telegram_id", ""))
+    if not user:
+        return _fail("Игрок не привязан.", 404)
+    draft_id, player_id = data.get("draft_id"), data.get("player_id")
+    if not draft_id or not player_id:
+        return _fail("draft_id и player_id обязательны.")
+    result = FantasyService.add_pick(user, int(draft_id), int(player_id))
+    return _result_response(result)
+
+
+@api_bot_bp.route("/fantasy/pick", methods=["DELETE"])
+def fantasy_remove_pick():
+    data = request.get_json(silent=True) or {}
+    user = _resolve_user(data.get("telegram_id", ""))
+    if not user:
+        return _fail("Игрок не привязан.", 404)
+    draft_id, player_id = data.get("draft_id"), data.get("player_id")
+    if not draft_id or not player_id:
+        return _fail("draft_id и player_id обязательны.")
+    result = FantasyService.remove_pick(user, int(draft_id), int(player_id))
+    return _result_response(result)
+
+
+@api_bot_bp.route("/fantasy/leaderboard")
+def fantasy_leaderboard():
+    tournament_id = request.args.get("tournament_id", type=int)
+    if not tournament_id:
+        return _fail("tournament_id обязателен.")
+    entries = FantasyService.get_leaderboard(tournament_id)
+    return _ok([e.to_dict() for e in entries])
+
+
+@api_bot_bp.route("/fantasy/available")
+def fantasy_available():
+    user = _resolve_user(request.args.get("telegram_id", ""))
+    if not user:
+        return _fail("Игрок не привязан.", 404)
+    tournament_id = request.args.get("tournament_id", type=int)
+    if not tournament_id:
+        return _fail("tournament_id обязателен.")
+    players = FantasyService.get_available_picks(user, tournament_id)
+    return _ok([{"id": p.id, "name": p.display_name, "elo": p.elo} for p in players])
 
 
 # ── Аккаунт ───────────────────────────────────────────────────────────────────
