@@ -186,6 +186,18 @@ class ShopService:
             f"from player #{previous_owner.id if previous_owner else '?'} for {offer_price}"
         )
 
+        if previous_owner:
+            from app.services.bot_notify_service import BotNotifyService
+            BotNotifyService.notify_player(
+                previous_owner.id, "item-bought-out",
+                {
+                    "item_name": item.name,
+                    "buyer_name": challenger.display_name,
+                    "offer_price": offer_price,
+                    "payout": payout,
+                },
+            )
+
         try:
             from app.services.achievement_service import AchievementService
             AchievementService.check_after_purchase(challenger.id)

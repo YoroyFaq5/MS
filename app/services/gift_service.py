@@ -85,6 +85,13 @@ class GiftService:
         db.session.commit()
 
         logger.info(f"Gift: player#{sender.id} -> player#{to_player_id}, item={item.name!r}")
+
+        from app.services.bot_notify_service import BotNotifyService
+        BotNotifyService.notify_player(
+            to_player_id, "gift-received",
+            {"item_name": item.name, "sender_name": sender.display_name, "message": message},
+        )
+
         return GiftResult.success(
             f"«{item.name}» подарен игроку «{recipient.display_name}».", data=transfer
         )

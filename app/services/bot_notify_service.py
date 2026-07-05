@@ -66,3 +66,21 @@ class BotNotifyService:
         except Exception:
             logger.exception("BotNotifyService: не удалось отправить событие %s", event_type)
             return False
+
+    @staticmethod
+    def notify_player(player_id: int, event_type: str, extra_payload: dict) -> bool:
+        """
+        Удобный шорткат для всех остальных hook-точек (достижения, титулы,
+        перекуп, fantasy, подарки, сезонные награды): резолвит
+        Player.telegram_id сам и просто не отправляет ничего, если игрок
+        не привязан — вызывающему коду не нужно каждый раз повторять эту
+        проверку.
+        """
+        from app.models import Player
+        from app import db
+
+        player = db.session.get(Player, player_id)
+        if not player or not player.telegram_id:
+            return False
+        payload = {"telegram_id": player.telegram_id, **extra_payload}
+        return BotNotifyService.send_event(event_type, payload)

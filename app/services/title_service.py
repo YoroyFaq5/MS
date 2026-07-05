@@ -203,6 +203,12 @@ class TitleService:
             db.session.commit()
 
         logger.info(f"Title granted: player#{player_id} title={title_code!r} season={season_id} by={granted_by}")
+
+        from app.services.bot_notify_service import BotNotifyService
+        BotNotifyService.notify_player(
+            player_id, "title-granted", {"title_name": title.name, "title_code": title.code},
+        )
+
         return TitleResult.success(f"Титул «{title.name}» выдан.", data=pt)
 
     @staticmethod

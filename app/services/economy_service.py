@@ -420,6 +420,8 @@ class EconomyService:
         ratings = RatingService.get_season_rating(season_id)
         results = []
 
+        from app.services.bot_notify_service import BotNotifyService
+
         for r in ratings:
             player = db.session.get(Player, r.player_id)
             if not player:
@@ -438,6 +440,11 @@ class EconomyService:
                 player, amount, desc, CoinSourceType.SEASON_REWARD
             )
             results.append(EconomyResult.success(f"{r.display_name}: +{amount}"))
+
+            BotNotifyService.notify_player(
+                player.id, "season-award",
+                {"season_name": season.name, "rank": r.rank, "amount": amount},
+            )
 
         if commit:
             db.session.commit()

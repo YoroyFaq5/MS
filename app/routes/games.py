@@ -416,6 +416,17 @@ def finish_game(game_id: int):
     else:
         flash("Игра завершена! Рейтинг и монеты обновлены.", "success")
 
+    from app.services.bot_notify_service import BotNotifyService
+    for slot in game.slots:
+        won = (
+            (slot.is_mafia_side and game.win_side == WinSide.MAFIA)
+            or (slot.is_city_side and game.win_side == WinSide.CITY)
+        )
+        BotNotifyService.notify_player(
+            slot.player_id, "game-finished",
+            {"won": won, "total_score": slot.total_score, "bonus_score": slot.bonus_score},
+        )
+
     # Авторассадка: если это была последняя незавершённая игра своего
     # раунда данной стадии — сразу же генерируем следующий раунд. Только
     # для игр, реально созданных через generate_next_round/generate_games

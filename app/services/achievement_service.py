@@ -66,6 +66,13 @@ class AchievementService:
         if commit:
             db.session.commit()
         logger.info(f"Player #{player_id} unlocked achievement {code!r}")
+
+        from app.services.bot_notify_service import BotNotifyService
+        BotNotifyService.notify_player(
+            player_id, "achievement-granted",
+            {"achievement_name": achievement.name, "achievement_code": achievement.code},
+        )
+
         return AchievementResult.success(f"Достижение «{achievement.name}» получено!", data=pa)
 
     # ── Dispatch hooks ───────────────────────────────────────────────────────

@@ -312,6 +312,14 @@ class FantasyService:
         if commit:
             db.session.commit()
 
+        from app.services.bot_notify_service import BotNotifyService
+        for draft in unscored:
+            if draft.user and draft.user.player_id:
+                BotNotifyService.notify_player(
+                    draft.user.player_id, "fantasy-result",
+                    {"tournament_name": t.name, "points": draft.total_points},
+                )
+
         # ── Prize pool payout ────────────────────────────────────────────
         bank = round(sum(d.entry_cost_paid for d in all_drafts), 2)
         if bank > 0:
@@ -337,6 +345,10 @@ class FantasyService:
                     CoinSourceType.FANTASY_REWARD,
                     ref_tournament_id=tournament_id,
                     commit=False,
+                )
+                BotNotifyService.notify_player(
+                    user.player.id, "fantasy-prize",
+                    {"tournament_name": t.name, "place": place, "amount": amount},
                 )
             if commit:
                 db.session.commit()
