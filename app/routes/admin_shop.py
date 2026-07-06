@@ -71,6 +71,7 @@ THEMES: list[tuple[str, str]] = [
     ("meteor", "🌠 Метеоритный дождь ULTRA"),
     ("arcane", "🔮 Магический круг ULTRA"),
     ("divine", "👑 Золото императора ULTRA"),
+    ("admin", "👑 Королевская власть ULTRA"),
 ]
 
 # Уровни тем — единственное место, где это решается (run.py::_shop_items()
@@ -78,7 +79,7 @@ THEMES: list[tuple[str, str]] = [
 # товарам магазина; ничего не дублируется вручную).
 THEME_ULTRA: set[str] = {
     "void", "aurora", "event_horizon", "thunder_god", "phoenix",
-    "dragon", "cosmos", "meteor", "arcane", "divine",
+    "dragon", "cosmos", "meteor", "arcane", "divine", "admin",
 }
 THEME_EPIC_WAVE: set[str] = {
     "fire", "ice", "electric", "toxic", "shadow", "holy",

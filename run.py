@@ -366,6 +366,13 @@ def _shop_items() -> list:
         "ultra": Rarity.ULTRA,
     }
 
+    # Точечные исключения из шкалы THEME_TIER_PRICE — для тем, которые
+    # статуснее остальных ULTRA (например "admin", зарезервированная за
+    # админской ролью), а не просто "ещё одна тема того же уровня".
+    THEME_PRICE_OVERRIDE: dict[str, float] = {
+        "admin": 10000.0,
+    }
+
     for code, label in THEMES:
         if code in THEME_ULTRA:
             tier = "ultra"
@@ -373,7 +380,7 @@ def _shop_items() -> list:
             tier = "epic_wave"
         else:
             tier = "mythic"
-        price = THEME_TIER_PRICE[tier]
+        price = THEME_PRICE_OVERRIDE.get(code, THEME_TIER_PRICE[tier])
         rarity = THEME_TIER_RARITY[tier]
 
         items.append(dict(
