@@ -10,6 +10,9 @@ from app.auth_decorators import requires_permission
 shop_bp = Blueprint("shop", __name__)
 
 
+SORT_OPTIONS = {"rarity_desc", "rarity_asc"}
+
+
 @shop_bp.route("/")
 def list_items():
     category_param = request.args.get("category")
@@ -20,7 +23,11 @@ def list_items():
         except ValueError:
             pass
 
-    items = ShopService.list_items(category=category)
+    sort_param = request.args.get("sort")
+    if sort_param not in SORT_OPTIONS:
+        sort_param = None
+
+    items = ShopService.list_items(category=category, sort=sort_param)
 
     player = current_user.player if current_user.is_authenticated else None
     affordability = {}
@@ -33,6 +40,7 @@ def list_items():
         items=items,
         categories=list(ShopCategory),
         selected_category=category,
+        selected_sort=sort_param,
         affordability=affordability,
         player=player,
     )

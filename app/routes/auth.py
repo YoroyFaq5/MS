@@ -337,6 +337,29 @@ def admin_economy_adjust():
     return redirect(url_for("auth.admin_economy"))
 
 
+@auth_bp.route("/admin/economy/bulk-adjust", methods=["POST"])
+@admin_required
+def admin_economy_bulk_adjust():
+    from app.models import Player
+    from app.services.economy_service import EconomyService
+
+    player_ids = request.form.getlist("player_ids", type=int)
+    amount     = request.form.get("amount", type=float)
+    reason     = request.form.get("reason", "").strip()
+
+    if not player_ids:
+        flash("Выберите хотя бы одного игрока.", "danger")
+        return redirect(url_for("auth.admin_economy"))
+    if amount is None:
+        flash("Укажите сумму.", "danger")
+        return redirect(url_for("auth.admin_economy"))
+
+    players = db.session.query(Player).filter(Player.id.in_(player_ids)).all()
+    result = EconomyService.admin_bulk_adjust(players, amount, reason)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("auth.admin_economy"))
+
+
 @auth_bp.route("/admin/economy/reset-all", methods=["POST"])
 @admin_required
 def admin_economy_reset_all():

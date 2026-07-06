@@ -212,6 +212,27 @@ class EconomyService:
         )
 
     @staticmethod
+    def admin_bulk_adjust(
+        players: List[Player],
+        amount: float,
+        reason: str,
+    ) -> EconomyResult:
+        """Same admin adjustment applied to many players in one ledger commit."""
+        if len(reason.strip()) < 10:
+            return EconomyResult.fail("Причина должна быть не короче 10 символов.")
+        if not players:
+            return EconomyResult.fail("Не выбрано ни одного игрока.")
+        if not amount:
+            return EconomyResult.fail("Сумма не может быть нулевой.")
+
+        for player in players:
+            EconomyService._record(player, amount, reason, CoinSourceType.ADMIN_ADJUSTMENT)
+        db.session.commit()
+        return EconomyResult.success(
+            f"Корректировка {'+' if amount >= 0 else ''}{amount} применена к {len(players)} игрокам: {reason}"
+        )
+
+    @staticmethod
     def grant_welcome_bonus(player: Player, commit: bool = True) -> EconomyResult:
         """
         Стартовый бонус новому игроку — единая точка входа, вызывается из

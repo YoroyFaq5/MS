@@ -33,6 +33,11 @@ UNIQUE_RARITIES = {Rarity.MYTHIC, Rarity.ULTRA}
 MIN_BUYOUT_INCREMENT = 100.0
 RESALE_OWNER_SHARE = 0.8
 
+# Rarity is a plain PyEnum (string values), so ORDER BY on the column would
+# sort alphabetically, not COMMON→ULTRA. This maps each member to its
+# declaration-order rank for use as a Python-side sort key.
+RARITY_ORDER: Dict[Rarity, int] = {r: i for i, r in enumerate(Rarity)}
+
 
 @dataclass
 class ShopResult:
@@ -54,13 +59,23 @@ class ShopService:
     # ── Browsing ─────────────────────────────────────────────────────────────
 
     @staticmethod
-    def list_items(category: Optional[ShopCategory] = None, active_only: bool = True) -> List[ShopItem]:
+    def list_items(
+        category: Optional[ShopCategory] = None,
+        active_only: bool = True,
+        sort: Optional[str] = None,
+    ) -> List[ShopItem]:
         q = db.session.query(ShopItem)
         if active_only:
             q = q.filter(ShopItem.is_active == True)
         if category is not None:
             q = q.filter(ShopItem.category == category)
-        return q.order_by(ShopItem.category, ShopItem.subcategory, ShopItem.price).all()
+        items = q.order_by(ShopItem.category, ShopItem.subcategory, ShopItem.price).all()
+
+        if sort == "rarity_desc":
+            items.sort(key=lambda i: RARITY_ORDER[i.rarity], reverse=True)
+        elif sort == "rarity_asc":
+            items.sort(key=lambda i: RARITY_ORDER[i.rarity])
+        return items
 
     @staticmethod
     def get_item(item_id: int) -> Optional[ShopItem]:

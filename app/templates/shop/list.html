@@ -22,17 +22,30 @@
   {% endif %}
 </div>
 
-<ul class="nav nav-pills mb-4 gap-2">
-  <li class="nav-item">
-    <a class="nav-link {% if not selected_category %}active{% endif %}" href="{{ url_for('shop.list_items') }}">Все</a>
-  </li>
-  {% for cat in categories %}
-  <li class="nav-item">
-    <a class="nav-link {% if selected_category == cat %}active{% endif %}"
-       href="{{ url_for('shop.list_items', category=cat.value) }}">{{ CATEGORY_LABELS.get(cat.value, cat.value) }}</a>
-  </li>
-  {% endfor %}
-</ul>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+  <ul class="nav nav-pills gap-2 mb-0">
+    <li class="nav-item">
+      <a class="nav-link {% if not selected_category %}active{% endif %}" href="{{ url_for('shop.list_items', sort=selected_sort) }}">Все</a>
+    </li>
+    {% for cat in categories %}
+    <li class="nav-item">
+      <a class="nav-link {% if selected_category == cat %}active{% endif %}"
+         href="{{ url_for('shop.list_items', category=cat.value, sort=selected_sort) }}">{{ CATEGORY_LABELS.get(cat.value, cat.value) }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <form method="get" class="d-flex align-items-center gap-2">
+    {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category.value }}">{% endif %}
+    <label class="text-muted small mb-0" for="sortSelect">Сортировка:</label>
+    <select name="sort" id="sortSelect" class="form-select form-select-sm" style="width:auto"
+            onchange="this.form.submit()">
+      <option value="" {% if not selected_sort %}selected{% endif %}>По умолчанию</option>
+      <option value="rarity_desc" {% if selected_sort == 'rarity_desc' %}selected{% endif %}>Редкость: сначала топовые</option>
+      <option value="rarity_asc" {% if selected_sort == 'rarity_asc' %}selected{% endif %}>Редкость: сначала обычные</option>
+    </select>
+  </form>
+</div>
 
 {% if items %}
 <div class="row g-3">
