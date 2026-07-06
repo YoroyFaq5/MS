@@ -155,6 +155,30 @@ def compare():
     return _ok(result)
 
 
+@api_bot_bp.route("/players/compare")
+def players_compare():
+    """
+    Сравнение ЛЮБЫХ двух игроков без привязки к telegram_id вызывающего —
+    для инлайн-режима бота ("Имя1 vs Имя2" в любом чате). ProfileService.
+    compare_players уже принимает произвольную пару id, роут /compare просто
+    исторически резолвит игрока A только через привязанный telegram-аккаунт.
+    """
+    a = request.args.get("a", type=int)
+    b = request.args.get("b", type=int)
+    if not a or not b:
+        return _fail("Параметры a и b обязательны.")
+
+    result = ProfileService.compare_players(a, b)
+    if not result:
+        return _fail("Не удалось сравнить — проверьте ID игроков.", 404)
+    result = {
+        **result,
+        "player_a": result["player_a"].to_dict(),
+        "player_b": result["player_b"].to_dict(),
+    }
+    return _ok(result)
+
+
 # ── Рейтинг ───────────────────────────────────────────────────────────────────
 
 @api_bot_bp.route("/ratings")
