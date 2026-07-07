@@ -336,6 +336,75 @@ class FantasyService:
         logger.info(f"Locked {len(drafts)} fantasy drafts for series #{tournament_series_id}")
         return len(drafts)
 
+    # ── Live points (preview, not final) ────────────────────────────────────
+    #
+    # total_points used to sit at 0 for the whole evening/tournament until
+    # an admin explicitly finished it and score_series()/score_tournament()
+    # ran — confusing, since the underlying games are already finished and
+    # scored individually. These two recompute total_points from the
+    # CURRENT rating after every game, so standings update live, without
+    # touching draft.status or paying out the prize pool — that stays a
+    # deliberate one-time action tied to actually finishing the series/
+    # tournament (score_series/score_tournament, called from
+    # finish_series()/finish_tournament()), which also marks drafts SCORED
+    # and is guarded against re-running. Safe to call repeatedly.
+
+    @staticmethod
+    def update_live_points_for_series(tournament_series_id: int, commit: bool = True) -> None:
+        from app.services.rating_service import RatingService
+
+        series = db.session.get(TournamentSeries, tournament_series_id)
+        if not series:
+            return
+        drafts = (
+            db.session.query(FantasyDraft)
+            .filter(
+                FantasyDraft.tournament_series_id == tournament_series_id,
+                FantasyDraft.status != FantasyDraftStatus.SCORED,
+            )
+            .all()
+        )
+        if not drafts:
+            return
+        ratings = RatingService.get_stage_rating(series.stage_id)
+        points_map = {r.player_id: r.total_score for r in ratings}
+        for draft in drafts:
+            total = 0.0
+            for pick in draft.picks:
+                pts = points_map.get(pick.player_id, 0.0)
+                pick.points_earned = round(pts, 2)
+                total += pts
+            draft.total_points = round(total, 2)
+        if commit:
+            db.session.commit()
+
+    @staticmethod
+    def update_live_points_for_tournament(tournament_id: int, commit: bool = True) -> None:
+        from app.services.rating_service import RatingService
+
+        drafts = (
+            db.session.query(FantasyDraft)
+            .filter(
+                FantasyDraft.tournament_id == tournament_id,
+                FantasyDraft.tournament_series_id.is_(None),
+                FantasyDraft.status != FantasyDraftStatus.SCORED,
+            )
+            .all()
+        )
+        if not drafts:
+            return
+        ratings = RatingService.get_tournament_rating(tournament_id)
+        points_map = {r.player_id: r.total_score for r in ratings}
+        for draft in drafts:
+            total = 0.0
+            for pick in draft.picks:
+                pts = points_map.get(pick.player_id, 0.0)
+                pick.points_earned = round(pts, 2)
+                total += pts
+            draft.total_points = round(total, 2)
+        if commit:
+            db.session.commit()
+
     # ── Scoring ───────────────────────────────────────────────────────────────
 
     @staticmethod

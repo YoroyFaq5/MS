@@ -40,9 +40,7 @@
             <thead>
               <tr>
                 <th class="ps-4">Игрок</th>
-                <th class="text-end pe-4">
-                  {% if my_draft.status.value == 'scored' %}Очки{% endif %}
-                </th>
+                <th class="text-end pe-4">Очки{% if my_draft.status.value != 'scored' %} <span class="text-muted fw-normal">(текущие)</span>{% endif %}</th>
                 {% if my_draft.status.value == 'open' %}<th></th>{% endif %}
               </tr>
             </thead>
@@ -51,11 +49,9 @@
               <tr>
                 <td class="ps-4 fw-medium">{{ player_name(pick.player, equipped_bulk.get(pick.player_id, {})) if pick.player else '?' }}</td>
                 <td class="text-end pe-4">
-                  {% if my_draft.status.value == 'scored' %}
                   <span class="fw-bold {% if pick.points_earned > 0 %}text-success{% else %}text-muted{% endif %}">
                     {{ pick.points_earned }}
                   </span>
-                  {% endif %}
                 </td>
                 {% if my_draft.status.value == 'open' %}
                 <td class="pe-3 text-end">
@@ -68,14 +64,12 @@
               </tr>
               {% endfor %}
             </tbody>
-            {% if my_draft.status.value == 'scored' %}
             <tfoot>
               <tr class="table-active">
-                <td class="ps-4 fw-bold">Итого</td>
+                <td class="ps-4 fw-bold">Итого{% if my_draft.status.value != 'scored' %} <span class="text-muted fw-normal small">(текущие)</span>{% endif %}</td>
                 <td class="text-end pe-4 fw-bold text-warning fs-6">{{ my_draft.total_points }}</td>
               </tr>
             </tfoot>
-            {% endif %}
           </table>
           </div>
           {% else %}

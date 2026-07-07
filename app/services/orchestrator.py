@@ -42,6 +42,27 @@ class OrchestratorResult:
         logger.error(f"[Orchestrator] ERROR: {msg}")
 
 
+def _update_fantasy_live_points(tournament_id: Optional[int], stage_id: Optional[int]) -> None:
+    """
+    Recompute Fantasy draft total_points from the current rating right
+    after a game is scored — otherwise standings sat at 0 the whole
+    evening/tournament until it was explicitly finished and
+    score_series()/score_tournament() ran, even though the underlying
+    games were already finished. Does not touch draft.status or pay out
+    the prize pool — that stays a deliberate one-time action tied to
+    actually finishing the series/tournament.
+    """
+    if not tournament_id:
+        return
+    from app.services.fantasy_service import FantasyService
+    FantasyService.update_live_points_for_tournament(tournament_id, commit=False)
+    if stage_id:
+        from app.models import TournamentSeries
+        series = db.session.query(TournamentSeries).filter_by(stage_id=stage_id).first()
+        if series:
+            FantasyService.update_live_points_for_series(series.id, commit=False)
+
+
 class PostGameOrchestrator:
     """
     Called immediately after a game is finished.
@@ -92,6 +113,13 @@ class PostGameOrchestrator:
                 result.add_step("Compensation points recomputed")
         except Exception as e:
             result.add_error(f"Compensation points failed: {e}")
+
+        try:
+            # 3c. Fantasy live points (превью, не финальный подсчёт)
+            _update_fantasy_live_points(game.tournament_id, game.stage_id)
+            result.add_step("Fantasy live points updated")
+        except Exception as e:
+            result.add_error(f"Fantasy live points failed: {e}")
 
         try:
             # 4. Coin rewards — as_of=game.played_at делает дневной анти-абьюз
@@ -153,6 +181,7 @@ class EditGameOrchestrator:
         game: Game,
         old_player_ids: List[int],
         old_tournament_id: Optional[int] = None,
+        old_stage_id: Optional[int] = None,
     ) -> "OrchestratorResult":
         from app.services.rating_service import RatingService
         from app.services.economy_service import EconomyService
@@ -206,6 +235,17 @@ class EditGameOrchestrator:
                 )
         except Exception as e:
             result.add_error(f"Compensation points failed: {e}")
+
+        try:
+            # Fantasy live points — пересчитать и для нового, и для старого
+            # турнира/этапа (если игру перепривязали или сняли, драфты
+            # старого турнира/серии тоже должны потерять её вклад).
+            _update_fantasy_live_points(game.tournament_id, game.stage_id)
+            if old_tournament_id and old_tournament_id != game.tournament_id:
+                _update_fantasy_live_points(old_tournament_id, old_stage_id)
+            result.add_step("Fantasy live points updated")
+        except Exception as e:
+            result.add_error(f"Fantasy live points failed: {e}")
 
         try:
             rewards = EconomyService.apply_rewards_after_game(

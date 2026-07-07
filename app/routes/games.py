@@ -555,6 +555,7 @@ def edit_game(game_id: int):
 
     old_player_ids = [s.player_id for s in game.slots]
     old_tournament_id = game.tournament_id
+    old_stage_id = game.stage_id
 
     error = _apply_tournament_assignment(game)
     if error:
@@ -631,7 +632,7 @@ def edit_game(game_id: int):
     db.session.flush()
 
     from app.services.orchestrator import EditGameOrchestrator
-    orch = EditGameOrchestrator.run(game, old_player_ids, old_tournament_id)
+    orch = EditGameOrchestrator.run(game, old_player_ids, old_tournament_id, old_stage_id)
     if orch.errors:
         flash(f"Игра обновлена с предупреждениями: {'; '.join(orch.errors)}", "warning")
     else:
