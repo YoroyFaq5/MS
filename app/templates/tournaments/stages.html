@@ -43,8 +43,8 @@
 <!-- Each stage detail -->
 {% for stage in stages %}
 <div class="card mb-4 {% if stage.status == 'active' %}border-warning{% endif %}">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <div class="d-flex align-items-center gap-3">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
       <span class="fw-bold">
         {% if stage.type == 'final' %}🏆{% elif stage.type == 'group' %}📊{% else %}⚔️{% endif %}
         {{ stage.name }}
@@ -58,7 +58,7 @@
       <span class="text-muted small">{{ stage.games|length }} игр</span>
     </div>
     {% if current_user.is_authenticated and current_user.is_admin %}
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
       {% if stage.status == 'pending' and tournament.status == 'active' %}
       <form method="POST" action="{{ url_for('tournaments.activate_stage', stage_id=stage.id) }}">
         <button class="btn btn-sm btn-success">▶ Активировать</button>

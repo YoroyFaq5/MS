@@ -6,7 +6,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import current_user, login_required
 
 from app import db
-from app.models import FantasyDraft, Tournament, Player, TournamentSeries
+from app.models import FantasyDraft, Tournament, Player, TournamentSeries, SeriesStatus
 from app.services import FantasyService, PermissionService, Permission
 from app.services.shop_service import ShopService
 from app.auth_decorators import requires_permission
@@ -25,21 +25,34 @@ def _draft_redirect_url(draft: FantasyDraft) -> str:
 
 @fantasy_bp.route("/")
 def index():
-    """List all tournaments with fantasy drafts."""
+    """List all tournaments with fantasy drafts, plus active series
+    (game evenings) that can be drafted individually."""
     tournaments = (
         db.session.query(Tournament)
         .filter(Tournament.status.in_(["pending", "active", "finished"]))
         .order_by(Tournament.created_at.desc())
         .all()
     )
+    active_series = (
+        db.session.query(TournamentSeries)
+        .filter_by(status=SeriesStatus.ACTIVE)
+        .order_by(TournamentSeries.created_at.desc())
+        .all()
+    )
     user_drafts = {}
+    user_series_drafts = {}
     if current_user.is_authenticated:
         for d in db.session.query(FantasyDraft).filter_by(user_id=current_user.id).all():
-            user_drafts[d.tournament_id] = d
+            if d.tournament_series_id:
+                user_series_drafts[d.tournament_series_id] = d
+            else:
+                user_drafts[d.tournament_id] = d
     return render_template(
         "fantasy/index.html",
         tournaments=tournaments,
         user_drafts=user_drafts,
+        active_series=active_series,
+        user_series_drafts=user_series_drafts,
     )
 
 

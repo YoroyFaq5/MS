@@ -17,6 +17,53 @@
 </div>
 {% endif %}
 
+{% if active_series %}
+<div class="mb-4">
+  <h6 class="fw-bold text-muted mb-3">🎲 Активные серии турниров</h6>
+  <div class="row g-3">
+    {% for s in active_series %}
+    <div class="col-md-6 col-xl-4">
+      <div class="card h-100 border-danger-subtle">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+              <h6 class="fw-bold mb-0">{{ s.name }}</h6>
+              <div class="small text-muted">{{ s.series_tournament.tournament.name }}</div>
+            </div>
+            <span class="badge bg-success">активна</span>
+          </div>
+
+          {% if s.id in user_series_drafts %}
+          {% set draft = user_series_drafts[s.id] %}
+          <div class="mb-3 p-2 rounded bg-body-secondary">
+            <div class="small text-muted mb-1">Ваш драфт</div>
+            <div class="d-flex justify-content-between">
+              <span class="fw-semibold">{{ draft.pick_count }} игроков</span>
+              <span class="badge
+                {% if draft.status.value == 'open' %}bg-success
+                {% elif draft.status.value == 'locked' %}bg-warning text-dark
+                {% else %}bg-info text-dark{% endif %}">
+                {{ draft.status.value }}
+              </span>
+            </div>
+            {% if draft.status.value == 'scored' %}
+            <div class="fw-bold text-warning mt-1">{{ draft.total_points }} очков</div>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          <a href="{{ url_for('fantasy.series_fantasy', series_id=s.id) }}"
+             class="btn btn-sm btn-outline-danger w-100">
+            {% if s.id in user_series_drafts %}Мой драфт →{% else %}Открыть →{% endif %}
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% if tournaments %}
 <div class="row g-3">
   {% for t in tournaments %}
