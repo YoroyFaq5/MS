@@ -58,16 +58,31 @@ with app.app_context():
         if new_constraint:
             print("Пропущено: уникальный индекс uq_fantasy_user_tournament_series уже существует.")
         else:
-            if old_constraint:
-                conn.execute(text(
-                    "ALTER TABLE fantasy_drafts DROP INDEX uq_fantasy_user_tournament;"
-                ))
+            # Новый индекс сначала — MySQL держит tournament_id FK "привязанным"
+            # к старому индексу как к опорному и не даёт его дропнуть, пока
+            # нет другого индекса с тем же префиксом столбцов на замену.
             conn.execute(text(
                 "ALTER TABLE fantasy_drafts "
                 "ADD CONSTRAINT uq_fantasy_user_tournament_series "
                 "UNIQUE (user_id, tournament_id, tournament_series_id);"
             ))
             conn.commit()
-            print("OK: заменён уникальный индекс на (user_id, tournament_id, tournament_series_id).")
+            print("OK: добавлен новый уникальный индекс (user_id, tournament_id, tournament_series_id).")
+
+        # Старый индекс теперь можно спокойно убрать — опорную роль для FK
+        # у него уже перехватил новый (тот же префикс user_id, tournament_id).
+        old_constraint_still_there = conn.execute(text(
+            "SELECT COUNT(*) FROM information_schema.table_constraints "
+            "WHERE table_schema = DATABASE() AND table_name = 'fantasy_drafts' "
+            "AND constraint_name = 'uq_fantasy_user_tournament'"
+        )).scalar()
+        if old_constraint_still_there:
+            conn.execute(text(
+                "ALTER TABLE fantasy_drafts DROP INDEX uq_fantasy_user_tournament;"
+            ))
+            conn.commit()
+            print("OK: удалён старый уникальный индекс uq_fantasy_user_tournament.")
+        else:
+            print("Пропущено: старого индекса uq_fantasy_user_tournament уже нет.")
 
 print("Готово.")
