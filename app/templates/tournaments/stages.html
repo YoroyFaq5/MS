@@ -11,6 +11,15 @@
   </div>
 </div>
 
+{% if series_tournament_id %}
+<div class="alert alert-info d-flex align-items-center gap-2 flex-wrap">
+  <i class="bi bi-info-circle"></i>
+  Это серийный турнир — управление сериями (вечерами), рассадкой и cutoff здесь недоступно.
+  <a href="{{ url_for('series_tournaments.series_tournament_detail', series_tournament_id=series_tournament_id) }}"
+     class="btn btn-sm btn-info text-dark ms-auto">Перейти на страницу серийного турнира</a>
+</div>
+{% endif %}
+
 <!-- Stage pipeline visualization -->
 <div class="card mb-4">
   <div class="card-body">
@@ -58,6 +67,12 @@
       <span class="text-muted small">{{ stage.games|length }} игр</span>
     </div>
     {% if current_user.is_authenticated and current_user.is_admin %}
+    {% if series_tournament_id %}
+    <a href="{{ url_for('series_tournaments.series_tournament_detail', series_tournament_id=series_tournament_id) }}"
+       class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-box-arrow-up-right me-1"></i>Управлять в серийном турнире
+    </a>
+    {% else %}
     <div class="d-flex gap-2 flex-wrap">
       {% if stage.status == 'pending' and tournament.status == 'active' %}
       <form method="POST" action="{{ url_for('tournaments.activate_stage', stage_id=stage.id) }}">
@@ -81,6 +96,7 @@
         </form>
       {% endif %}
     </div>
+    {% endif %}
     {% endif %}
   </div>
 

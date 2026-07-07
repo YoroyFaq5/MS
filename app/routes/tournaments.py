@@ -12,7 +12,7 @@ from app import db
 from app.models import (
     Tournament, TournamentStage, TournamentParticipant,
     Team, TeamPlayer, Game, GameSlot, Player, Role,
-    TournamentType, StageType,
+    TournamentType, StageType, SeriesTournament,
 )
 from app.services import TournamentService, RatingService
 from app.services.shop_service import ShopService
@@ -35,6 +35,20 @@ def _active_players():
     return db.session.query(Player).filter_by(is_active=True).order_by(Player.name).all()
 
 
+def _get_series_tournament_id(tournament_id: int) -> int | None:
+    """
+    A series-tournament is just a Tournament row with a matching
+    SeriesTournament wrapper (see series_tournament_service.py). Bracket
+    actions (cutoff, whole-pool "next round", generic "finish stage") make
+    no sense for a series' evenings and can silently corrupt state (e.g.
+    run_cutoff marks advanced_to_final from a single evening's rating,
+    then finds no FINAL stage to activate) — routes/templates use this to
+    hide those actions and point admins to /series-tournaments/... instead.
+    """
+    st = db.session.query(SeriesTournament).filter_by(tournament_id=tournament_id).first()
+    return st.id if st else None
+
+
 # ── Tournament CRUD ───────────────────────────────────────────────────────────
 
 @tournaments_bp.route("/")
@@ -44,7 +58,15 @@ def list_tournaments():
         .order_by(Tournament.created_at.desc())
         .all()
     )
-    return render_template("tournaments/list.html", tournaments=tournaments)
+    series_tournament_ids = {
+        st.tournament_id: st.id
+        for st in db.session.query(SeriesTournament).all()
+    }
+    return render_template(
+        "tournaments/list.html",
+        tournaments=tournaments,
+        series_tournament_ids=series_tournament_ids,
+    )
 
 
 @tournaments_bp.route("/new", methods=["GET", "POST"])
@@ -95,6 +117,7 @@ def tournament_detail(tournament_id: int):
         available_players=available_players,
         registered_ids=list(registered_ids),
         equipped_bulk=equipped_bulk,
+        series_tournament_id=_get_series_tournament_id(tournament_id),
     )
 
 
@@ -189,6 +212,7 @@ def stages(tournament_id: int):
         stages=sorted_stages,
         stage_ratings=stage_ratings,
         equipped_bulk=equipped_bulk,
+        series_tournament_id=_get_series_tournament_id(tournament_id),
     )
 
 
@@ -216,10 +240,19 @@ def activate_stage(stage_id: int):
     return redirect(url_for("tournaments.stages", tournament_id=stage.tournament_id))
 
 
+_SERIES_ACTION_BLOCKED_MSG = (
+    "Это серийный турнир — управляйте его сериями (вечерами) через "
+    "страницу серийного турнира, а не через общие действия с этапами."
+)
+
+
 @tournaments_bp.route("/stages/<int:stage_id>/finish", methods=["POST"])
 @admin_required
 def finish_stage(stage_id: int):
     stage = _get_stage_or_404(stage_id)
+    if _get_series_tournament_id(stage.tournament_id):
+        flash(_SERIES_ACTION_BLOCKED_MSG, "danger")
+        return redirect(url_for("tournaments.stages", tournament_id=stage.tournament_id))
     result = TournamentService.finish_stage(stage_id)
     flash(result.message, "success" if result.ok else "danger")
     return redirect(url_for("tournaments.stages", tournament_id=stage.tournament_id))
@@ -229,6 +262,9 @@ def finish_stage(stage_id: int):
 @admin_required
 def run_cutoff(stage_id: int):
     stage = _get_stage_or_404(stage_id)
+    if _get_series_tournament_id(stage.tournament_id):
+        flash(_SERIES_ACTION_BLOCKED_MSG, "danger")
+        return redirect(url_for("tournaments.stages", tournament_id=stage.tournament_id))
     result = TournamentService.run_cutoff(stage_id)
     flash(result.message, "success" if result.ok else "danger")
     return redirect(url_for("tournaments.leaderboard", tournament_id=stage.tournament_id))
@@ -238,6 +274,9 @@ def run_cutoff(stage_id: int):
 @admin_required
 def generate_next_round(stage_id: int):
     stage = _get_stage_or_404(stage_id)
+    if _get_series_tournament_id(stage.tournament_id):
+        flash(_SERIES_ACTION_BLOCKED_MSG, "danger")
+        return redirect(url_for("tournaments.stages", tournament_id=stage.tournament_id))
     result = TournamentService.generate_next_round(stage_id)
     flash(result.message, "success" if result.ok else "danger")
     return redirect(url_for("tournaments.tournament_games", tournament_id=stage.tournament_id))
@@ -355,6 +394,10 @@ def remove_team_player(team_id: int, player_id: int):
 @tournaments_bp.route("/<int:tournament_id>/games/generate", methods=["POST"])
 @admin_required
 def generate_games(tournament_id: int):
+    if _get_series_tournament_id(tournament_id):
+        flash(_SERIES_ACTION_BLOCKED_MSG, "danger")
+        return redirect(url_for("tournaments.tournament_games", tournament_id=tournament_id))
+
     n = request.form.get("n_games", type=int, default=1)
     stage_id = request.form.get("stage_id", type=int) or None
 

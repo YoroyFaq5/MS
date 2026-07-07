@@ -42,6 +42,9 @@
               {% if t.has_stages %}
                 <span class="badge bg-info-subtle text-info border border-info-subtle">📋 Этапы</span>
               {% endif %}
+              {% if series_tournament_ids.get(t.id) %}
+                <span class="badge bg-info-subtle text-info border border-info-subtle">🔗 Серийный</span>
+              {% endif %}
             </div>
           </div>
           <span class="badge fs-6
