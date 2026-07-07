@@ -150,13 +150,13 @@
       {% if tournament.status != 'finished' and available_players and current_user.is_authenticated and current_user.is_admin %}
       <div class="card-footer">
         <form method="POST" action="{{ url_for('tournaments.add_participant', tournament_id=tournament.id) }}"
-              class="d-flex gap-2">
-          <select name="player_id" class="form-select form-select-sm" required>
-            <option value="">— Добавить игрока —</option>
-            {% for p in available_players %}
-            <option value="{{ p.id }}">{{ p.display_name }}</option>
-            {% endfor %}
-          </select>
+              class="d-flex gap-2 position-relative" id="addParticipantForm">
+          <input type="hidden" name="player_id" id="addParticipantHidden" required>
+          <input type="text" id="addParticipantInput" class="form-control form-control-sm"
+                 placeholder="Ник игрока…" autocomplete="off">
+          <div id="addParticipantResults"
+               class="list-group position-absolute shadow-sm"
+               style="z-index:20; max-height:240px; overflow-y:auto; display:none; top:100%; left:0; right:60px;"></div>
           <button type="submit" class="btn btn-sm btn-danger text-nowrap">
             <i class="bi bi-person-plus"></i>
           </button>
@@ -362,5 +362,28 @@
     </div>
   </div>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if tournament.status != 'finished' and available_players and current_user.is_authenticated and current_user.is_admin %}
+<script src="{{ url_for('static', filename='js/player-search.js') }}"></script>
+<script>
+const registeredPlayerIds = new Set({{ (registered_ids | default([])) | tojson }});
+
+const addParticipantForm = document.getElementById('addParticipantForm');
+initPlayerSearchPicker({
+  input: document.getElementById('addParticipantInput'),
+  hidden: document.getElementById('addParticipantHidden'),
+  results: document.getElementById('addParticipantResults'),
+  filterFn: (p) => !registeredPlayerIds.has(p.id),
+});
+addParticipantForm.addEventListener('submit', (e) => {
+  if (!document.getElementById('addParticipantHidden').value) {
+    e.preventDefault();
+    document.getElementById('addParticipantInput').classList.add('is-invalid');
+  }
+});
+</script>
 {% endif %}
 {% endblock %}

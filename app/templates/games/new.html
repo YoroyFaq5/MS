@@ -83,9 +83,6 @@
   <div class="card mb-4">
     <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
       <span>🪑 Рассадка игроков</span>
-      <span id="participantHint" class="badge bg-warning-subtle text-warning border border-warning-subtle small d-none">
-        <i class="bi bi-funnel me-1"></i>Только участники турнира
-      </span>
     </div>
     <div class="card-body">
       <div class="d-flex flex-wrap gap-2 mb-4 p-3 bg-body-secondary rounded">
@@ -147,18 +144,7 @@
 const teamMembership = {{ team_membership | tojson }};
 const teamNames      = {{ team_names | tojson }};
 
-// tournamentId → [playerId, ...] (пусто = без ограничения)
-const tournamentParticipants = {{ tournament_participants | tojson }};
-
 const tournamentSelect = document.getElementById('tournamentSelect');
-
-function getAllowedParticipantIds() {
-  const tid = parseInt(tournamentSelect?.value) || null;
-  if (tid && tournamentParticipants[tid] && tournamentParticipants[tid].length > 0) {
-    return new Set(tournamentParticipants[tid]);
-  }
-  return null;
-}
 
 function getBlockedTeammates(excludePicker) {
   const tid = parseInt(tournamentSelect?.value) || null;
@@ -222,13 +208,11 @@ async function searchPlayers(picker, query) {
     // сеть недоступна — просто не покажем подсказки, форма всё равно валидна без выбора
   }
 
-  const allowed = getAllowedParticipantIds();
   const blockedByTeam = getBlockedTeammates(picker);
   const chosenElsewhere = new Set(
     getAllChosen().filter(c => c.picker !== picker && c.id).map(c => c.id)
   );
   items = items.filter(p =>
-    (allowed === null || allowed.has(p.id)) &&
     !blockedByTeam.has(p.id) &&
     !chosenElsewhere.has(p.id)
   );
@@ -435,22 +419,8 @@ function updateStages() {
     : '';
 }
 
-// ── Filter by tournament participants (сброс невалидных мест) ──
+// ── Пересчёт конфликтов команд при смене турнира (состав команд другой) ──
 function filterPlayersByTournament() {
-  const allowed = getAllowedParticipantIds();
-
-  document.querySelectorAll('.player-seat-picker').forEach(picker => {
-    const { hidden, input } = seatEls(picker);
-    const pid = parseInt(hidden.value) || null;
-    if (pid && allowed !== null && !allowed.has(pid)) {
-      hidden.value = '';
-      input.value = '';
-    }
-  });
-
-  const hint = document.getElementById('participantHint');
-  if (hint) hint.classList.toggle('d-none', allowed === null);
-
   updatePlayerOptions();
 }
 

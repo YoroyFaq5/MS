@@ -93,6 +93,7 @@ def tournament_detail(tournament_id: int):
         "tournaments/detail.html",
         **summary,
         available_players=available_players,
+        registered_ids=list(registered_ids),
         equipped_bulk=equipped_bulk,
     )
 

@@ -90,22 +90,39 @@ def _lock_series_fantasy_if_needed(stage_id: int | None) -> None:
         FantasyService.lock_drafts_for_series(series.id, commit=True)
 
 
+def _ensure_tournament_participants(tournament_id: int, player_ids) -> None:
+    """
+    Играть в турнирной игре — уже достаточное основание считаться
+    участником турнира (тот же принцип, что при вступлении в команду, см.
+    TournamentService.assign_to_team) — регистрирует недостающих молча,
+    идемпотентно. Без этого игрок, попавший в турнирную игру без отдельной
+    ручной регистрации, не находился бы в поиске формы создания игры для
+    этого турнира и выпадал бы из RatingService.get_tournament_rating()
+    (она строит список игроков от TournamentParticipant, а не от Game).
+    """
+    if not player_ids:
+        return
+    existing = {
+        p.player_id for p in
+        db.session.query(TournamentParticipant).filter_by(tournament_id=tournament_id).all()
+    }
+    for pid in set(player_ids):
+        if pid not in existing:
+            db.session.add(TournamentParticipant(tournament_id=tournament_id, player_id=pid))
+
+
 def _new_game_form_context(tournaments, preselect_tournament=None, preselect_stage=None) -> dict:
     """
     Общий контекст для games/new.html — используется и на GET, и во всех
     веток POST, которые возвращают форму повторно (ошибка валидации).
-    Раньше часть таких веток не передавала team_membership/team_names/
-    tournament_participants, из-за чего `{{ team_membership | tojson }}`
-    в шаблоне падал на Undefined — теперь контекст всегда полный.
+    Раньше часть таких веток не передавала team_membership/team_names,
+    из-за чего `{{ team_membership | tojson }}` в шаблоне падал на
+    Undefined — теперь контекст всегда полный.
     """
     team_membership = {}
     team_names = {}
-    tournament_participants = {}
 
     for t in tournaments:
-        parts = db.session.query(TournamentParticipant).filter_by(tournament_id=t.id).all()
-        tournament_participants[t.id] = [p.player_id for p in parts]
-
         if t.type.value == "team":
             mapping = {}
             for team in t.teams:
@@ -119,7 +136,6 @@ def _new_game_form_context(tournaments, preselect_tournament=None, preselect_sta
         "preselect_stage": preselect_stage,
         "team_membership": team_membership,
         "team_names": team_names,
-        "tournament_participants": tournament_participants,
     }
 
 
@@ -200,18 +216,6 @@ def game_detail(game_id: int):
         and current_user.is_authenticated and current_user.is_admin
     )
     equipped_bulk = ShopService.get_equipped_bulk([s.player_id for s in slots])
-    all_players = []
-    if edit_mode:
-        # Union of active players and whoever is currently in this game's
-        # slots (even if since deactivated) — otherwise an inactive slot
-        # player wouldn't appear as a <select> option at all, and the
-        # browser would silently default to the first option instead,
-        # changing that seat's player even if the admin left it untouched.
-        by_id = {p.id: p for p in _active_players()}
-        for s in slots:
-            if s.player and s.player_id not in by_id:
-                by_id[s.player_id] = s.player
-        all_players = sorted(by_id.values(), key=lambda p: p.name)
 
     tournaments = []
     if current_user.is_authenticated and current_user.is_admin and (not game.is_finished or edit_mode):
@@ -219,7 +223,7 @@ def game_detail(game_id: int):
 
     return render_template("games/detail.html", game=game, slots=slots,
                            roles_editable=roles_editable, edit_mode=edit_mode,
-                           all_players=all_players, tournaments=tournaments,
+                           tournaments=tournaments,
                            equipped_bulk=equipped_bulk)
 
 
@@ -269,35 +273,23 @@ def new_game():
                         **_new_game_form_context(tournaments, tournament_id, stage_id),
                     )
 
-        # Validate all players are tournament participants (if game is in a tournament)
+        # Игрок, выбранный в турнирную игру, тем самым и есть участник
+        # турнира — регистрируем его автоматически (тот же принцип, что при
+        # вступлении в команду, см. TournamentService.assign_to_team), а не
+        # блокируем создание игры требованием зарегистрировать заранее.
+        # Раньше здесь была именно блокировка — на практике она просто не
+        # давала найти игрока в поиске формы, если админ забыл отдельный
+        # шаг регистрации.
         if tournament_id and t:
-            participant_ids = {
-                p.player_id for p in
-                db.session.query(TournamentParticipant).filter_by(tournament_id=tournament_id).all()
-            }
-            if participant_ids:  # only validate if tournament has registered participants
-                non_members = []
-                for seat in range(1, TOTAL_PLAYERS + 1):
-                    pid_str = request.form.get(f"player_{seat}")
-                    if pid_str:
-                        try:
-                            pid = int(pid_str)
-                        except ValueError:
-                            continue
-                        if pid not in participant_ids:
-                            player_obj = db.session.get(Player, pid)
-                            name = player_obj.display_name if player_obj else str(pid)
-                            non_members.append(name)
-                if non_members:
-                    flash(
-                        f"Игроки не являются участниками турнира: {', '.join(non_members)}. "
-                        f"Сначала добавьте их в турнир.",
-                        "danger"
-                    )
-                    return render_template(
-                        "games/new.html", players=players, tournaments=tournaments,
-                        **_new_game_form_context(tournaments, tournament_id, stage_id),
-                    )
+            selected_pids = set()
+            for seat in range(1, TOTAL_PLAYERS + 1):
+                pid_str = request.form.get(f"player_{seat}")
+                if pid_str:
+                    try:
+                        selected_pids.add(int(pid_str))
+                    except ValueError:
+                        pass
+            _ensure_tournament_participants(tournament_id, selected_pids)
 
         # Team conflict check
         selected_ids_pre = []
@@ -421,6 +413,7 @@ def _apply_tournament_assignment(game: Game) -> str | None:
     game.tournament_id = tournament_id
     game.stage_id = stage_id
     game.is_ranked = t.is_ranked
+    _ensure_tournament_participants(tournament_id, [s.player_id for s in game.slots])
     db.session.flush()
     _lock_series_fantasy_if_needed(stage_id)
     return None
@@ -631,6 +624,9 @@ def edit_game(game_id: int):
         db.session.rollback()
         flash("Один и тот же игрок не может занимать два места.", "danger")
         return redirect(url_for("games.game_detail", game_id=game_id))
+
+    if game.tournament_id:
+        _ensure_tournament_participants(game.tournament_id, [s.player_id for s in game.slots])
 
     db.session.flush()
 

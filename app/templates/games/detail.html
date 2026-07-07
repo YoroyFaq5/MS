@@ -92,11 +92,14 @@
             </td>
             <td class="fw-medium">
               {% if edit_mode %}
-                <select name="player_{{ slot.id }}" class="form-select form-select-sm" style="min-width:160px">
-                  {% for p in all_players %}
-                  <option value="{{ p.id }}" {% if p.id == slot.player_id %}selected{% endif %}>{{ p.display_name }}</option>
-                  {% endfor %}
-                </select>
+                <div class="position-relative" style="min-width:160px">
+                  <input type="hidden" name="player_{{ slot.id }}" id="player-hidden-{{ slot.id }}"
+                         value="{{ slot.player_id }}">
+                  <input type="text" id="player-input-{{ slot.id }}" class="form-control form-control-sm"
+                         value="{{ slot.player.display_name }}" autocomplete="off">
+                  <div id="player-results-{{ slot.id }}" class="list-group position-absolute w-100 shadow-sm"
+                       style="z-index:20; max-height:220px; overflow-y:auto; display:none"></div>
+                </div>
               {% else %}
                 <a href="{{ url_for('profile.view_profile', player_id=slot.player_id) }}"
                    class="text-decoration-none">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}
@@ -287,6 +290,28 @@
 {% endif %}
 {% endblock %}
 {% block scripts %}
+{% if edit_mode %}
+<script src="{{ url_for('static', filename='js/player-search.js') }}"></script>
+<script>
+const editSlotIds = {{ slots | map(attribute='id') | list | tojson }};
+editSlotIds.forEach(slotId => {
+  const hidden = document.getElementById('player-hidden-' + slotId);
+  const input = document.getElementById('player-input-' + slotId);
+  const results = document.getElementById('player-results-' + slotId);
+  if (!hidden || !input || !results) return;
+  initPlayerSearchPicker({
+    input, hidden, results,
+    filterFn: (p) => {
+      const chosenElsewhere = editSlotIds
+        .filter(id => id !== slotId)
+        .map(id => parseInt(document.getElementById('player-hidden-' + id)?.value))
+        .filter(Boolean);
+      return !chosenElsewhere.includes(p.id);
+    },
+  });
+});
+</script>
+{% endif %}
 <script>
 function togglePuCount(checkbox, slotId) {
   const sel = document.getElementById('pu_mafia_' + slotId);
