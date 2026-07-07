@@ -557,6 +557,19 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   color: var(--ms-gold-light);
 }
 
+/* Club-wide showcase (главная) — кто держит титул, а не "мой" список */
+.title-card__holder {
+  display: block;
+  margin-top: .5rem;
+  padding-top: .4rem;
+  border-top: 1px solid var(--ms-border);
+  font-size: .76rem;
+  font-weight: 600;
+  color: var(--ms-text);
+  text-decoration: none;
+}
+.title-card__holder:hover { color: var(--flavor); }
+
 /* Locked / "live race" preview — a title the viewer is currently
    leading but hasn't been formally awarded yet (season still open). */
 .title-card--live {

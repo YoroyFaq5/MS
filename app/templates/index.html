@@ -116,23 +116,52 @@
     </div>
   </div>
 </div>
-{% if club_titles %}
-<div class="card mt-4">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <span class="fw-semibold"><i class="bi bi-patch-check text-warning me-2"></i>Титулы клуба</span>
+{% set RARITY_LABEL = {'common': '🟢 Обычный', 'rare': '🔵 Редкий', 'epic': '🟣 Эпический',
+                        'legendary': '🟠 Легендарный', 'mythic': '🔴 Мифический', 'ultra': '🔴 Ультра'} %}
+{% if club_titles or current_leaders %}
+<div class="titles-showcase mt-4">
+  <div class="titles-showcase__header">
+    <div>
+      <h3 class="titles-showcase__title">🏆 Титулы клуба</h3>
+      <div class="titles-showcase__subtitle">Действующие рекордсмены{% if current_season %} и номинации «{{ current_season.name }}»{% endif %}</div>
+    </div>
     <a href="{{ url_for('titles.nominations') }}" class="btn btn-sm btn-outline-secondary">Все номинации →</a>
   </div>
-  <div class="card-body">
-    <div class="d-flex gap-2 flex-wrap">
-      {% for pt in club_titles %}
-      <a href="{{ url_for('profile.view_profile', player_id=pt.player_id) }}" class="text-decoration-none">
-        <span class="badge bg-body-secondary text-body border">
-          {% if pt.title.icon %}<i class="bi {{ pt.title.icon }} me-1"></i>{% endif %}
-          {{ pt.title.name }} — <strong class="ms-1">{{ player_name(pt.player, equipped_bulk.get(pt.player_id, {})) }}</strong>
-        </span>
+
+  <div class="titles-grid">
+    {% for pt in club_titles %}
+    {% set flavor = TitleService.get_title_flavor(pt.title.code) %}
+    <div class="title-card title-card--{{ flavor }}" tabindex="0">
+      <span class="title-card__rarity-dot title-card__rarity-dot--{{ pt.title.rarity.value }}"
+            title="{{ RARITY_LABEL.get(pt.title.rarity.value, pt.title.rarity.value) }}"></span>
+      <div class="title-card__icon"><i class="bi {{ pt.title.icon or 'bi-award' }}"></i></div>
+      <div class="title-card__name">{{ pt.title.name }}</div>
+      <div class="title-card__desc">{{ pt.title.description or '' }}</div>
+      <a href="{{ url_for('profile.view_profile', player_id=pt.player_id) }}" class="title-card__holder">
+        {{ player_name(pt.player, equipped_bulk.get(pt.player_id, {})) }}
       </a>
-      {% endfor %}
+      <div class="title-card__tooltip">
+        <div class="title-card__tooltip-row"><strong>{{ RARITY_LABEL.get(pt.title.rarity.value, pt.title.rarity.value) }}</strong></div>
+        <div class="title-card__tooltip-row">Действующий рекорд клуба — держится, пока не будет побит.</div>
+      </div>
     </div>
+    {% endfor %}
+
+    {% for entry in current_leaders %}
+    <div class="title-card title-card--nomination" tabindex="0">
+      <div class="title-card__icon"><i class="bi {{ entry.title.icon or 'bi-award' }}"></i></div>
+      <div class="title-card__name">{{ entry.title.name }}</div>
+      <div class="title-card__desc">{{ entry.title.description or '' }}</div>
+      <a href="{{ url_for('profile.view_profile', player_id=entry.player.id) }}" class="title-card__holder">
+        {{ player_name(entry.player, equipped_bulk.get(entry.player.id, {})) }}
+      </a>
+      <div class="title-card__season-chip">С{{ current_season.number }} · {{ current_season.year }}</div>
+      <div class="title-card__tooltip">
+        <div class="title-card__tooltip-row">Лидирует по текущим результатам сезона.</div>
+        <div class="title-card__tooltip-row">Закрепится по итогам закрытия сезона.</div>
+      </div>
+    </div>
+    {% endfor %}
   </div>
 </div>
 {% endif %}
