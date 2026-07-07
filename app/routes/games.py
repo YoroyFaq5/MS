@@ -220,6 +220,16 @@ def game_detail(game_id: int):
     tournaments = []
     if current_user.is_authenticated and current_user.is_admin and (not game.is_finished or edit_mode):
         tournaments = _active_tournaments()
+        # Игра уже может быть привязана к турниру, которого нет в списке
+        # активных (турнир успели завершить) — без этого в <select> не
+        # находится ни одной опции с этим tournament_id, ни одна не
+        # получает selected, и браузер по умолчанию подставляет первую
+        # опцию ("Без турнира"), молча отвязывая игру при простом
+        # сохранении правок (бонусы/ПУ), даже если админ турнир не трогал.
+        if game.tournament_id and game.tournament_id not in {t.id for t in tournaments}:
+            own_tournament = db.session.get(Tournament, game.tournament_id)
+            if own_tournament:
+                tournaments = [own_tournament] + tournaments
 
     return render_template("games/detail.html", game=game, slots=slots,
                            roles_editable=roles_editable, edit_mode=edit_mode,

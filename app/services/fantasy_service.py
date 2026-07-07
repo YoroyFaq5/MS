@@ -202,11 +202,12 @@ class FantasyService:
         )
 
     @staticmethod
-    def _self_heal_series_lock(draft: FantasyDraft) -> None:
+    def _self_heal_series(tournament_series_id: int) -> None:
         """
-        Defensive re-check, run on every read/edit of a series-scoped draft:
-        re-derives LOCKED status and live total_points from the series'
-        current games/rating instead of trusting the stored values blindly.
+        Defensive re-check, run ONCE per series on every read/edit that
+        touches it: re-derives LOCKED status and live total_points for
+        ALL of the series' drafts from its current games/rating, instead
+        of trusting stored values blindly.
 
         Both the lock (lock_drafts_for_series) and the live points update
         (update_live_points_for_series) normally fire as a side effect of
@@ -218,15 +219,22 @@ class FantasyService:
         triggers a recompute) would otherwise stay OPEN and/or stuck at
         stale points until some unrelated future game happens to fire the
         hook again.
+
+        Batched by series (not called per-draft) — an earlier per-draft
+        version called update_live_points_for_series() once per OPEN/LOCKED
+        draft, and that function itself recomputes EVERY such draft in the
+        series, so a series with K non-scored drafts did O(K^2) recompute
+        work (plus a commit per draft) on every leaderboard render.
         """
-        if draft.status == FantasyDraftStatus.SCORED or not draft.tournament_series_id:
-            return
-        series = draft.tournament_series
+        series = db.session.get(TournamentSeries, tournament_series_id)
         if not (series and series.stage and series.stage.games):
             return
-        if draft.status == FantasyDraftStatus.OPEN:
-            draft.status = FantasyDraftStatus.LOCKED
-        FantasyService.update_live_points_for_series(series.id, commit=False)
+        open_drafts = db.session.query(FantasyDraft).filter_by(
+            tournament_series_id=tournament_series_id, status=FantasyDraftStatus.OPEN,
+        ).all()
+        for d in open_drafts:
+            d.status = FantasyDraftStatus.LOCKED
+        FantasyService.update_live_points_for_series(tournament_series_id, commit=False)
         db.session.commit()
 
     @staticmethod
@@ -240,7 +248,8 @@ class FantasyService:
             return FantasyResult.fail("Драфт не найден.")
         if draft.user_id != user.id and not user.is_admin:
             return FantasyResult.fail("Доступ запрещён.")
-        FantasyService._self_heal_series_lock(draft)
+        if draft.tournament_series_id:
+            FantasyService._self_heal_series(draft.tournament_series_id)
         if draft.status != FantasyDraftStatus.OPEN:
             return FantasyResult.fail("Драфт зафиксирован — изменения невозможны.")
 
@@ -290,7 +299,8 @@ class FantasyService:
         draft = db.session.get(FantasyDraft, draft_id)
         if not draft or (draft.user_id != user.id and not user.is_admin):
             return FantasyResult.fail("Доступ запрещён.")
-        FantasyService._self_heal_series_lock(draft)
+        if draft.tournament_series_id:
+            FantasyService._self_heal_series(draft.tournament_series_id)
         if draft.status != FantasyDraftStatus.OPEN:
             return FantasyResult.fail("Драфт зафиксирован.")
 
@@ -635,6 +645,13 @@ class FantasyService:
     def get_leaderboard(
         tournament_id: int, tournament_series_id: Optional[int] = None,
     ) -> List[FantasyLeaderboardEntry]:
+        # Self-heal BEFORE the query, once for the whole series — not per
+        # draft in the loop below, and not after ORDER BY has already run
+        # (both of which the older version did, so the rank order could
+        # reflect stale total_points on the very render that fixes them).
+        if tournament_series_id:
+            FantasyService._self_heal_series(tournament_series_id)
+
         drafts = (
             db.session.query(FantasyDraft)
             .filter_by(tournament_id=tournament_id, tournament_series_id=tournament_series_id)
@@ -646,7 +663,6 @@ class FantasyService:
             user = d.user
             if not user:
                 continue
-            FantasyService._self_heal_series_lock(d)
             entries.append(FantasyLeaderboardEntry(
                 rank=rank,
                 user_id=user.id,
@@ -663,13 +679,12 @@ class FantasyService:
     def get_user_draft(
         user_id: int, tournament_id: int, tournament_series_id: Optional[int] = None,
     ) -> Optional[FantasyDraft]:
-        draft = db.session.query(FantasyDraft).filter_by(
+        if tournament_series_id:
+            FantasyService._self_heal_series(tournament_series_id)
+        return db.session.query(FantasyDraft).filter_by(
             user_id=user_id, tournament_id=tournament_id,
             tournament_series_id=tournament_series_id,
         ).first()
-        if draft:
-            FantasyService._self_heal_series_lock(draft)
-        return draft
 
     @staticmethod
     def get_available_picks(

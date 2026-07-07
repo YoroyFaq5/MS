@@ -234,7 +234,7 @@
           {% for t in tournaments %}
           <option value="{{ t.id }}" {% if game.tournament_id == t.id %}selected{% endif %}>
             {{ t.name }}
-            {% if t.status == 'active' %}🟢{% else %}⏳{% endif %}
+            {% if t.status == 'active' %}🟢{% elif t.status == 'finished' %}✅{% else %}⏳{% endif %}
             {% if not t.is_ranked %}· нерейтинговый{% endif %}
           </option>
           {% endfor %}

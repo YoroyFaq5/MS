@@ -240,8 +240,12 @@ class EditGameOrchestrator:
             # Fantasy live points — пересчитать и для нового, и для старого
             # турнира/этапа (если игру перепривязали или сняли, драфты
             # старого турнира/серии тоже должны потерять её вклад).
+            # Проверяем tournament_id И stage_id по отдельности — перенос
+            # игры между двумя сериями ОДНОГО и того же серийного турнира
+            # меняет только stage_id, tournament_id остаётся прежним, и
+            # старая серия всё равно должна пересчитаться.
             _update_fantasy_live_points(game.tournament_id, game.stage_id)
-            if old_tournament_id and old_tournament_id != game.tournament_id:
+            if old_tournament_id != game.tournament_id or old_stage_id != game.stage_id:
                 _update_fantasy_live_points(old_tournament_id, old_stage_id)
             result.add_step("Fantasy live points updated")
         except Exception as e:
