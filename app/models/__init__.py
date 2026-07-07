@@ -451,6 +451,15 @@ class GameSlot(db.Model):
     is_pu        = Column(Boolean, default=False, nullable=False)
     pu_mafia_count = Column(Integer, default=0, nullable=False)
 
+    # ── Компенсационные баллы (Правила ФСМ, п.8.6.1–8.6.5) ──────────────────
+    # Начисляются игроку, убитому в 1-ю ночь на роли мирного/шерифа, как
+    # частичная компенсация за раннюю "потерю игры". Считаются на дистанции
+    # турнира целиком — см. RatingService.recompute_compensation_points().
+    # Хранится отдельным полем (а не смешивается с base_score), чтобы
+    # пересчёт всегда мог безопасно перезаписать его с нуля, не пытаясь
+    # "вычесть" старое значение из общего base_score.
+    compensation_score = Column(Float, default=0.0, nullable=False)
+
     # ── ELO engine inputs (admin/judge assessed, optional) ──────────────────
     # quality_score (s_i): -1.0 .. +1.0, subjective performance rating
     quality_score = Column(Float, nullable=True)
@@ -485,6 +494,10 @@ class GameSlot(db.Model):
     def round_base(self, key, value):
         return round(float(value), 2)
 
+    @validates("compensation_score")
+    def round_compensation(self, key, value):
+        return round(float(value), 2)
+
     # PU bonus lookup table (immutable business rule)
     _PU_BONUS: dict[int, float] = {0: 0.0, 1: 0.1, 2: 0.3, 3: 0.6}
 
@@ -498,7 +511,9 @@ class GameSlot(db.Model):
 
     @property
     def total_score(self) -> float:
-        return round(self.base_score + self.bonus_score + self.pu_bonus, 2)
+        return round(
+            self.base_score + self.bonus_score + self.pu_bonus + self.compensation_score, 2
+        )
 
     @property
     def is_mafia_side(self) -> bool:

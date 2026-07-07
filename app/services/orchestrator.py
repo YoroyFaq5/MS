@@ -83,6 +83,17 @@ class PostGameOrchestrator:
             result.add_error(f"Season assignment failed: {e}")
 
         try:
+            # 3b. Компенсационные баллы ФСМ (п.8.6.1-8.6.5) — только для
+            # игр внутри турнира, дистанция = весь турнир целиком.
+            if game.tournament_id:
+                RatingService.recompute_compensation_points(
+                    game.tournament_id, commit=False,
+                )
+                result.add_step("Compensation points recomputed")
+        except Exception as e:
+            result.add_error(f"Compensation points failed: {e}")
+
+        try:
             # 4. Coin rewards — as_of=game.played_at делает дневной анти-абьюз
             # кап привязанным к реальной дате игры, а не моменту вызова.
             # Для обычных (только что сыгранных) игр played_at и "сейчас"
@@ -138,7 +149,11 @@ class EditGameOrchestrator:
     """
 
     @staticmethod
-    def run(game: Game, old_player_ids: List[int]) -> "OrchestratorResult":
+    def run(
+        game: Game,
+        old_player_ids: List[int],
+        old_tournament_id: Optional[int] = None,
+    ) -> "OrchestratorResult":
         from app.services.rating_service import RatingService
         from app.services.economy_service import EconomyService
         from app.services.season_service import SeasonService
@@ -174,6 +189,23 @@ class EditGameOrchestrator:
                 result.add_step(f"Game assigned to season: {season.name}")
         except Exception as e:
             result.add_error(f"Season assignment failed: {e}")
+
+        try:
+            # Компенсационные баллы ФСМ (п.8.6.1-8.6.5) — пересчитать для
+            # старого турнира тоже, если игру перепривязали к другому/сняли
+            # с турнира вовсе (иначе оставшиеся игры старого турнира будут
+            # использовать устаревшее games_played/i для этого игрока).
+            touched_tournaments = {
+                t for t in (game.tournament_id, old_tournament_id) if t
+            }
+            for t_id in touched_tournaments:
+                RatingService.recompute_compensation_points(t_id, commit=False)
+            if touched_tournaments:
+                result.add_step(
+                    f"Compensation points recomputed for {len(touched_tournaments)} tournament(s)"
+                )
+        except Exception as e:
+            result.add_error(f"Compensation points failed: {e}")
 
         try:
             rewards = EconomyService.apply_rewards_after_game(

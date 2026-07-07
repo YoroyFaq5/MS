@@ -419,4 +419,86 @@ class RatingService:
         if commit:
             db.session.commit()
 
+    # ── Компенсационные баллы (Правила ФСМ, п.8.6.1-8.6.5) ──────────────────
+
+    @staticmethod
+    def _compensation_coefficient(kills: int, games_played: int) -> float:
+        """
+        Ci по п.8.6.1-8.6.2: доля 0.4, растущая линейно с частотой
+        "отстрелов в 1-ю ночь" игрока на дистанции, с потолком 0.4.
+
+        B = round(0.4 * games_played) — "ожидаемое" число отстрелов.
+        Ci = i * 0.4 / B, если i <= B (не более ожидаемого — компенсация
+             пропорциональна фактической частоте);
+        Ci = 0.4, если i > B (чаще ожидаемого — компенсация капается сверху).
+        i == 0 или games_played == 0 (=> B == 0 при i == 0) → 0.0, отстрелов
+        не было — компенсировать нечего.
+        """
+        if kills <= 0:
+            return 0.0
+        expected = round(0.4 * games_played)
+        if expected <= 0 or kills > expected:
+            return 0.4
+        return round(kills * 0.4 / expected, 4)
+
+    @staticmethod
+    def recompute_compensation_points(tournament_id: int, commit: bool = True) -> int:
+        """
+        Recompute GameSlot.compensation_score for every player who has at
+        least one finished game in this tournament ("дистанция" = весь
+        турнир целиком, упрощение для v1 — см. п.8.6.5 про раздельные
+        дистанции по стадиям, сознательно не реализовано).
+
+        Правило (п.8.6.1-8.6.4): игрок, убитый в 1-ю ночь на роли мирного
+        или шерифа ("красная" команда = городская сторона), получает Ci
+        основных баллов, если его команда проиграла (п.8.6.3), либо 0.5*Ci,
+        если команда выиграла, но он успел в лучшем ходе назвать хотя бы
+        одного реального "чёрного" (мафию) — п.8.6.4.
+
+        Полностью пересчитывает compensation_score с нуля для ВСЕХ слотов
+        затронутых игроков в этом турнире (включая обнуление у слотов,
+        переставших подходить под условия) — безопасно перезапускать сколько
+        угодно раз, идемпотентно.
+
+        Returns the number of players recomputed.
+        """
+        games = (
+            db.session.query(Game)
+            .filter(Game.tournament_id == tournament_id, Game.is_finished == True)
+            .all()
+        )
+        if not games:
+            return 0
+
+        slots_by_player: dict[int, list[GameSlot]] = {}
+        for g in games:
+            for slot in g.slots:
+                slots_by_player.setdefault(slot.player_id, []).append(slot)
+
+        for player_id, slots in slots_by_player.items():
+            games_played = len(slots)
+            qualifying = [
+                s for s in slots
+                if s.is_pu and s.role in (Role.CIVILIAN, Role.SHERIFF)
+            ]
+            ci = RatingService._compensation_coefficient(len(qualifying), games_played)
+
+            for slot in slots:
+                if slot not in qualifying:
+                    slot.compensation_score = 0.0
+                    continue
+                win_side = slot.game.win_side
+                if win_side == WinSide.MAFIA:
+                    # "Красная" (городская) команда проиграла — полная компенсация.
+                    slot.compensation_score = ci
+                elif win_side == WinSide.CITY and (slot.pu_mafia_count or 0) >= 1:
+                    # Команда выиграла, но игрок успел назвать мафию — половина.
+                    slot.compensation_score = round(ci * 0.5, 2)
+                else:
+                    slot.compensation_score = 0.0
+
+        if commit:
+            db.session.commit()
+        return len(slots_by_player)
+
 
