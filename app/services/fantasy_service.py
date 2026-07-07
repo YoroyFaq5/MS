@@ -4,8 +4,8 @@ FantasyService
 Fantasy draft system — entry-fee pool game (not FPL-style placement points).
 
 Rules:
-- User picks 3–5 players from a tournament they are NOT participating in.
-  Pick count: ≤10 participants → 3, 11–16 → 4, 17+ → 5.
+- User picks 2–5 players from a tournament they are NOT participating in.
+  Pick count: ≤40 participants → 2, >40 → 5.
 - Cannot pick yourself (if user.player_id is a tournament participant).
 - Cannot change picks after tournament starts (LOCKED status).
 - One draft per user per tournament.
@@ -49,10 +49,8 @@ logger = logging.getLogger(__name__)
 
 
 def _allowed_picks(participant_count: int) -> int:
-    if participant_count <= 10:
-        return 3
-    if participant_count <= 16:
-        return 4
+    if participant_count <= 40:
+        return 2
     return 5
 
 
@@ -136,6 +134,16 @@ class FantasyService:
             if series.status != SeriesStatus.ACTIVE:
                 return FantasyResult.fail(
                     f"Драфт можно создать только для активной серии (сейчас: «{series.status.value}»)."
+                )
+            # Раз для серий нет отдельного события "старт" (в отличие от
+            # целого турнира — TournamentService.start_tournament) — как
+            # только по этой серии записана хотя бы одна игра, дальше
+            # создавать новые драфты нечестно (часть результатов уже
+            # известна). Существующие открытые драфты в этот момент уже
+            # заблокированы отдельно — см. games.py::_lock_series_fantasy_if_needed.
+            if series.stage and series.stage.games:
+                return FantasyResult.fail(
+                    "По этой серии уже записаны игры — драфт больше нельзя создать."
                 )
 
         # Anti-abuse: one draft per (tournament, series) per user

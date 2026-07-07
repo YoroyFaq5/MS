@@ -69,6 +69,27 @@ def _notify_next_slot(round_data: dict) -> None:
     BotNotifyService.send_event("next-slot", {"players": players_payload})
 
 
+def _lock_series_fantasy_if_needed(stage_id: int | None) -> None:
+    """
+    A series-tournament never transitions Tournament.status to "active"
+    (it stays "pending" its whole life — see SeriesTournamentService), so
+    the usual "lock fantasy drafts when the tournament starts" hook
+    (TournamentService.start_tournament) never fires for it. The first
+    game recorded against a series' stage — created here, or attached
+    retroactively via _apply_tournament_assignment() — is the closest
+    equivalent "this evening has started" signal, so drafting locks then
+    instead of drifting open all evening while results trickle in.
+    Idempotent: locking an already-locked series is a no-op.
+    """
+    if not stage_id:
+        return
+    from app.models import TournamentSeries
+    series = db.session.query(TournamentSeries).filter_by(stage_id=stage_id).first()
+    if series:
+        from app.services.fantasy_service import FantasyService
+        FantasyService.lock_drafts_for_series(series.id, commit=True)
+
+
 def _new_game_form_context(tournaments, preselect_tournament=None, preselect_stage=None) -> dict:
     """
     Общий контекст для games/new.html — используется и на GET, и во всех
@@ -353,6 +374,7 @@ def new_game():
         db.session.commit()
         SeasonService.resolve_season_for_game(game)
         db.session.commit()
+        _lock_series_fantasy_if_needed(stage_id)
 
         flash("Игра создана! Заполните бонусы и завершите игру.", "success")
         return redirect(url_for("games.game_detail", game_id=game.id))
@@ -399,6 +421,8 @@ def _apply_tournament_assignment(game: Game) -> str | None:
     game.tournament_id = tournament_id
     game.stage_id = stage_id
     game.is_ranked = t.is_ranked
+    db.session.flush()
+    _lock_series_fantasy_if_needed(stage_id)
     return None
 
 
