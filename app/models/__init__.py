@@ -714,6 +714,13 @@ class FantasyDraft(db.Model):
     id            = Column(Integer, primary_key=True)
     user_id       = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     tournament_id = Column(Integer, ForeignKey("tournaments.id", ondelete="CASCADE"), nullable=False)
+    # Опционально — сужает драфт до одной серии (игрового вечера) внутри
+    # серийного турнира вместо всего турнира целиком. NULL — обычный,
+    # turnирный-wide драфт (поведение по умолчанию, как было всегда).
+    # Добавлено через migrate_fantasy_series.py для существующих БД.
+    tournament_series_id = Column(
+        Integer, ForeignKey("tournament_series.id", ondelete="CASCADE"), nullable=True
+    )
     total_points  = Column(Float, default=0.0, nullable=False)
     # Entry fee actually charged at draft creation time (snapshot of
     # EconomySettings.fantasy_entry_cost at that moment). Used to compute
@@ -735,6 +742,7 @@ class FantasyDraft(db.Model):
 
     user       = relationship("User",       foreign_keys=[user_id])
     tournament = relationship("Tournament", foreign_keys=[tournament_id])
+    tournament_series = relationship("TournamentSeries", foreign_keys=[tournament_series_id])
     picks      = relationship(
         "FantasyDraftPick",
         back_populates="draft",
@@ -743,7 +751,10 @@ class FantasyDraft(db.Model):
     )
 
     __table_args__ = (
-        UniqueConstraint("user_id", "tournament_id", name="uq_fantasy_user_tournament"),
+        UniqueConstraint(
+            "user_id", "tournament_id", "tournament_series_id",
+            name="uq_fantasy_user_tournament_series",
+        ),
     )
 
     @property
@@ -755,6 +766,7 @@ class FantasyDraft(db.Model):
             "id":            self.id,
             "user_id":       self.user_id,
             "tournament_id": self.tournament_id,
+            "tournament_series_id": self.tournament_series_id,
             "total_points":  self.total_points,
             "entry_cost_paid": self.entry_cost_paid,
             "status":        self.status.value,

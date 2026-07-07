@@ -40,6 +40,7 @@ from app import db
 from app.models import (
     FantasyDraft, FantasyDraftPick, FantasyDraftStatus,
     Tournament, TournamentParticipant, Player,
+    TournamentSeries, SeriesStatus,
     CoinSourceType,
 )
 from app.models.user import User
@@ -105,11 +106,19 @@ class FantasyService:
     # ── Draft lifecycle ───────────────────────────────────────────────────────
 
     @staticmethod
-    def create_draft(user: User, tournament_id: int) -> FantasyResult:
+    def create_draft(
+        user: User, tournament_id: int, tournament_series_id: Optional[int] = None,
+    ) -> FantasyResult:
         """
         Create an OPEN draft for the user, charging the Fantasy entry fee.
         Validates: tournament active/pending, user not a participant, no
         existing draft, linked player with sufficient balance.
+
+        tournament_series_id (optional) scopes the draft to one series
+        (game evening) inside a series-tournament instead of the whole
+        tournament — picks are then scored off that series' stage rating
+        (RatingService.get_stage_rating) rather than the tournament-wide
+        one, with its own separate leaderboard/prize pool.
         """
         from app.services.economy_service import EconomyService
 
@@ -119,12 +128,26 @@ class FantasyService:
         if t.status == "finished":
             return FantasyResult.fail("Нельзя создать драфт для завершённого турнира.")
 
-        # Anti-abuse: one draft per tournament per user
+        series: Optional[TournamentSeries] = None
+        if tournament_series_id is not None:
+            series = db.session.get(TournamentSeries, tournament_series_id)
+            if not series or series.series_tournament.tournament_id != tournament_id:
+                return FantasyResult.fail("Серия не найдена.")
+            if series.status != SeriesStatus.ACTIVE:
+                return FantasyResult.fail(
+                    f"Драфт можно создать только для активной серии (сейчас: «{series.status.value}»)."
+                )
+
+        # Anti-abuse: one draft per (tournament, series) per user
         existing = db.session.query(FantasyDraft).filter_by(
-            user_id=user.id, tournament_id=tournament_id
+            user_id=user.id, tournament_id=tournament_id,
+            tournament_series_id=tournament_series_id,
         ).first()
         if existing:
-            return FantasyResult.fail("У вас уже есть драфт для этого турнира.")
+            return FantasyResult.fail(
+                "У вас уже есть драфт для этой серии." if series
+                else "У вас уже есть драфт для этого турнира."
+            )
 
         # Anti-abuse: user cannot draft their own tournament
         if user.player_id:
@@ -143,11 +166,12 @@ class FantasyService:
                 "Для участия в Fantasy нужен привязанный профиль игрока."
             )
 
+        label = f"{t.name} — {series.name}" if series else t.name
         entry_cost = EconomyService.get_settings().fantasy_entry_cost
         spend = EconomyService.spend_coins(
             user.player,
             entry_cost,
-            f"Fantasy: вступительный взнос «{t.name}»",
+            f"Fantasy: вступительный взнос «{label}»",
             commit=False,
         )
         if not spend.ok:
@@ -156,13 +180,14 @@ class FantasyService:
         draft = FantasyDraft(
             user_id=user.id,
             tournament_id=tournament_id,
+            tournament_series_id=tournament_series_id,
             status=FantasyDraftStatus.OPEN,
             entry_cost_paid=entry_cost,
         )
         db.session.add(draft)
         db.session.commit()
         return FantasyResult.success(
-            f"Драфт для «{t.name}» создан, списано {entry_cost:.0f} монет. Выберите игроков.",
+            f"Драфт для «{label}» создан, списано {entry_cost:.0f} монет. Выберите игроков.",
             data=draft,
         )
 
@@ -257,6 +282,27 @@ class FantasyService:
         logger.info(f"Locked {len(drafts)} fantasy drafts for tournament #{tournament_id}")
         return len(drafts)
 
+    @staticmethod
+    def lock_drafts_for_series(tournament_series_id: int, commit: bool = True) -> int:
+        """
+        Lock all OPEN drafts scoped to one series. Series-tournaments never
+        transition through Tournament.status "active" (they stay "pending"
+        for their whole lifecycle — see SeriesTournamentService), so
+        lock_drafts_for_tournament never fires for them; this is the
+        series-scoped equivalent, called from finish_series() right before
+        scoring.
+        """
+        drafts = db.session.query(FantasyDraft).filter_by(
+            tournament_series_id=tournament_series_id,
+            status=FantasyDraftStatus.OPEN,
+        ).all()
+        for d in drafts:
+            d.status = FantasyDraftStatus.LOCKED
+        if commit:
+            db.session.commit()
+        logger.info(f"Locked {len(drafts)} fantasy drafts for series #{tournament_series_id}")
+        return len(drafts)
+
     # ── Scoring ───────────────────────────────────────────────────────────────
 
     @staticmethod
@@ -280,7 +326,7 @@ class FantasyService:
             return [FantasyResult.fail("Турнир не завершён.")]
 
         all_drafts = db.session.query(FantasyDraft).filter_by(
-            tournament_id=tournament_id
+            tournament_id=tournament_id, tournament_series_id=None,
         ).all()
         if not all_drafts:
             return [FantasyResult.fail("Нет Fantasy-драфтов для этого турнира.")]
@@ -356,18 +402,113 @@ class FantasyService:
         return results
 
     @staticmethod
-    def get_pool_info(tournament_id: int) -> dict:
+    def score_series(tournament_series_id: int, commit: bool = True) -> List[FantasyResult]:
+        """
+        Series-scoped equivalent of score_tournament — points come from
+        RatingService.get_stage_rating(series.stage_id) (just that one
+        evening) instead of the whole-tournament rating, and the prize
+        pool is the bank of only THIS series' drafts. Called from
+        SeriesTournamentService.finish_series() right after
+        lock_drafts_for_series().
+        """
+        from app.services.rating_service import RatingService
+        from app.services.economy_service import EconomyService
+
+        series = db.session.get(TournamentSeries, tournament_series_id)
+        if not series or series.status != SeriesStatus.FINISHED:
+            return [FantasyResult.fail("Серия не завершена.")]
+
+        t = series.series_tournament.tournament
+        all_drafts = db.session.query(FantasyDraft).filter_by(
+            tournament_series_id=tournament_series_id,
+        ).all()
+        if not all_drafts:
+            return [FantasyResult.fail("Нет Fantasy-драфтов для этой серии.")]
+
+        unscored = [d for d in all_drafts if d.status != FantasyDraftStatus.SCORED]
+        if not unscored:
+            return [FantasyResult.fail("Все драфты этой серии уже подсчитаны.")]
+
+        ratings = RatingService.get_stage_rating(series.stage_id)
+        points_map = {r.player_id: r.total_score for r in ratings}
+
+        label = f"{t.name} — {series.name}"
+        results = []
+        for draft in unscored:
+            total = 0.0
+            for pick in draft.picks:
+                pts = points_map.get(pick.player_id, 0.0)
+                pick.points_earned = round(pts, 2)
+                total += pts
+
+            draft.total_points = round(total, 2)
+            draft.status = FantasyDraftStatus.SCORED
+            draft.scored_at = datetime.now(timezone.utc)
+
+            results.append(FantasyResult.success(
+                f"Драфт #{draft.id} ({draft.user.username}): {draft.total_points} очков",
+                data=draft,
+            ))
+
+        if commit:
+            db.session.commit()
+
+        from app.services.bot_notify_service import BotNotifyService
+        for draft in unscored:
+            if draft.user and draft.user.player_id:
+                BotNotifyService.notify_player(
+                    draft.user.player_id, "fantasy-result",
+                    {"tournament_name": label, "points": draft.total_points},
+                )
+
+        # ── Prize pool payout (this series' bank only) ───────────────────
+        bank = round(sum(d.entry_cost_paid for d in all_drafts), 2)
+        if bank > 0:
+            settings = EconomyService.get_settings()
+            leaderboard = FantasyService.get_leaderboard(t.id, tournament_series_id)
+            for place, share in (
+                (1, settings.fantasy_first_place_share),
+                (2, settings.fantasy_second_place_share),
+            ):
+                if share <= 0 or len(leaderboard) < place:
+                    continue
+                entry = leaderboard[place - 1]
+                user = db.session.get(User, entry.user_id)
+                if not (user and user.player):
+                    continue
+                amount = round(bank * share, 2)
+                if amount <= 0:
+                    continue
+                EconomyService.add_coins(
+                    user.player,
+                    amount,
+                    f"Fantasy место #{place} в «{label}» (банк {bank:.0f})",
+                    CoinSourceType.FANTASY_REWARD,
+                    ref_tournament_id=t.id,
+                    commit=False,
+                )
+                BotNotifyService.notify_player(
+                    user.player.id, "fantasy-prize",
+                    {"tournament_name": label, "place": place, "amount": amount},
+                )
+            if commit:
+                db.session.commit()
+
+        return results
+
+    @staticmethod
+    def get_pool_info(tournament_id: int, tournament_series_id: Optional[int] = None) -> dict:
         """
         Entry cost, participant count, current bank and projected payouts
-        for the tournament's Fantasy page. Bank is the sum of what was
-        actually charged to each draft (entry_cost_paid), so it stays
-        correct even if the admin changes the entry cost mid-tournament.
+        for the tournament's (or one series') Fantasy page. Bank is the sum
+        of what was actually charged to each draft (entry_cost_paid), so it
+        stays correct even if the admin changes the entry cost mid-way.
         """
         from app.services.economy_service import EconomyService
 
         settings = EconomyService.get_settings()
         drafts = db.session.query(FantasyDraft).filter_by(
-            tournament_id=tournament_id
+            tournament_id=tournament_id, tournament_series_id=tournament_series_id,
         ).all()
 
         bank = round(sum(d.entry_cost_paid for d in drafts), 2)
@@ -382,10 +523,12 @@ class FantasyService:
     # ── Leaderboard ───────────────────────────────────────────────────────────
 
     @staticmethod
-    def get_leaderboard(tournament_id: int) -> List[FantasyLeaderboardEntry]:
+    def get_leaderboard(
+        tournament_id: int, tournament_series_id: Optional[int] = None,
+    ) -> List[FantasyLeaderboardEntry]:
         drafts = (
             db.session.query(FantasyDraft)
-            .filter_by(tournament_id=tournament_id)
+            .filter_by(tournament_id=tournament_id, tournament_series_id=tournament_series_id)
             .order_by(FantasyDraft.total_points.desc())
             .all()
         )
@@ -406,15 +549,27 @@ class FantasyService:
         return entries
 
     @staticmethod
-    def get_user_draft(user_id: int, tournament_id: int) -> Optional[FantasyDraft]:
+    def get_user_draft(
+        user_id: int, tournament_id: int, tournament_series_id: Optional[int] = None,
+    ) -> Optional[FantasyDraft]:
         return db.session.query(FantasyDraft).filter_by(
-            user_id=user_id, tournament_id=tournament_id
+            user_id=user_id, tournament_id=tournament_id,
+            tournament_series_id=tournament_series_id,
         ).first()
 
     @staticmethod
-    def get_available_picks(user: User, tournament_id: int) -> List[Player]:
-        """Players available for the user to pick (in tournament, not self, not already picked)."""
-        draft = FantasyService.get_user_draft(user.id, tournament_id)
+    def get_available_picks(
+        user: User, tournament_id: int, tournament_series_id: Optional[int] = None,
+    ) -> List[Player]:
+        """
+        Players available for the user to pick — in tournament, not self,
+        not already picked in THIS draft. Eligibility pool is always the
+        whole tournament's participants (same players are draftable for
+        any individual series/evening, not just those who already have
+        results recorded for that specific evening — drafting happens
+        before the evening is played).
+        """
+        draft = FantasyService.get_user_draft(user.id, tournament_id, tournament_series_id)
         already_picked = {p.player_id for p in draft.picks} if draft else set()
 
         participants = (

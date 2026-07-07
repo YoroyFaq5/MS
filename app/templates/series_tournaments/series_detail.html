@@ -23,6 +23,9 @@
     {% endif %}
   </div>
   <div class="d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('fantasy.series_fantasy', series_id=series.id) }}" class="btn btn-outline-danger">
+      <i class="bi bi-stars me-1"></i>Fantasy
+    </a>
     {% if series.status.value == 'active' and current_user.is_authenticated and current_user.is_admin %}
     <a href="{{ url_for('games.new_game', tournament_id=tournament.id, stage_id=series.stage_id) }}"
        class="btn btn-danger"><i class="bi bi-plus-lg me-1"></i>Добавить игру</a>

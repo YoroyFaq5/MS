@@ -187,6 +187,18 @@ class SeriesTournamentService:
 
         series.status = SeriesStatus.FINISHED
         db.session.commit()
+
+        # Fantasy-драфты, сделанные именно на эту серию — блокируем и сразу
+        # считаем очки (переиспользуем ту же связку lock+score, что и у
+        # турнирного Fantasy при старте/завершении турнира, см.
+        # TournamentService.start_tournament/PostTournamentOrchestrator).
+        try:
+            from app.services.fantasy_service import FantasyService
+            FantasyService.lock_drafts_for_series(series.id, commit=True)
+            FantasyService.score_series(series.id, commit=True)
+        except Exception:
+            logger.exception(f"Failed to score fantasy drafts for series #{series.id}")
+
         return SeriesResult.success(f"Серия «{series.name}» завершена.", data=series)
 
     @staticmethod

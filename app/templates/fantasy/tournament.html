@@ -1,13 +1,18 @@
 {% extends "base.html" %}
 {% from "_macros.html" import player_name %}
-{% block title %}Fantasy — {{ tournament.name }}{% endblock %}
+{% block title %}Fantasy — {{ tournament.name }}{% if series %} — {{ series.name }}{% endif %}{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center gap-3 mb-4">
-  <a href="{{ url_for('fantasy.index') }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
   <div>
-    <h2 class="mb-0 fw-bold">🎯 Fantasy: {{ tournament.name }}</h2>
-    <p class="text-muted small mb-0">Выберите {{ max_picks }} игроков — итог драфта: сумма их рейтинговых очков</p>
+    <h2 class="mb-0 fw-bold">
+      🎯 Fantasy: {{ tournament.name }}{% if series %} — {{ series.name }}{% endif %}
+    </h2>
+    <p class="text-muted small mb-0">
+      Выберите {{ max_picks }} игроков — итог драфта: сумма их рейтинговых очков
+      {% if series %}за эту серию{% else %}за весь турнир{% endif %}
+    </p>
   </div>
 </div>
 
@@ -102,7 +107,7 @@
       </div>
 
       {% else %}{# no draft yet #}
-      {% if tournament.status != 'finished' %}
+      {% if (series and series.status.value == 'active') or (not series and tournament.status != 'finished') %}
       <div class="card">
         <div class="card-body text-center py-4">
           <div class="fs-2 mb-2">🎯</div>
@@ -113,7 +118,7 @@
             · ваш баланс: <strong>{{ (current_user.player.coins or 0) | int }}</strong>
             {% endif %}
           </p>
-          <form method="POST" action="{{ url_for('fantasy.create_draft', tournament_id=tournament.id) }}">
+          <form method="POST" action="{{ create_draft_url }}">
             <button type="submit" class="btn btn-danger">
               <i class="bi bi-plus-lg me-1"></i>Создать драфт
             </button>
@@ -121,7 +126,9 @@
         </div>
       </div>
       {% else %}
-      <div class="alert alert-secondary small">Турнир завершён — создание драфтов недоступно.</div>
+      <div class="alert alert-secondary small">
+        {% if series %}Серия завершена{% else %}Турнир завершён{% endif %} — создание драфтов недоступно.
+      </div>
       {% endif %}
       {% endif %}
 
