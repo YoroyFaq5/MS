@@ -640,7 +640,9 @@ class TournamentService:
         return tables
 
     @staticmethod
-    def generate_next_round(stage_id: int) -> ServiceResult:
+    def generate_next_round(
+        stage_id: int, player_ids: Optional[list[int]] = None,
+    ) -> ServiceResult:
         """
         Создаёт игры следующего раунда стадии турнира с рассадкой по
         правилам клуба (см. блок выше). История пар/мест считается на лету
@@ -650,6 +652,13 @@ class TournamentService:
         вызов создаёт СЛЕДУЮЩИЙ раунд (по max(round_number) в стадии) —
         повторный вызов без завершения текущего раунда просто создаст ещё
         один раунд поверх, ничего не перезаписывая.
+
+        player_ids (опционально) — сузить круг играющих до конкретного
+        подмножества участников турнира (например, кто реально пришёл на
+        конкретный вечер серийного турнира), вместо всех участников
+        турнира/финалистов по умолчанию. История пар/мест по-прежнему
+        считается по всему турниру — сужение касается только того, КТО
+        играет в этом раунде, не влияет на честность подсчёта.
         """
         from app.models import GameSlot, Role
         from collections import Counter, defaultdict
@@ -662,7 +671,16 @@ class TournamentService:
         if stage.status != "active":
             return ServiceResult.fail(f"Этап «{stage.name}» не активен.")
 
-        if stage.type == StageType.FINAL:
+        if player_ids is not None:
+            participant_ids = {p.player_id for p in tournament.participants}
+            chosen = list(dict.fromkeys(player_ids))  # de-dup, preserve order
+            invalid = [pid for pid in chosen if pid not in participant_ids]
+            if invalid:
+                return ServiceResult.fail(
+                    "Среди выбранных есть игроки, не являющиеся участниками турнира."
+                )
+            eligible_ids = chosen
+        elif stage.type == StageType.FINAL:
             eligible_ids = [p.player_id for p in tournament.participants if p.advanced_to_final]
         else:
             eligible_ids = [p.player_id for p in tournament.participants]

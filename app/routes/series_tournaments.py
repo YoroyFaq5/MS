@@ -11,7 +11,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 
 from app import db
 from app.models import Player, TournamentSeries
-from app.services import SeriesTournamentService
+from app.services import SeriesTournamentService, TournamentService
 from app.services.shop_service import ShopService
 from app.auth_decorators import admin_required
 
@@ -117,7 +117,14 @@ def series_detail(series_tournament_id: int, series_id: int):
     leaderboard = SeriesTournamentService.get_series_leaderboard(series_id)
     games = sorted(series.stage.games, key=lambda g: g.played_at, reverse=True) if series.stage else []
 
-    equipped_bulk = ShopService.get_equipped_bulk([r.player_id for r in leaderboard])
+    tournament_players = sorted(
+        (p.player for p in st.tournament.participants if p.player),
+        key=lambda pl: pl.name,
+    )
+
+    equipped_bulk = ShopService.get_equipped_bulk(
+        [r.player_id for r in leaderboard] + [p.id for p in tournament_players]
+    )
 
     return render_template(
         "series_tournaments/series_detail.html",
@@ -126,6 +133,7 @@ def series_detail(series_tournament_id: int, series_id: int):
         series=series,
         leaderboard=leaderboard,
         games=games,
+        tournament_players=tournament_players,
         equipped_bulk=equipped_bulk,
     )
 
@@ -147,6 +155,38 @@ def finish_series(series_id: int):
 def cancel_series(series_id: int):
     series = _get_series_or_404(series_id)
     result = SeriesTournamentService.cancel_series(series_id)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for(
+        "series_tournaments.series_detail",
+        series_tournament_id=series.series_tournament_id, series_id=series_id,
+    ))
+
+
+@series_tournaments_bp.route("/series/<int:series_id>/generate-seating", methods=["POST"])
+@admin_required
+def generate_series_seating(series_id: int):
+    """
+    Рассадка на конкретный вечер — в отличие от обычной «Следующий раунд»
+    (которая всегда берёт ВСЕХ участников турнира), тут админ явно
+    отмечает, кто пришёл сегодня, и рассадка строится только для них.
+    """
+    series = _get_series_or_404(series_id)
+    if not series.stage_id:
+        flash("У серии нет этапа.", "danger")
+        return redirect(url_for(
+            "series_tournaments.series_detail",
+            series_tournament_id=series.series_tournament_id, series_id=series_id,
+        ))
+
+    player_ids = request.form.getlist("player_ids", type=int)
+    if len(player_ids) < 10:
+        flash(f"Нужно выбрать минимум 10 игроков. Выбрано: {len(player_ids)}.", "danger")
+        return redirect(url_for(
+            "series_tournaments.series_detail",
+            series_tournament_id=series.series_tournament_id, series_id=series_id,
+        ))
+
+    result = TournamentService.generate_next_round(series.stage_id, player_ids=player_ids)
     flash(result.message, "success" if result.ok else "danger")
     return redirect(url_for(
         "series_tournaments.series_detail",

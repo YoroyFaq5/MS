@@ -29,6 +29,11 @@
     {% if series.status.value == 'active' and current_user.is_authenticated and current_user.is_admin %}
     <a href="{{ url_for('games.new_game', tournament_id=tournament.id, stage_id=series.stage_id) }}"
        class="btn btn-danger"><i class="bi bi-plus-lg me-1"></i>Добавить игру</a>
+    {% if tournament_players|length >= 10 %}
+    <button class="btn btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#seatingPanel">
+      <i class="bi bi-shuffle me-1"></i>Сгенерировать рассадку
+    </button>
+    {% endif %}
     <form method="POST" action="{{ url_for('series_tournaments.finish_series', series_id=series.id) }}"
           onsubmit="return confirm('Завершить серию?')">
       <button class="btn btn-outline-secondary"><i class="bi bi-flag-fill me-1"></i>Завершить</button>
@@ -40,6 +45,56 @@
     {% endif %}
   </div>
 </div>
+
+{% if series.status.value == 'active' and current_user.is_authenticated and current_user.is_admin and tournament_players|length >= 10 %}
+<div class="collapse mb-4" id="seatingPanel">
+  <div class="card border-primary">
+    <div class="card-header fw-semibold text-primary">
+      <i class="bi bi-shuffle me-1"></i>Рассадка на сегодняшний вечер
+    </div>
+    <div class="card-body">
+      <p class="text-muted small mb-3">
+        Отметьте, кто из участников турнира пришёл сегодня — рассадка (столы + места)
+        построится только для отмеченных, минимизируя повторные пары и места, как обычно.
+      </p>
+      <form method="POST" action="{{ url_for('series_tournaments.generate_series_seating', series_id=series.id) }}">
+        <div class="d-flex gap-2 mb-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAllSeatingChecks(true)">Выбрать всех</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAllSeatingChecks(false)">Снять всех</button>
+          <span class="text-muted small align-self-center ms-auto" id="seatingCount"></span>
+        </div>
+        <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-1 mb-3" style="max-height:260px; overflow-y:auto">
+          {% for p in tournament_players %}
+          <div class="col">
+            <div class="form-check">
+              <input class="form-check-input seating-check" type="checkbox" name="player_ids"
+                     value="{{ p.id }}" id="seat-p-{{ p.id }}" onchange="updateSeatingCount()">
+              <label class="form-check-label small" for="seat-p-{{ p.id }}">
+                {{ player_name(p, equipped_bulk.get(p.id, {})) }}
+              </label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-shuffle me-1"></i>Сгенерировать рассадку
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+function setAllSeatingChecks(checked) {
+  document.querySelectorAll('.seating-check').forEach(cb => { cb.checked = checked; });
+  updateSeatingCount();
+}
+function updateSeatingCount() {
+  const n = document.querySelectorAll('.seating-check:checked').length;
+  document.getElementById('seatingCount').textContent = n + ' выбрано';
+}
+document.addEventListener('DOMContentLoaded', updateSeatingCount);
+</script>
+{% endif %}
 
 <div class="row g-4">
   <div class="col-lg-7">
