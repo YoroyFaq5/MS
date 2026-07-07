@@ -82,6 +82,7 @@ class FantasyLeaderboardEntry:
     total_points: float
     pick_count: int
     draft_id: int
+    status: str = "open"
 
     def to_dict(self) -> dict:
         return {
@@ -92,6 +93,7 @@ class FantasyLeaderboardEntry:
             "total_points": self.total_points,
             "pick_count": self.pick_count,
             "draft_id": self.draft_id,
+            "status": self.status,
         }
 
 
@@ -200,6 +202,27 @@ class FantasyService:
         )
 
     @staticmethod
+    def _self_heal_series_lock(draft: FantasyDraft) -> None:
+        """
+        Defensive re-check, run right before any pick edit: a series-scoped
+        draft should be LOCKED as soon as its series has any recorded game
+        (see lock_drafts_for_series / games.py::_lock_series_fantasy_if_needed),
+        but that lock only fires as a side effect of creating/attaching the
+        NEXT game to the series' stage. A draft created in the narrow gap
+        between "series already has a game" and "that hook actually ran"
+        (e.g. right before a code deploy that introduced/fixed the hook)
+        stays OPEN forever unless another game happens to be added later.
+        This closes that gap by re-deriving the correct state on demand,
+        instead of trusting the stored status blindly.
+        """
+        if draft.status != FantasyDraftStatus.OPEN or not draft.tournament_series_id:
+            return
+        series = draft.tournament_series
+        if series and series.stage and series.stage.games:
+            draft.status = FantasyDraftStatus.LOCKED
+            db.session.commit()
+
+    @staticmethod
     def add_pick(user: User, draft_id: int, player_id: int) -> FantasyResult:
         """
         Add a player pick to an OPEN draft.
@@ -210,6 +233,7 @@ class FantasyService:
             return FantasyResult.fail("Драфт не найден.")
         if draft.user_id != user.id and not user.is_admin:
             return FantasyResult.fail("Доступ запрещён.")
+        FantasyService._self_heal_series_lock(draft)
         if draft.status != FantasyDraftStatus.OPEN:
             return FantasyResult.fail("Драфт зафиксирован — изменения невозможны.")
 
@@ -259,6 +283,7 @@ class FantasyService:
         draft = db.session.get(FantasyDraft, draft_id)
         if not draft or (draft.user_id != user.id and not user.is_admin):
             return FantasyResult.fail("Доступ запрещён.")
+        FantasyService._self_heal_series_lock(draft)
         if draft.status != FantasyDraftStatus.OPEN:
             return FantasyResult.fail("Драфт зафиксирован.")
 
@@ -545,6 +570,7 @@ class FantasyService:
             user = d.user
             if not user:
                 continue
+            FantasyService._self_heal_series_lock(d)
             entries.append(FantasyLeaderboardEntry(
                 rank=rank,
                 user_id=user.id,
@@ -553,6 +579,7 @@ class FantasyService:
                 total_points=d.total_points,
                 pick_count=d.pick_count,
                 draft_id=d.id,
+                status=d.status.value,
             ))
         return entries
 
@@ -560,10 +587,13 @@ class FantasyService:
     def get_user_draft(
         user_id: int, tournament_id: int, tournament_series_id: Optional[int] = None,
     ) -> Optional[FantasyDraft]:
-        return db.session.query(FantasyDraft).filter_by(
+        draft = db.session.query(FantasyDraft).filter_by(
             user_id=user_id, tournament_id=tournament_id,
             tournament_series_id=tournament_series_id,
         ).first()
+        if draft:
+            FantasyService._self_heal_series_lock(draft)
+        return draft
 
     @staticmethod
     def get_available_picks(

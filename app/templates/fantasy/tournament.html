@@ -204,8 +204,14 @@
               </td>
               <td class="text-center text-muted">{{ e.pick_count }}</td>
               <td class="text-center">
-                {% set draft = none %}
-                <!-- status shown from leaderboard data if available -->
+                <span class="badge
+                  {% if e.status == 'open' %}bg-success
+                  {% elif e.status == 'locked' %}bg-warning text-dark
+                  {% else %}bg-secondary{% endif %}">
+                  {% if e.status == 'open' %}Открыт
+                  {% elif e.status == 'locked' %}Зафиксирован
+                  {% else %}Подсчитан{% endif %}
+                </span>
               </td>
               <td class="text-end pe-4 fw-bold
                 {% if e.total_points > 0 %}text-success{% else %}text-muted{% endif %}">
