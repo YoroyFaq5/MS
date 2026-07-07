@@ -164,6 +164,8 @@ def list_games():
 
 @games_bp.route("/<int:game_id>")
 def game_detail(game_id: int):
+    from flask_login import current_user
+
     game = db.session.get(Game, game_id) or abort(404)
     slots = sorted(game.slots, key=lambda s: s.seat_number)
     # Generated games have all roles as CIVILIAN placeholder — roles are editable
@@ -172,9 +174,26 @@ def game_detail(game_id: int):
         all(s.role.value == "civilian" for s in slots) and
         len(slots) == 10
     )
+    edit_mode = (
+        game.is_finished and request.args.get("edit") == "1"
+        and current_user.is_authenticated and current_user.is_admin
+    )
     equipped_bulk = ShopService.get_equipped_bulk([s.player_id for s in slots])
+    all_players = []
+    if edit_mode:
+        # Union of active players and whoever is currently in this game's
+        # slots (even if since deactivated) — otherwise an inactive slot
+        # player wouldn't appear as a <select> option at all, and the
+        # browser would silently default to the first option instead,
+        # changing that seat's player even if the admin left it untouched.
+        by_id = {p.id: p for p in _active_players()}
+        for s in slots:
+            if s.player and s.player_id not in by_id:
+                by_id[s.player_id] = s.player
+        all_players = sorted(by_id.values(), key=lambda p: p.name)
     return render_template("games/detail.html", game=game, slots=slots,
-                           roles_editable=roles_editable, equipped_bulk=equipped_bulk)
+                           roles_editable=roles_editable, edit_mode=edit_mode,
+                           all_players=all_players, equipped_bulk=equipped_bulk)
 
 
 @games_bp.route("/api/<int:game_id>")
@@ -451,6 +470,101 @@ def finish_game(game_id: int):
             # Отсутствие следующего раунда (например, стадия почти закончена,
             # участников не хватает) — не ошибка самого finish_game, поэтому
             # неудачу generate_next_round здесь не показываем как danger.
+
+    if game.tournament_id:
+        return redirect(url_for("tournaments.tournament_detail", tournament_id=game.tournament_id))
+    return redirect(url_for("games.game_detail", game_id=game_id))
+
+
+@games_bp.route("/<int:game_id>/edit", methods=["POST"])
+@admin_required
+def edit_game(game_id: int):
+    """
+    Edit an ALREADY-finished game — roles, win side, bonus/PU, quality,
+    and (optionally) which player occupies a seat. finish_game() covers
+    the one-time initial submission for unfinished games; this is the
+    separate "fix a mistake after the fact" path, which additionally has
+    to undo+redo ELO/economy side effects (see EditGameOrchestrator).
+    """
+    game = db.session.get(Game, game_id) or abort(404)
+    if not game.is_finished:
+        flash("Игра ещё не завершена — используйте форму завершения игры.", "warning")
+        return redirect(url_for("games.game_detail", game_id=game_id))
+
+    old_player_ids = [s.player_id for s in game.slots]
+
+    win_side_str = request.form.get("win_side", "none")
+    try:
+        game.win_side = WinSide(win_side_str)
+    except ValueError:
+        flash("Неверное значение победителя.", "danger")
+        return redirect(url_for("games.game_detail", game_id=game_id))
+
+    for slot in game.slots:
+        pid_str = request.form.get(f"player_{slot.id}", "").strip()
+        if pid_str:
+            try:
+                new_pid = int(pid_str)
+            except ValueError:
+                new_pid = None
+            if new_pid and new_pid != slot.player_id and db.session.get(Player, new_pid):
+                slot.player_id = new_pid
+
+        role_val = request.form.get(f"role_{slot.id}", "").strip()
+        if role_val:
+            try:
+                slot.role = Role(role_val)
+            except ValueError:
+                pass
+
+        val = request.form.get(f"bonus_{slot.id}", "0").strip()
+        try:
+            slot.bonus_score = float(val)
+        except ValueError:
+            slot.bonus_score = 0.0
+
+        slot.is_pu = bool(request.form.get(f"pu_{slot.id}"))
+        if slot.is_pu:
+            try:
+                slot.pu_mafia_count = max(0, min(3, int(
+                    request.form.get(f"pu_mafia_{slot.id}", 0)
+                )))
+            except ValueError:
+                slot.pu_mafia_count = 0
+        else:
+            slot.pu_mafia_count = 0
+
+        qs_val = request.form.get(f"quality_{slot.id}", "").strip()
+        if qs_val:
+            try:
+                slot.quality_score = max(-1.0, min(1.0, float(qs_val)))
+            except ValueError:
+                pass
+
+    from collections import Counter
+    role_dist = Counter(s.role.value for s in game.slots)
+    if all(s.role.value == "civilian" for s in game.slots):
+        db.session.rollback()
+        flash("Назначьте роли перед сохранением (сейчас все — Мирный).", "danger")
+        return redirect(url_for("games.game_detail", game_id=game_id))
+    if role_dist.get("mafia", 0) + role_dist.get("don", 0) == 0:
+        db.session.rollback()
+        flash("В игре должна быть хотя бы одна роль мафии (Мафия или Дон).", "danger")
+        return redirect(url_for("games.game_detail", game_id=game_id))
+
+    if len({s.player_id for s in game.slots}) != len(game.slots):
+        db.session.rollback()
+        flash("Один и тот же игрок не может занимать два места.", "danger")
+        return redirect(url_for("games.game_detail", game_id=game_id))
+
+    db.session.flush()
+
+    from app.services.orchestrator import EditGameOrchestrator
+    orch = EditGameOrchestrator.run(game, old_player_ids)
+    if orch.errors:
+        flash(f"Игра обновлена с предупреждениями: {'; '.join(orch.errors)}", "warning")
+    else:
+        flash("Игра обновлена — ELO, монеты и рейтинг пересчитаны.", "success")
 
     if game.tournament_id:
         return redirect(url_for("tournaments.tournament_detail", tournament_id=game.tournament_id))

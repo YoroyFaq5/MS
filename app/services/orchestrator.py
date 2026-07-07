@@ -116,6 +116,92 @@ class PostGameOrchestrator:
         return result
 
 
+class EditGameOrchestrator:
+    """
+    Called after an admin edits an already-finished game (roles, win side,
+    bonus/PU, or which player occupies a seat). Unlike PostGameOrchestrator,
+    this must first UNDO the game's old side effects before reapplying the
+    corrected ones:
+
+    - ELO is a running total, not reversible per-game in isolation — see
+      EloEngine.recompute_chain_from() for why this replays every ranked
+      game from this one onward instead of just recomputing this one game.
+    - Economy (coins) IS precisely reversible per-game (CoinTransaction.
+      ref_game_id) — reverse the old reward, then reapply the new one.
+    - Achievements have no per-game reference in the data model at all
+      (PlayerAchievement has no ref_game_id), so an incorrectly-granted
+      achievement from the old (wrong) result can't be reliably revoked —
+      out of scope. check_after_game() is still re-run so any newly
+      correct achievement gets granted (idempotent, additive-only).
+    - Season assignment is per-game/per-date, not cumulative — safe to
+      just re-run for this one game like PostGameOrchestrator does.
+    """
+
+    @staticmethod
+    def run(game: Game, old_player_ids: List[int]) -> "OrchestratorResult":
+        from app.services.rating_service import RatingService
+        from app.services.economy_service import EconomyService
+        from app.services.season_service import SeasonService
+        from app.services.elo_engine import EloEngine
+
+        result = OrchestratorResult.empty()
+
+        try:
+            RatingService.apply_base_scores_to_game(game)
+            result.add_step(f"Base scores recomputed for game #{game.id}")
+        except Exception as e:
+            result.add_error(f"Base scores failed: {e}")
+
+        try:
+            reversed_count = EconomyService.reverse_game_rewards(game, commit=False)
+            db.session.flush()
+            result.add_step(f"Reversed old rewards for {reversed_count} players")
+        except Exception as e:
+            result.add_error(f"Reward reversal failed: {e}")
+
+        try:
+            if game.is_ranked:
+                replayed = EloEngine.recompute_chain_from(
+                    game, extra_player_ids=old_player_ids, commit=False,
+                )
+                result.add_step(f"ELO chain recomputed: {replayed} games replayed")
+        except Exception as e:
+            result.add_error(f"ELO recompute failed: {e}")
+
+        try:
+            season = SeasonService.resolve_season_for_game(game)
+            if season:
+                result.add_step(f"Game assigned to season: {season.name}")
+        except Exception as e:
+            result.add_error(f"Season assignment failed: {e}")
+
+        try:
+            rewards = EconomyService.apply_rewards_after_game(
+                game, commit=False, as_of=game.played_at,
+            )
+            ok_count = sum(1 for r in rewards if r.ok)
+            result.add_step(f"New coins distributed: {ok_count} players rewarded")
+        except Exception as e:
+            result.add_error(f"Coin rewards failed: {e}")
+
+        try:
+            db.session.commit()
+            result.add_step("Committed all changes")
+        except Exception as e:
+            db.session.rollback()
+            result.add_error(f"Commit failed: {e}")
+
+        try:
+            from app.services.achievement_service import AchievementService
+            unlocked = AchievementService.check_after_game(game)
+            newly = sum(1 for r in unlocked if r.ok and r.data)
+            result.add_step(f"Achievements checked: {newly} newly unlocked")
+        except Exception as e:
+            result.add_error(f"Achievement check failed: {e}")
+
+        return result
+
+
 class PostTournamentOrchestrator:
     """
     Called when a tournament is marked as finished.

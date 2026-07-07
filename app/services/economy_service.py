@@ -375,6 +375,47 @@ class EconomyService:
             db.session.commit()
         return results
 
+    @staticmethod
+    def reverse_game_rewards(game: Game, commit: bool = True) -> int:
+        """
+        Undo this game's GAME_REWARD coin transactions — for editing an
+        already-finished game (see EditGameOrchestrator). Never mutates or
+        deletes the original ledger entries (immutable ledger) — instead
+        appends one compensating entry per player for the negative of
+        their net GAME_REWARD total on this game, tagged with the same
+        source_type so a later _daily_game_earnings() check on the same
+        calendar day nets out correctly (a plain negative GAME_REWARD
+        entry is already excluded by that query's `amount > 0` filter).
+        Returns the number of players whose reward was reversed.
+        """
+        totals = (
+            db.session.query(CoinTransaction.player_id, func.sum(CoinTransaction.amount))
+            .filter(
+                CoinTransaction.ref_game_id == game.id,
+                CoinTransaction.source_type == CoinSourceType.GAME_REWARD,
+            )
+            .group_by(CoinTransaction.player_id)
+            .all()
+        )
+        count = 0
+        for player_id, net_amount in totals:
+            if not net_amount:
+                continue
+            player = db.session.get(Player, player_id)
+            if not player:
+                continue
+            EconomyService._record(
+                player,
+                -round(net_amount, 2),
+                f"Отмена награды за игру #{game.id} (редактирование результата)",
+                CoinSourceType.GAME_REWARD,
+                ref_game_id=game.id,
+            )
+            count += 1
+        if commit:
+            db.session.commit()
+        return count
+
     # ── Tournament rewards ────────────────────────────────────────────────────
 
     @staticmethod

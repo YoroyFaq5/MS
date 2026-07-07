@@ -9,7 +9,7 @@
     <h2 class="mb-0 fw-bold">🎮 Игра #{{ game.id }}</h2>
     <p class="text-muted small mb-0">{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</p>
   </div>
-  <div class="ms-auto d-flex gap-2">
+  <div class="ms-auto d-flex align-items-center gap-2">
     {% if game.is_finished %}
       {% if game.win_side.value == 'mafia' %}
         <span class="badge bg-danger fs-6 px-3 py-2">🔫 Победила Мафия</span>
@@ -18,11 +18,29 @@
       {% else %}
         <span class="badge bg-secondary fs-6 px-3 py-2">Ничья</span>
       {% endif %}
+      {% if current_user.is_authenticated and current_user.is_admin %}
+        {% if edit_mode %}
+        <a href="{{ url_for('games.game_detail', game_id=game.id) }}" class="btn btn-outline-secondary btn-sm">Отмена</a>
+        {% else %}
+        <a href="{{ url_for('games.game_detail', game_id=game.id, edit=1) }}" class="btn btn-outline-warning btn-sm">
+          <i class="bi bi-pencil me-1"></i>Редактировать
+        </a>
+        {% endif %}
+      {% endif %}
     {% else %}
       <span class="badge bg-warning text-dark fs-6 px-3 py-2">⏳ В процессе</span>
     {% endif %}
   </div>
 </div>
+
+{% if edit_mode %}
+<div class="alert alert-warning small">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  Редактирование завершённой игры пересчитает ELO для всех, кто играл позже
+  этой игры (цепочкой вперёд), и переначислит монеты за неё заново.
+  Достижения, выданные по старому результату, автоматически не отзываются.
+</div>
+{% endif %}
 
 {% if game.notes %}
 <div class="alert alert-secondary mb-4">
@@ -33,10 +51,10 @@
 <!-- Players table -->
 <div class="card mb-4">
   <div class="card-header fw-semibold">🪑 Состав игры</div>
-  {% if not game.is_finished %}
-  {% if current_user.is_admin %}
-  <form method="POST" action="{{ url_for('games.finish_game', game_id=game.id) }}" id="finishForm">
-  {% endif %}
+  {% if (not game.is_finished or edit_mode) and current_user.is_admin %}
+  <form method="POST"
+        action="{{ url_for('games.edit_game', game_id=game.id) if edit_mode else url_for('games.finish_game', game_id=game.id) }}"
+        id="finishForm">
   {% endif %}
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -64,6 +82,7 @@
         </thead>
         {% endif %}
         {% if current_user.is_admin %}
+        {% set editable_now = (not game.is_finished and roles_editable) or edit_mode %}
         <tbody>
           {% for slot in slots %}
           <tr>
@@ -71,15 +90,23 @@
               <span class="badge bg-body-secondary text-body border">{{ slot.seat_number }}</span>
             </td>
             <td class="fw-medium">
-              <a href="{{ url_for('profile.view_profile', player_id=slot.player_id) }}"
-                 class="text-decoration-none">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}
-                  {% if slot.is_pu %}
-                    <span class="ms-1" title="Первый убиенный">💀</span>
-                  {% endif %}
-              </a>
+              {% if edit_mode %}
+                <select name="player_{{ slot.id }}" class="form-select form-select-sm" style="min-width:160px">
+                  {% for p in all_players %}
+                  <option value="{{ p.id }}" {% if p.id == slot.player_id %}selected{% endif %}>{{ p.display_name }}</option>
+                  {% endfor %}
+                </select>
+              {% else %}
+                <a href="{{ url_for('profile.view_profile', player_id=slot.player_id) }}"
+                   class="text-decoration-none">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}
+                    {% if slot.is_pu %}
+                      <span class="ms-1" title="Первый убиенный">💀</span>
+                    {% endif %}
+                </a>
+              {% endif %}
             </td>
             <td class="text-center">
-              {% if game.is_finished or not roles_editable %}
+              {% if not editable_now %}
                 {% if slot.role.value == 'mafia' %}<span class="badge bg-danger">🔫 Мафия</span>
                 {% elif slot.role.value == 'don' %}<span class="badge bg-dark border border-secondary">🎩 Дон</span>
                 {% elif slot.role.value == 'sheriff' %}<span class="badge bg-info text-dark">🔍 Шериф</span>
@@ -96,7 +123,7 @@
             <td class="text-center text-muted">{{ slot.base_score }}</td>
             <!-- Bonus -->
             <td class="text-center">
-              {% if game.is_finished %}
+              {% if not editable_now %}
                 <span class="{% if slot.bonus_score > 0 %}text-success{% elif slot.bonus_score < 0 %}text-danger{% endif %}">
                   {{ '+' if slot.bonus_score > 0 else '' }}{{ slot.bonus_score }}
                 </span>
@@ -110,7 +137,7 @@
             </td>
             <!-- PU (Первый Убиенный) -->
             <td class="text-center">
-              {% if game.is_finished %}
+              {% if not editable_now %}
                 {% if slot.is_pu %}
                   <span class="badge bg-info text-dark" title="Первый убиенный, мафий в списке: {{ slot.pu_mafia_count }}">
                     ПУ +{{ slot.pu_bonus }}
@@ -122,17 +149,18 @@
                     <input class="form-check-input pu-check" type="checkbox"
                            name="pu_{{ slot.id }}" value="1"
                            id="pu_{{ slot.id }}"
+                           {% if slot.is_pu %}checked{% endif %}
                            onchange="togglePuCount(this, {{ slot.id }})">
                     <label class="form-check-label small" for="pu_{{ slot.id }}">ПУ</label>
                   </div>
                   <select name="pu_mafia_{{ slot.id }}"
                           id="pu_mafia_{{ slot.id }}"
-                          class="form-select form-select-sm d-none"
+                          class="form-select form-select-sm {% if not slot.is_pu %}d-none{% endif %}"
                           style="width:70px">
-                    <option value="0">0 🔫</option>
-                    <option value="1">1 🔫</option>
-                    <option value="2">2 🔫</option>
-                    <option value="3">3 🔫</option>
+                    <option value="0" {% if slot.pu_mafia_count == 0 %}selected{% endif %}>0 🔫</option>
+                    <option value="1" {% if slot.pu_mafia_count == 1 %}selected{% endif %}>1 🔫</option>
+                    <option value="2" {% if slot.pu_mafia_count == 2 %}selected{% endif %}>2 🔫</option>
+                    <option value="3" {% if slot.pu_mafia_count == 3 %}selected{% endif %}>3 🔫</option>
                   </select>
                 </div>
               {% endif %}
@@ -180,29 +208,34 @@
     </div>
   </div>
 
-  {% if not game.is_finished %}
-  {% if current_user.is_admin %}
-  <!-- Finish game panel -->
+  {% if (not game.is_finished or edit_mode) and current_user.is_admin %}
+  <!-- Finish/edit game panel -->
   <div class="card-footer">
     <div class="row align-items-end g-3">
       <div class="col-md-4">
         <label class="form-label fw-medium mb-1">🏆 Кто победил?</label>
         <select name="win_side" class="form-select" required>
-          <option value="city">🏙 Город (мирные + шериф)</option>
-          <option value="mafia">🔫 Мафия (мафия + дон)</option>
-          <option value="none">— Ничья / отмена</option>
+          <option value="city" {% if edit_mode and game.win_side.value == 'city' %}selected{% endif %}>🏙 Город (мирные + шериф)</option>
+          <option value="mafia" {% if edit_mode and game.win_side.value == 'mafia' %}selected{% endif %}>🔫 Мафия (мафия + дон)</option>
+          <option value="none" {% if edit_mode and game.win_side.value == 'none' %}selected{% endif %}>— Ничья / отмена</option>
         </select>
       </div>
       <div class="col-md-auto">
+        {% if edit_mode %}
+        <button type="submit" class="btn btn-warning px-4"
+                onclick="return confirm('Сохранить изменения? ELO и монеты будут пересчитаны заново.')">
+          <i class="bi bi-check-lg me-1"></i>Сохранить изменения
+        </button>
+        {% else %}
         <button type="submit" class="btn btn-danger px-4"
                 onclick="return confirm('Завершить игру? Это изменит рейтинг.')">
           <i class="bi bi-flag-fill me-1"></i>Завершить игру
         </button>
+        {% endif %}
       </div>
     </div>
   </div>
   </form>
-  {% endif %}
   {% endif %}
 </div>
 

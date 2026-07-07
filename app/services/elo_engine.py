@@ -32,6 +32,8 @@ import logging
 from dataclasses import dataclass
 from typing import List, Sequence
 
+from sqlalchemy import or_, and_
+
 from app import db
 from app.models import Game, GameSlot, Player, Role, WinSide
 
@@ -289,3 +291,86 @@ class EloEngine:
             f"EloEngine: applied {len(deltas)} deltas for game #{game.id}"
         )
         return deltas
+
+    # ── Chain recompute: editing an already-finished game ────────────────────
+
+    @staticmethod
+    def recompute_chain_from(
+        anchor_game: Game, extra_player_ids: Sequence[int] = (), commit: bool = True,
+    ) -> int:
+        """
+        ELO is a running total on Player.elo, not a per-game-reversible
+        value — apply_match() always reads whatever elo is CURRENTLY on
+        the player. So correcting one historical game means: reset every
+        touched player back to their value right before this game, then
+        replay every ranked/finished game from this game onward, in
+        chronological order, so later games naturally cascade off the
+        corrected earlier ones exactly as they originally did.
+
+        extra_player_ids: players who were in the OLD version of
+        anchor_game's slots but got removed by the edit (seat reassigned
+        to someone else) — they must still be reset even though no game
+        from this point on references them anymore (that reset to their
+        pre-cutoff baseline IS the fully-corrected final value for them).
+
+        Returns the number of games replayed.
+        """
+        cutoff_at = anchor_game.played_at
+        cutoff_id = anchor_game.id
+
+        games_to_replay = (
+            db.session.query(Game)
+            .filter(
+                Game.is_finished == True,
+                Game.is_ranked == True,
+                or_(
+                    Game.played_at > cutoff_at,
+                    and_(Game.played_at == cutoff_at, Game.id >= cutoff_id),
+                ),
+            )
+            .order_by(Game.played_at.asc(), Game.id.asc())
+            .all()
+        )
+
+        player_ids = set(extra_player_ids)
+        for g in games_to_replay:
+            player_ids.update(s.player_id for s in g.slots)
+
+        for pid in player_ids:
+            player = db.session.get(Player, pid)
+            if not player:
+                continue
+            prior_slot = (
+                db.session.query(GameSlot)
+                .join(Game)
+                .filter(
+                    GameSlot.player_id == pid,
+                    Game.is_finished == True,
+                    Game.is_ranked == True,
+                    or_(
+                        Game.played_at < cutoff_at,
+                        and_(Game.played_at == cutoff_at, Game.id < cutoff_id),
+                    ),
+                )
+                .order_by(Game.played_at.desc(), Game.id.desc())
+                .first()
+            )
+            player.elo = (
+                prior_slot.elo_after
+                if prior_slot and prior_slot.elo_after is not None
+                else 1000.0
+            )
+            db.session.add(player)
+        db.session.flush()
+
+        for g in games_to_replay:
+            EloEngine.apply_match(g, commit=False)
+
+        if commit:
+            db.session.commit()
+
+        logger.info(
+            f"EloEngine: recomputed chain from game #{anchor_game.id} — "
+            f"{len(games_to_replay)} games replayed, {len(player_ids)} players reset"
+        )
+        return len(games_to_replay)
