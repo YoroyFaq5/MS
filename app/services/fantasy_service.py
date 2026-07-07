@@ -204,23 +204,30 @@ class FantasyService:
     @staticmethod
     def _self_heal_series_lock(draft: FantasyDraft) -> None:
         """
-        Defensive re-check, run right before any pick edit: a series-scoped
-        draft should be LOCKED as soon as its series has any recorded game
-        (see lock_drafts_for_series / games.py::_lock_series_fantasy_if_needed),
-        but that lock only fires as a side effect of creating/attaching the
-        NEXT game to the series' stage. A draft created in the narrow gap
-        between "series already has a game" and "that hook actually ran"
-        (e.g. right before a code deploy that introduced/fixed the hook)
-        stays OPEN forever unless another game happens to be added later.
-        This closes that gap by re-deriving the correct state on demand,
-        instead of trusting the stored status blindly.
+        Defensive re-check, run on every read/edit of a series-scoped draft:
+        re-derives LOCKED status and live total_points from the series'
+        current games/rating instead of trusting the stored values blindly.
+
+        Both the lock (lock_drafts_for_series) and the live points update
+        (update_live_points_for_series) normally fire as a side effect of
+        creating/attaching a game to the series' stage — see
+        games.py::_lock_series_fantasy_if_needed and
+        orchestrator.py::_update_fantasy_live_points. A draft that existed
+        in the narrow gap before either of those hooks was deployed (or
+        simply the last draft of an evening, after which no further game
+        triggers a recompute) would otherwise stay OPEN and/or stuck at
+        stale points until some unrelated future game happens to fire the
+        hook again.
         """
-        if draft.status != FantasyDraftStatus.OPEN or not draft.tournament_series_id:
+        if draft.status == FantasyDraftStatus.SCORED or not draft.tournament_series_id:
             return
         series = draft.tournament_series
-        if series and series.stage and series.stage.games:
+        if not (series and series.stage and series.stage.games):
+            return
+        if draft.status == FantasyDraftStatus.OPEN:
             draft.status = FantasyDraftStatus.LOCKED
-            db.session.commit()
+        FantasyService.update_live_points_for_series(series.id, commit=False)
+        db.session.commit()
 
     @staticmethod
     def add_pick(user: User, draft_id: int, player_id: int) -> FantasyResult:
