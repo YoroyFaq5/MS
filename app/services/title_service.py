@@ -41,6 +41,43 @@ class TitleResult:
 
 class TitleService:
 
+    # ── Визуальная категория ("флейвор") титула ──────────────────────────────
+    # Title не хранит category (в отличие от Achievement) — набор титулов
+    # маленький и курируемый (см. коды в nomination_service.py), поэтому
+    # проще держать явное сопоставление здесь, чем гонять миграцию ради
+    # decorative-поля. Неизвестный код (ручной админский титул) получает
+    # "special" — нейтральный фолбэк, а не падение/пустой цвет.
+    _TITLE_FLAVORS: Dict[str, str] = {
+        "club_legend":           "special",     # лучший общий перформанс
+        "streak_king":           "streak",      # победная серия
+        "iron_player":           "special",     # больше всех игр
+        "mafia_terror":          "defense",     # лучший WR за город
+        "dark_genius":           "intellect",   # лучший WR за мафию — хитрость
+        "season_best_civilian":  "defense",
+        "season_best_sheriff":   "intellect",   # детектив — расследование
+        "season_best_mafia":     "aggression",
+        "season_best_don":       "aggression",
+    }
+
+    FLAVOR_LABELS: Dict[str, str] = {
+        "defense":    "Защита",
+        "intellect":  "Интеллект",
+        "streak":     "Серия побед",
+        "rating":     "Рейтинг",
+        "aggression": "Агрессия",
+        "special":    "Особый",
+    }
+
+    @staticmethod
+    def get_title_flavor(code: str) -> str:
+        return TitleService._TITLE_FLAVORS.get(code, "special")
+
+    # Порядок редкости для сортировки "самые значимые — сверху" (Rarity
+    # enum сам по себе не упорядочен по значимости — тут явный порядок).
+    RARITY_RANK: Dict[str, int] = {
+        "common": 0, "rare": 1, "epic": 2, "legendary": 3, "mythic": 4, "ultra": 5,
+    }
+
     # ── Чтение (используется в профиле/хедере/лидербордах) ───────────────────
 
     @staticmethod

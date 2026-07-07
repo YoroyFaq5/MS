@@ -379,6 +379,351 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 }
 
 /* ============================================================
+   Titles showcase (профиль — "Титулы клуба")
+   ============================================================
+   Two independent color signals, on purpose:
+     - flavor (category)  -> card border/glow/icon tint
+     - rarity              -> small corner dot, readable at a glance
+     without needing to read any text. Deliberately its own muted
+     jewel-tone palette (blue/purple/orange/teal) rather than reusing
+     the achievement rarity ladder above — titles are a small, curated
+     showcase and read better with more color variety than the site's
+     restrained gold/wine system chrome.
+   ============================================================ */
+
+:root {
+  --flavor-defense:    #5B8DC9;
+  --flavor-intellect:  #9B72CF;
+  --flavor-streak:     #D98A4A;
+  --flavor-rating:     var(--ms-gold);
+  --flavor-aggression: #C15C56;
+  --flavor-special:    #4FB8AE;
+
+  --title-common:    #6FA37D;
+  --title-rare:      #5B8DC9;
+  --title-epic:      #9B72CF;
+  --title-legendary: #D98A4A;
+  --title-mythic:    #C15C56;
+}
+
+.titles-showcase {
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface-raised);
+  border: 1px solid var(--ms-border);
+  padding: 1.25rem;
+}
+
+.titles-showcase__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+
+.titles-showcase__title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.titles-showcase__subtitle {
+  color: var(--ms-muted);
+  font-size: .75rem;
+}
+
+.titles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: .75rem;
+}
+
+/* ── Card ─────────────────────────────────────────────────────── */
+
+.title-card {
+  position: relative;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  padding: .9rem .8rem;
+  cursor: default;
+  overflow: visible;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  --flavor: var(--flavor-special);
+}
+
+.title-card::before {
+  /* цветной верхний акцент — тонкая полоса, а не заливка всей карточки */
+  content: "";
+  position: absolute;
+  top: 0; left: .8rem; right: .8rem;
+  height: 2px;
+  background: var(--flavor);
+  border-radius: 0 0 2px 2px;
+  opacity: .85;
+}
+
+.title-card:hover,
+.title-card:focus-within {
+  transform: translateY(-4px) scale(1.03);
+  border-color: var(--flavor);
+  box-shadow: 0 10px 28px rgba(0,0,0,.45), 0 0 0 1px color-mix(in srgb, var(--flavor) 45%, transparent),
+              0 0 22px color-mix(in srgb, var(--flavor) 30%, transparent);
+  z-index: 2;
+}
+
+.title-card--defense    { --flavor: var(--flavor-defense); }
+.title-card--intellect  { --flavor: var(--flavor-intellect); }
+.title-card--streak     { --flavor: var(--flavor-streak); }
+.title-card--rating     { --flavor: var(--flavor-rating); }
+.title-card--aggression { --flavor: var(--flavor-aggression); }
+.title-card--special    { --flavor: var(--flavor-special); }
+
+.title-card__icon {
+  font-size: 1.9rem;
+  line-height: 1;
+  margin-bottom: .5rem;
+  color: var(--flavor);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--flavor) 55%, transparent));
+}
+
+.title-card__name {
+  font-weight: 600;
+  font-size: .85rem;
+  line-height: 1.25;
+  margin-bottom: .15rem;
+}
+
+.title-card__desc {
+  color: var(--ms-muted);
+  font-size: .72rem;
+  line-height: 1.3;
+  min-height: 1.7em;
+}
+
+.title-card__equipped-flag {
+  position: absolute;
+  top: -8px; right: -6px;
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ms-gold);
+  color: #0D0D0D;
+  border-radius: 50%;
+  font-size: .7rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+}
+
+/* Rarity — small corner dot, independent of the flavor border color */
+.title-card__rarity-dot {
+  position: absolute;
+  top: .7rem; right: .7rem;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--ms-surface);
+}
+.title-card__rarity-dot--common    { background: var(--title-common); }
+.title-card__rarity-dot--rare      { background: var(--title-rare); }
+.title-card__rarity-dot--epic      { background: var(--title-epic); }
+.title-card__rarity-dot--legendary { background: var(--title-legendary); box-shadow: 0 0 0 2px var(--ms-surface), 0 0 6px var(--title-legendary); }
+.title-card__rarity-dot--mythic,
+.title-card__rarity-dot--ultra     { background: var(--title-mythic); box-shadow: 0 0 0 2px var(--ms-surface), 0 0 6px var(--title-mythic); }
+
+/* Season nomination — deliberately more "prestigious" than a regular
+   title: gradient gold frame + ribbon corner, per requirement that
+   nominations read as a step above ordinary titles. */
+.title-card--nomination {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--ms-surface), var(--ms-surface)) padding-box,
+    linear-gradient(135deg, var(--ms-gold-light), var(--ms-gold-dark) 60%, var(--ms-gold-light)) border-box;
+}
+.title-card--nomination::before { background: linear-gradient(90deg, var(--ms-gold-light), var(--ms-gold)); opacity: 1; }
+.title-card--nomination .title-card__icon { color: var(--ms-gold-light); filter: drop-shadow(0 0 8px var(--ms-gold-glow)); }
+.title-card--nomination:hover,
+.title-card--nomination:focus-within {
+  box-shadow: 0 10px 28px rgba(0,0,0,.45), 0 0 22px var(--ms-gold-glow);
+}
+
+.title-card__season-chip {
+  display: inline-block;
+  margin-top: .35rem;
+  padding: .1rem .45rem;
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .03em;
+  border-radius: 99px;
+  background: rgba(199,165,82,.14);
+  color: var(--ms-gold-light);
+}
+
+/* Locked / "live race" preview — a title the viewer is currently
+   leading but hasn't been formally awarded yet (season still open). */
+.title-card--live {
+  border-style: dashed;
+  border-color: var(--flavor);
+  background: color-mix(in srgb, var(--flavor) 6%, var(--ms-surface));
+}
+.title-card--live::before { display: none; }
+
+@keyframes title-live-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--flavor) 45%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--flavor) 0%, transparent); }
+}
+.title-card--live .title-card__icon { animation: title-live-pulse 2.2s ease-in-out infinite; }
+
+.title-card__live-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  margin-top: .35rem;
+  font-size: .62rem;
+  font-weight: 600;
+  color: var(--flavor);
+}
+.title-card__live-flag .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--flavor);
+  animation: title-live-blink 1.4s ease-in-out infinite;
+}
+@keyframes title-live-blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+/* Newly-awarded — one-shot intro flash + settle, plays once on load for
+   any title granted in the last 48h. Pure CSS, no JS/websocket needed. */
+@keyframes title-new-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0); transform: scale(.94); opacity: 0; }
+  35%  { box-shadow: 0 0 32px 6px var(--ms-gold-glow); opacity: 1; }
+  60%  { box-shadow: 0 0 20px 2px var(--ms-gold-glow); transform: scale(1.02); }
+  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); transform: scale(1); }
+}
+.title-card--new {
+  animation: title-new-flash 1.6s ease-out 1;
+}
+.title-card--new::after {
+  content: "Новый!";
+  position: absolute;
+  top: -9px; left: .8rem;
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: .05rem .4rem;
+  border-radius: 99px;
+  background: var(--ms-gold);
+  color: #0D0D0D;
+  animation: title-new-flash 1.6s ease-out 1;
+}
+
+/* Tooltip — pure CSS, no JS init required */
+.title-card__tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translate(-50%, 4px);
+  min-width: 190px;
+  background: var(--ms-bg);
+  border: 1px solid var(--flavor);
+  border-radius: 8px;
+  padding: .55rem .7rem;
+  font-size: .68rem;
+  color: var(--ms-text-dim);
+  box-shadow: 0 8px 24px rgba(0,0,0,.55);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .15s ease, transform .15s ease;
+  z-index: 5;
+}
+.title-card__tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%; left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--flavor);
+}
+.title-card:hover .title-card__tooltip,
+.title-card:focus-within .title-card__tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+.title-card__tooltip-row + .title-card__tooltip-row { margin-top: .2rem; }
+.title-card__tooltip-row strong { color: var(--ms-text); }
+
+.title-card__actions {
+  margin-top: .5rem;
+}
+.title-card__actions .btn { font-size: .68rem; padding: .15rem .5rem; }
+
+/* ── Stat panel (right side) ─────────────────────────────────────── */
+
+.titles-stat-panel {
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  padding: 1rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+
+.titles-stat-panel__total {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--ms-gold-light);
+}
+.titles-stat-panel__total small {
+  font-family: 'Inter', sans-serif;
+  font-size: .7rem;
+  font-weight: 500;
+  color: var(--ms-muted);
+  margin-left: .3rem;
+}
+
+.titles-stat-panel__rarity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: .72rem;
+  color: var(--ms-text-dim);
+}
+.titles-stat-panel__rarity-row .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  margin-right: .4rem;
+  display: inline-block;
+}
+
+.titles-toggle-more {
+  grid-column: 1 / -1;
+  background: transparent;
+  border: 1px dashed var(--ms-border);
+  border-radius: var(--ms-radius);
+  color: var(--ms-muted);
+  font-size: .78rem;
+  padding: .6rem;
+  transition: border-color .2s, color .2s;
+}
+.titles-toggle-more:hover { border-color: var(--ms-gold); color: var(--ms-gold-light); }
+
+.title-card--extra { display: none; }
+.titles-grid.titles-grid--expanded .title-card--extra { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .title-card, .title-card__icon, .title-card--new, .title-card--new::after,
+  .title-card--live .title-card__icon, .title-card__live-flag .dot {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .titles-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: .5rem; }
+  .titles-showcase { padding: 1rem; }
+}
+
+/* ============================================================
    Auth extensions
    ============================================================ */
 

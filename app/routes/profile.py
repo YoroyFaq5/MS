@@ -1,13 +1,30 @@
+from datetime import datetime, timezone, timedelta
+
 from flask import Blueprint, render_template, redirect, url_for, flash, abort, request, current_app
 from flask_login import current_user
 
 from app import db
-from app.models import Player
+from app.models import Player, Title
 from app.services import ProfileService, AchievementService, PermissionService, TitleService, ChartDataService
 from app.services.shop_service import ShopService
+from app.services.nomination_service import NominationService
+from app.services.season_service import SeasonService
 from app.auth_decorators import login_required
 
 profile_bp = Blueprint("profile", __name__)
+
+
+def _naive_utc(dt):
+    """
+    DateTime(timezone=True) columns round-trip as tz-naive once read back
+    from MySQL (no real TZ storage there) but stay tz-aware for an
+    in-memory object that hasn't been re-queried yet — comparing the two
+    forms directly raises. Strip tzinfo from both sides before any diff;
+    the app's convention of always writing datetime.now(timezone.utc)
+    means a naive value already represents UTC wall-clock time, so this
+    doesn't change what it means, just makes it comparable.
+    """
+    return dt.replace(tzinfo=None) if dt and dt.tzinfo else dt
 
 
 @profile_bp.route("/")
@@ -25,9 +42,45 @@ def view_profile(player_id: int):
     if not profile:
         abort(404)
     is_own = current_user.is_authenticated and current_user.player_id == player_id
-    # Список наград владельца нужен только ему самому — для управления
-    # экипировкой прямо на странице профиля.
-    own_titles = TitleService.list_player_titles(player_id) if is_own else []
+    # Титулы — витрина достижений, видна всем посетителям профиля (не
+    # только владельцу); управление экипировкой (кнопки "Надеть"/"Снять")
+    # остаётся доступно только владельцу — это ограничено в шаблоне через
+    # is_own, а не на уровне выборки данных.
+    # Сортировка (самое значимое — сверху): экипированный первым, дальше
+    # по редкости, дальше по свежести. Jinja's |sort умеет сортировать
+    # только по значению атрибута (алфавитно — "legendary" < "rare" по
+    # буквам, что не совпадает со значимостью), поэтому порядок считаем
+    # здесь через TitleService.RARITY_RANK, а не в шаблоне.
+    held_titles = [pt for pt in TitleService.list_player_titles(player_id) if not pt.revoked]
+    held_titles.sort(key=lambda pt: (
+        not pt.equipped,
+        -TitleService.RARITY_RANK.get(pt.title.rarity.value, 0),
+        -_naive_utc(pt.awarded_at).timestamp(),
+    ))
+
+    # "Новый!" — одноразовая CSS-анимация для титулов, выданных недавно
+    # (см. .title-card--new в main.css). Флаг вычисляется здесь, а не в
+    # шаблоне — Jinja не умеет сравнивать tz-aware/tz-naive datetime без
+    # падения (см. _naive_utc выше).
+    now_naive = _naive_utc(datetime.now(timezone.utc))
+    for pt in held_titles:
+        awarded = _naive_utc(pt.awarded_at)
+        pt.is_new = bool(awarded and timedelta(0) <= (now_naive - awarded) < timedelta(days=2))
+
+    # Живая номинация сезона: если у игрока сейчас лучшая формула по роли
+    # в активном сезоне — показываем это отдельным "живым" блоком, даже
+    # если титул ещё не выдан (выдаётся только при закрытии сезона).
+    # Дёшево — переиспользует уже существующий NominationService-превью
+    # (те же 4 запроса, что и на странице /titles/nominations).
+    leading_titles = []
+    current_season = SeasonService.get_current_season()
+    if current_season:
+        preview = NominationService.get_role_leaders_preview(current_season.id)
+        leading_codes = [code for code, pid in preview.items() if pid == player_id]
+        if leading_codes:
+            leading_titles = (
+                db.session.query(Title).filter(Title.code.in_(leading_codes)).all()
+            )
 
     # Статус привязки Telegram — только владельцу, отдельно от to_dict()
     # (telegram_id намеренно не публикуется в общем JSON/профиле).
@@ -36,9 +89,14 @@ def view_profile(player_id: int):
         player = db.session.get(Player, player_id)
         telegram_linked = bool(player and player.telegram_id)
 
+    total_titles_count = db.session.query(Title).filter_by(is_active=True).count()
+
     return render_template(
         "profile/main.html", profile=profile, player_id=player_id,
-        is_own=is_own, own_titles=own_titles,
+        is_own=is_own, held_titles=held_titles,
+        leading_titles=leading_titles, current_season=current_season,
+        total_titles_count=total_titles_count,
+        TitleService=TitleService,
         telegram_linked=telegram_linked,
         telegram_bot_username=current_app.config.get("TELEGRAM_BOT_USERNAME"),
     )

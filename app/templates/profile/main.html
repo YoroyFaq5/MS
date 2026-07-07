@@ -93,30 +93,121 @@
     {% endif %}
   </div>
 
-  {% if is_own and own_titles %}
-  <div class="mt-3 pt-3 border-top">
-    <div class="text-muted small mb-2">Мои титулы (экипирован только один):</div>
-    <div class="d-flex gap-2 flex-wrap">
-      {% for pt in own_titles if not pt.revoked %}
-      <div class="d-flex align-items-center gap-1">
-        <span class="badge {% if pt.equipped %}bg-warning text-dark{% else %}bg-body-secondary text-body border{% endif %}">
-          {% if pt.title.icon %}<i class="bi {{ pt.title.icon }} me-1"></i>{% endif %}{{ pt.title.name }}
-        </span>
-        {% if pt.equipped %}
-        <form method="POST" action="{{ url_for('titles.unequip') }}" class="d-inline">
-          <button type="submit" class="btn btn-link btn-sm text-muted p-0" title="Снять">✕</button>
-        </form>
-        {% else %}
-        <form method="POST" action="{{ url_for('titles.equip', player_title_id=pt.id) }}" class="d-inline">
-          <button type="submit" class="btn btn-link btn-sm p-0" title="Экипировать">Надеть</button>
-        </form>
-        {% endif %}
+</div>
+
+{% set RARITY_LABEL = {'common': '🟢 Обычный', 'rare': '🔵 Редкий', 'epic': '🟣 Эпический',
+                        'legendary': '🟠 Легендарный', 'mythic': '🔴 Мифический', 'ultra': '🔴 Ультра'} %}
+{% set VISIBLE_LIMIT = 6 %}
+{# held_titles приходит уже отфильтрованным (без revoked) и отсортированным
+   (экипирован → редкость → свежесть) из profile.view_profile — Jinja's
+   |sort умеет сортировать только по строковому значению атрибута
+   (алфавитно, что не совпадает со значимостью редкости), поэтому порядок
+   считается в Python через TitleService.RARITY_RANK. #}
+{% set sorted_titles = held_titles %}
+
+{% if sorted_titles or leading_titles %}
+<div class="titles-showcase mb-4">
+  <div class="titles-showcase__header">
+    <div>
+      <h3 class="titles-showcase__title">🏆 Титулы клуба</h3>
+      <div class="titles-showcase__subtitle">
+        Коллекция наград{% if is_own %} — экипирован только один{% endif %}
       </div>
-      {% endfor %}
     </div>
   </div>
-  {% endif %}
+
+  <div class="row g-3">
+    <div class="col-lg-9">
+      <div class="titles-grid" id="titlesGrid">
+
+        {# ── Живые номинации сезона (лидирует прямо сейчас, ещё не выдано) ── #}
+        {% for t in leading_titles %}
+        {% set flavor = TitleService.get_title_flavor(t.code) %}
+        <div class="title-card title-card--live title-card--{{ flavor }}" tabindex="0">
+          <div class="title-card__icon"><i class="bi {{ t.icon or 'bi-award' }}"></i></div>
+          <div class="title-card__name">{{ t.name }}</div>
+          <div class="title-card__desc">{{ t.description or '' }}</div>
+          <div class="title-card__live-flag"><span class="dot"></span>Лидирует сейчас — {{ current_season.name }}</div>
+          <div class="title-card__tooltip">
+            <div class="title-card__tooltip-row">Номинация активного сезона.</div>
+            <div class="title-card__tooltip-row">Титул закрепится по итогам закрытия сезона.</div>
+          </div>
+        </div>
+        {% endfor %}
+
+        {# ── Полученные титулы ── #}
+        {% for pt in sorted_titles %}
+        {% set flavor = TitleService.get_title_flavor(pt.title.code) %}
+        {% set is_nomination = pt.title.type.value == 'seasonal' %}
+        <div class="title-card
+                    {% if is_nomination %}title-card--nomination{% else %}title-card--{{ flavor }}{% endif %}
+                    {% if pt.is_new %}title-card--new{% endif %}
+                    {% if loop.index > VISIBLE_LIMIT %}title-card--extra{% endif %}"
+             tabindex="0">
+          <span class="title-card__rarity-dot title-card__rarity-dot--{{ pt.title.rarity.value }}"
+                title="{{ RARITY_LABEL.get(pt.title.rarity.value, pt.title.rarity.value) }}"></span>
+          {% if pt.equipped %}<span class="title-card__equipped-flag" title="Экипирован"><i class="bi bi-star-fill"></i></span>{% endif %}
+          <div class="title-card__icon"><i class="bi {{ pt.title.icon or 'bi-award' }}"></i></div>
+          <div class="title-card__name">{{ pt.title.name }}</div>
+          <div class="title-card__desc">{{ pt.title.description or '' }}</div>
+          {% if is_nomination and pt.season %}
+          <div class="title-card__season-chip">С{{ pt.season.number }} · {{ pt.season.year }}</div>
+          {% endif %}
+
+          <div class="title-card__tooltip">
+            <div class="title-card__tooltip-row"><strong>{{ RARITY_LABEL.get(pt.title.rarity.value, pt.title.rarity.value) }}</strong></div>
+            <div class="title-card__tooltip-row">Получен: {{ pt.awarded_at.strftime('%d.%m.%Y') }}</div>
+            {% if pt.reason %}<div class="title-card__tooltip-row">{{ pt.reason }}</div>
+            {% elif pt.granted_by == 'system' %}<div class="title-card__tooltip-row">Присвоен автоматически</div>{% endif %}
+          </div>
+
+          {% if is_own %}
+          <div class="title-card__actions">
+            {% if pt.equipped %}
+            <form method="POST" action="{{ url_for('titles.unequip') }}">
+              <button type="submit" class="btn btn-outline-secondary w-100">Снять</button>
+            </form>
+            {% else %}
+            <form method="POST" action="{{ url_for('titles.equip', player_title_id=pt.id) }}">
+              <button type="submit" class="btn btn-outline-secondary w-100">Надеть</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+
+        {% if sorted_titles | length > VISIBLE_LIMIT %}
+        <button type="button" class="titles-toggle-more" id="titlesToggleMore"
+                onclick="document.getElementById('titlesGrid').classList.toggle('titles-grid--expanded'); this.textContent = document.getElementById('titlesGrid').classList.contains('titles-grid--expanded') ? 'Свернуть ↑' : 'Все титулы ({{ sorted_titles | length }}) →';">
+          Все титулы ({{ sorted_titles | length }}) →
+        </button>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-3">
+      <div class="titles-stat-panel">
+        <div>
+          <div class="titles-stat-panel__total">{{ sorted_titles | length }}<small>/ {{ total_titles_count }} собрано</small></div>
+        </div>
+        {% for r in ['legendary', 'epic', 'rare', 'common'] %}
+        {% set cnt = sorted_titles | selectattr('title.rarity.value', 'equalto', r) | list | length %}
+        {% if cnt > 0 %}
+        <div class="titles-stat-panel__rarity-row">
+          <span><span class="dot" style="background:var(--title-{{ r }})"></span>{{ RARITY_LABEL.get(r, r).split(' ')[1] }}</span>
+          <strong>{{ cnt }}</strong>
+        </div>
+        {% endif %}
+        {% endfor %}
+        <a href="{{ url_for('titles.nominations') }}" class="btn btn-outline-secondary btn-sm mt-auto">
+          Все титулы →
+        </a>
+      </div>
+    </div>
+  </div>
 </div>
+{% endif %}
 
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-4 col-lg-2">
