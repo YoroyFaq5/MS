@@ -104,19 +104,46 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   color: var(--ms-gold);
 }
 
-/* Navbar */
+/* ============================================================
+   Navbar — grouped dropdown architecture (see base.html)
+   ============================================================
+   Primary nav collapses from 9 flat links + 4 admin links down to
+   Главная + 3 topical dropdowns ("mega menus") + a separately-styled
+   admin dropdown, so growth means adding a row inside an existing
+   dropdown instead of a new top-level item competing for width.
+   ============================================================ */
+
 #main-nav {
   background: rgba(13,13,13,.95);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--ms-border);
+  transition: padding .25s ease, box-shadow .25s ease;
+  padding-top: .5rem;
+  padding-bottom: .5rem;
 }
+
+/* Scroll-shrink — toggled by main.js; shrinks the chrome + brand once
+   the page has scrolled, freeing vertical space and reading as a more
+   "app-like" persistent bar (Steam/Battle.net do this too). */
+#main-nav.is-scrolled {
+  padding-top: .2rem;
+  padding-bottom: .2rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+#main-nav.is-scrolled .brand-monogram { width: 28px; height: 28px; font-size: .85rem; }
+
+.navbar-brand { transition: none; }
+.brand-monogram { transition: width .25s ease, height .25s ease, font-size .25s ease; }
 
 #main-nav .nav-link {
   color: var(--ms-muted) !important;
   font-size: .875rem;
   font-weight: 500;
   border-radius: 8px;
-  padding: .4rem .75rem !important;
+  padding: .5rem .7rem !important;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
   transition: color .2s, background .2s;
 }
 
@@ -124,6 +151,129 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 #main-nav .nav-link.active {
   color: var(--ms-gold-light) !important;
   background: rgba(199,165,82,.08);
+}
+
+#main-nav .nav-link i { font-size: .95rem; line-height: 1; }
+
+/* Animated underline — scales in from center, Riot/FACEIT-style accent
+   instead of a flat background swap alone. */
+.nav-link--underline { position: relative; }
+.nav-link--underline::after {
+  content: "";
+  position: absolute;
+  left: .7rem; right: .7rem; bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ms-gold-light);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform .25s ease;
+}
+.nav-link--underline:hover::after,
+.nav-link--underline.active::after { transform: scaleX(1); }
+
+/* Dropdown caret — de-emphasized, spins on open rather than sitting as
+   static Bootstrap chevron clutter. */
+#main-nav .dropdown-toggle::after {
+  margin-left: .3rem;
+  vertical-align: .1em;
+  transition: transform .2s ease;
+  opacity: .6;
+}
+#main-nav .dropdown-toggle[aria-expanded="true"]::after,
+#main-nav .dropdown-toggle.show::after { transform: rotate(180deg); }
+
+/* ── Mega dropdown panel ──────────────────────────────────────── */
+
+.nav-mega {
+  --stagger: 0ms;
+  min-width: 250px;
+  padding: .5rem;
+  animation: nav-mega-in .18s ease both;
+}
+@keyframes nav-mega-in {
+  from { opacity: 0; transform: translateY(-6px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.nav-mega__item {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .5rem .6rem;
+  border-radius: 8px;
+  color: var(--ms-text);
+  text-decoration: none;
+  opacity: 0;
+  animation: nav-mega-item-in .22s ease forwards;
+  animation-delay: var(--stagger);
+}
+.nav-mega li:nth-child(1) .nav-mega__item { --stagger: .02s; }
+.nav-mega li:nth-child(2) .nav-mega__item { --stagger: .06s; }
+.nav-mega li:nth-child(3) .nav-mega__item { --stagger: .1s; }
+.nav-mega li:nth-child(4) .nav-mega__item { --stagger: .14s; }
+.nav-mega li:nth-child(5) .nav-mega__item { --stagger: .18s; }
+@keyframes nav-mega-item-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.nav-mega__item:hover, .nav-mega__item:focus {
+  background: rgba(199,165,82,.1);
+  color: var(--ms-text);
+}
+.nav-mega__item:hover .nav-mega__icon {
+  background: var(--ms-gold);
+  color: #0D0D0D;
+  transform: scale(1.08);
+}
+
+.nav-mega__icon {
+  flex-shrink: 0;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  background: rgba(199,165,82,.12);
+  color: var(--ms-gold-light);
+  font-size: .95rem;
+  transition: background .18s ease, color .18s ease, transform .18s ease;
+}
+
+.nav-mega__text { display: flex; flex-direction: column; line-height: 1.25; }
+.nav-mega__title { font-size: .85rem; font-weight: 600; }
+.nav-mega__desc { font-size: .7rem; color: var(--ms-muted); }
+
+/* Admin dropdown — distinct wine/gold accent so it visually reads as a
+   separate, higher-privilege surface rather than "one more menu". */
+.nav-dropdown--admin > .nav-link { color: var(--ms-gold-light) !important; }
+.nav-mega--admin {
+  border-color: rgba(212,176,106,.35);
+  box-shadow: 0 12px 32px rgba(0,0,0,.5), 0 0 0 1px rgba(212,176,106,.08);
+}
+.nav-mega--admin .nav-mega__icon {
+  background: rgba(212,176,106,.16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-mega, .nav-mega__item { animation: none !important; opacity: 1 !important; }
+  .nav-link--underline::after, #main-nav .dropdown-toggle::after,
+  .brand-monogram, #main-nav { transition: none !important; }
+}
+
+/* Mobile — dropdowns render as static in-place sections inside the
+   collapsed menu (Bootstrap default); just tone down the mega-item
+   entrance animation delay so it doesn't feel sluggish stacked full-width. */
+@media (max-width: 991.98px) {
+  .nav-mega {
+    min-width: 0;
+    box-shadow: none;
+    border: none;
+    background: rgba(199,165,82,.03);
+    margin: .25rem 0 .5rem;
+    animation: none;
+  }
+  .nav-mega__item { animation: none; opacity: 1; }
+  .nav-link--underline::after { display: none; }
 }
 
 /* Cards */

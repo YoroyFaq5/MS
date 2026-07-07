@@ -19,48 +19,104 @@
   <div class="container-xxl">
     <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="{{ url_for('main.index') }}">
       <span class="brand-monogram">MS</span>
-      <span class="brand-wordmark d-none d-sm-inline">MAFIA STYLE</span>
+      <span class="brand-wordmark d-none d-xl-inline">MAFIA STYLE</span>
     </a>
     <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
       <span class="navbar-toggler-icon"></span>
     </button>
+
+    {% set ep = request.endpoint or '' %}
+    {% set nav_play_active    = ep.startswith('games.') or ep.startswith('tournaments.') or ep.startswith('series_tournaments.') %}
+    {% set nav_ratings_active = ep.startswith('ratings.') or ep.startswith('seasons.') or ep.startswith('titles.') %}
+    {% set nav_club_active    = ep.startswith('players.') or ep.startswith('fantasy.') or ep.startswith('shop.') %}
+    {% set nav_admin_active   = ep.startswith('admin_shop.') or ep.startswith('admin_titles.') or ep.startswith('admin_analytics.') or ep.startswith('auth.admin') %}
+
     <div class="collapse navbar-collapse" id="navMenu">
       <ul class="navbar-nav me-auto gap-1">
         <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'main.index' %}active{% endif %}"
-             href="{{ url_for('main.index') }}"><i class="bi bi-house-door me-1"></i>Главная</a>
+          <a class="nav-link nav-link--underline {% if ep == 'main.index' %}active{% endif %}"
+             href="{{ url_for('main.index') }}"><i class="bi bi-house-door-fill"></i><span>Главная</span></a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'games' in (request.endpoint or '') %}active{% endif %}"
-             href="{{ url_for('games.list_games') }}"><i class="bi bi-controller me-1"></i>Игры</a>
+
+        <li class="nav-item dropdown nav-dropdown">
+          <a class="nav-link nav-link--underline dropdown-toggle {% if nav_play_active %}active{% endif %}"
+             href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-controller"></i><span>Играть</span>
+          </a>
+          <ul class="dropdown-menu nav-mega">
+            <li>
+              <a class="nav-mega__item" href="{{ url_for('games.list_games') }}">
+                <span class="nav-mega__icon"><i class="bi bi-controller"></i></span>
+                <span class="nav-mega__text"><span class="nav-mega__title">Игры</span><span class="nav-mega__desc">Все сыгранные партии</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-mega__item" href="{{ url_for('tournaments.list_tournaments') }}">
+                <span class="nav-mega__icon"><i class="bi bi-trophy"></i></span>
+                <span class="nav-mega__text"><span class="nav-mega__title">Турниры</span><span class="nav-mega__desc">Сетка и этапы</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-mega__item" href="{{ url_for('series_tournaments.list_series_tournaments') }}">
+                <span class="nav-mega__icon"><i class="bi bi-collection"></i></span>
+                <span class="nav-mega__text"><span class="nav-mega__title">Серийные турниры</span><span class="nav-mega__desc">Несколько вечеров подряд</span></span>
+              </a>
+            </li>
+          </ul>
         </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'players' in (request.endpoint or '') %}active{% endif %}"
-             href="{{ url_for('players.list_players') }}"><i class="bi bi-people me-1"></i>Игроки</a>
+
+        <li class="nav-item dropdown nav-dropdown">
+          <a class="nav-link nav-link--underline dropdown-toggle {% if nav_ratings_active %}active{% endif %}"
+             href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-bar-chart-fill"></i><span>Рейтинги</span>
+          </a>
+          <ul class="dropdown-menu nav-mega">
+            <li>
+              <a class="nav-mega__item" href="{{ url_for('ratings.leaderboard') }}">
+                <span class="nav-mega__icon"><i class="bi bi-bar-chart"></i></span>
+                <span class="nav-mega__text"><span class="nav-mega__title">Общий рейтинг</span><span class="nav-mega__desc">Лидерборд клуба</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-mega__item" href="{{ url_for('seasons.index') }}">
+                <span class="nav-mega__icon"><i class="bi bi-calendar2-range"></i></span>
+                <span class="nav-mega__text"><span class="nav-mega__title">Сезоны</span><span class="nav-mega__desc">Текущий и прошлые</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-mega__item" href="{{ url_for('titles.nominations') }}">
+                <span class="nav-mega__icon"><i class="bi bi-patch-check"></i></span>
+                <span class="nav-mega__text"><span class="nav-mega__title">Номинации</span><span class="nav-mega__desc">Титулы клуба и сезона</span></span>
+              </a>
+            </li>
+          </ul>
         </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'tournaments' in (request.endpoint or '') %}active{% endif %}"
-             href="{{ url_for('tournaments.list_tournaments') }}"><i class="bi bi-trophy me-1"></i>Турниры</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'ratings' in (request.endpoint or '') %}active{% endif %}"
-             href="{{ url_for('ratings.leaderboard') }}"><i class="bi bi-bar-chart me-1"></i>Рейтинг</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'seasons' in (request.endpoint or '') %}active{% endif %}"
-             href="{{ url_for('seasons.index') }}"><i class="bi bi-calendar2-range me-1"></i>Сезоны</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'fantasy' in (request.endpoint or '') %}active{% endif %}"
-             href="{{ url_for('fantasy.index') }}"><i class="bi bi-joystick me-1"></i>Fantasy</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('shop.') %}active{% endif %}"
-             href="{{ url_for('shop.list_items') }}"><i class="bi bi-shop me-1"></i>Магазин</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint and request.endpoint.startswith('titles.') %}active{% endif %}"
-             href="{{ url_for('titles.nominations') }}"><i class="bi bi-patch-check me-1"></i>Номинации</a>
+
+        <li class="nav-item dropdown nav-dropdown">
+          <a class="nav-link nav-link--underline dropdown-toggle {% if nav_club_active %}active{% endif %}"
+             href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-people-fill"></i><span>Клуб</span>
+          </a>
+          <ul class="dropdown-menu nav-mega">
+            <li>
+              <a class="nav-mega__item" href="{{ url_for('players.list_players') }}">
+                <span class="nav-mega__icon"><i class="bi bi-people"></i></span>
+                <span class="nav-mega__text"><span class="nav-mega__title">Игроки</span><span class="nav-mega__desc">Все участники клуба</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-mega__item" href="{{ url_for('fantasy.index') }}">
+                <span class="nav-mega__icon"><i class="bi bi-joystick"></i></span>
+                <span class="nav-mega__text"><span class="nav-mega__title">Fantasy</span><span class="nav-mega__desc">Драфты и призовой банк</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-mega__item" href="{{ url_for('shop.list_items') }}">
+                <span class="nav-mega__icon"><i class="bi bi-shop"></i></span>
+                <span class="nav-mega__text"><span class="nav-mega__title">Магазин</span><span class="nav-mega__desc">Косметика за монеты</span></span>
+              </a>
+            </li>
+          </ul>
         </li>
       </ul>
 
@@ -68,25 +124,43 @@
       <ul class="navbar-nav gap-1 align-items-lg-center">
         {% if current_user.is_authenticated %}
           {% if current_user.is_admin %}
-          <li class="nav-item">
-            <a class="nav-link text-warning" href="{{ url_for('auth.admin_users') }}">
-              <i class="bi bi-shield-fill me-1"></i>Админ
+          <li class="nav-item dropdown nav-dropdown nav-dropdown--admin">
+            <a class="nav-link nav-link--underline dropdown-toggle text-warning {% if nav_admin_active %}active{% endif %}"
+               href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-shield-fill"></i><span>Админ</span>
             </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-warning" href="{{ url_for('admin_shop.list_items') }}">
-              <i class="bi bi-bag-check-fill me-1"></i>Магазин (админ)
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-warning" href="{{ url_for('admin_titles.list_titles') }}">
-              <i class="bi bi-patch-check-fill me-1"></i>Титулы (админ)
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-warning" href="{{ url_for('admin_analytics.social') }}">
-              <i class="bi bi-graph-up me-1"></i>Аналитика (админ)
-            </a>
+            <ul class="dropdown-menu dropdown-menu-end nav-mega nav-mega--admin">
+              <li>
+                <a class="nav-mega__item" href="{{ url_for('auth.admin_users') }}">
+                  <span class="nav-mega__icon"><i class="bi bi-person-badge"></i></span>
+                  <span class="nav-mega__text"><span class="nav-mega__title">Пользователи</span><span class="nav-mega__desc">Аккаунты и права</span></span>
+                </a>
+              </li>
+              <li>
+                <a class="nav-mega__item" href="{{ url_for('auth.admin_economy') }}">
+                  <span class="nav-mega__icon"><i class="bi bi-coin"></i></span>
+                  <span class="nav-mega__text"><span class="nav-mega__title">Экономика</span><span class="nav-mega__desc">Баланс монет игроков</span></span>
+                </a>
+              </li>
+              <li>
+                <a class="nav-mega__item" href="{{ url_for('admin_shop.list_items') }}">
+                  <span class="nav-mega__icon"><i class="bi bi-bag-check-fill"></i></span>
+                  <span class="nav-mega__text"><span class="nav-mega__title">Магазин</span><span class="nav-mega__desc">Товары и цены</span></span>
+                </a>
+              </li>
+              <li>
+                <a class="nav-mega__item" href="{{ url_for('admin_titles.list_titles') }}">
+                  <span class="nav-mega__icon"><i class="bi bi-patch-check-fill"></i></span>
+                  <span class="nav-mega__text"><span class="nav-mega__title">Титулы</span><span class="nav-mega__desc">Ручная выдача/отзыв</span></span>
+                </a>
+              </li>
+              <li>
+                <a class="nav-mega__item" href="{{ url_for('admin_analytics.social') }}">
+                  <span class="nav-mega__icon"><i class="bi bi-graph-up"></i></span>
+                  <span class="nav-mega__text"><span class="nav-mega__title">Аналитика</span><span class="nav-mega__desc">Соц. граф и подарки</span></span>
+                </a>
+              </li>
+            </ul>
           </li>
           {% endif %}
           <li class="nav-item dropdown">
@@ -144,8 +218,8 @@
           </li>
           {% if current_user.is_admin %}
           <li class="nav-item">
-            <a class="btn btn-danger btn-sm px-3" href="{{ url_for('games.new_game') }}">
-              <i class="bi bi-plus-lg me-1"></i>Новая игра
+            <a class="btn btn-danger btn-sm px-3 nav-cta" href="{{ url_for('games.new_game') }}">
+              <i class="bi bi-plus-lg"></i><span class="d-none d-xl-inline ms-1">Новая игра</span>
             </a>
           </li>
           {% endif %}

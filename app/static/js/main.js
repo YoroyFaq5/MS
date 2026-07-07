@@ -9,3 +9,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 5000);
   });
 });
+
+// Navbar scroll-shrink — toggles #main-nav.is-scrolled (see main.css),
+// a small height/logo shrink once the page scrolls past the hero.
+(() => {
+  const nav = document.getElementById('main-nav');
+  if (!nav) return;
+  const onScroll = () => nav.classList.toggle('is-scrolled', window.scrollY > 24);
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();
