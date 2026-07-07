@@ -82,7 +82,8 @@
         </thead>
         {% endif %}
         {% if current_user.is_admin %}
-        {% set editable_now = (not game.is_finished and roles_editable) or edit_mode %}
+        {% set role_editable_now = (not game.is_finished and roles_editable) or edit_mode %}
+        {% set fields_editable_now = not game.is_finished or edit_mode %}
         <tbody>
           {% for slot in slots %}
           <tr>
@@ -106,7 +107,7 @@
               {% endif %}
             </td>
             <td class="text-center">
-              {% if not editable_now %}
+              {% if not role_editable_now %}
                 {% if slot.role.value == 'mafia' %}<span class="badge bg-danger">🔫 Мафия</span>
                 {% elif slot.role.value == 'don' %}<span class="badge bg-dark border border-secondary">🎩 Дон</span>
                 {% elif slot.role.value == 'sheriff' %}<span class="badge bg-info text-dark">🔍 Шериф</span>
@@ -123,7 +124,7 @@
             <td class="text-center text-muted">{{ slot.base_score }}</td>
             <!-- Bonus -->
             <td class="text-center">
-              {% if not editable_now %}
+              {% if not fields_editable_now %}
                 <span class="{% if slot.bonus_score > 0 %}text-success{% elif slot.bonus_score < 0 %}text-danger{% endif %}">
                   {{ '+' if slot.bonus_score > 0 else '' }}{{ slot.bonus_score }}
                 </span>
@@ -137,7 +138,7 @@
             </td>
             <!-- PU (Первый Убиенный) -->
             <td class="text-center">
-              {% if not editable_now %}
+              {% if not fields_editable_now %}
                 {% if slot.is_pu %}
                   <span class="badge bg-info text-dark" title="Первый убиенный, мафий в списке: {{ slot.pu_mafia_count }}">
                     ПУ +{{ slot.pu_bonus }}
