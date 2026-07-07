@@ -191,9 +191,15 @@ def game_detail(game_id: int):
             if s.player and s.player_id not in by_id:
                 by_id[s.player_id] = s.player
         all_players = sorted(by_id.values(), key=lambda p: p.name)
+
+    tournaments = []
+    if current_user.is_authenticated and current_user.is_admin and (not game.is_finished or edit_mode):
+        tournaments = _active_tournaments()
+
     return render_template("games/detail.html", game=game, slots=slots,
                            roles_editable=roles_editable, edit_mode=edit_mode,
-                           all_players=all_players, equipped_bulk=equipped_bulk)
+                           all_players=all_players, tournaments=tournaments,
+                           equipped_bulk=equipped_bulk)
 
 
 @games_bp.route("/api/<int:game_id>")
@@ -362,6 +368,40 @@ def new_game():
     )
 
 
+def _apply_tournament_assignment(game: Game) -> str | None:
+    """
+    Read tournament_id/stage_id from the finish/edit form and (re)attach
+    the game to a tournament — e.g. a game created without picking a
+    tournament, retroactively linked later. Returns an error message on
+    validation failure, None on success (including "left as-is" when the
+    fields weren't in the submitted form at all, for older/other callers).
+    """
+    if "tournament_id" not in request.form:
+        return None
+
+    tournament_id = request.form.get("tournament_id", type=int) or None
+    stage_id = request.form.get("stage_id", type=int) or None
+
+    if not tournament_id:
+        game.tournament_id = None
+        game.stage_id = None
+        return None
+
+    t = db.session.get(Tournament, tournament_id)
+    if not t:
+        return "Турнир не найден."
+
+    if stage_id:
+        stage = db.session.get(TournamentStage, stage_id)
+        if not stage or stage.tournament_id != tournament_id:
+            return "Этап не принадлежит выбранному турниру."
+
+    game.tournament_id = tournament_id
+    game.stage_id = stage_id
+    game.is_ranked = t.is_ranked
+    return None
+
+
 @games_bp.route("/<int:game_id>/finish", methods=["POST"])
 @admin_required
 def finish_game(game_id: int):
@@ -369,6 +409,11 @@ def finish_game(game_id: int):
 
     if game.is_finished:
         flash("Игра уже завершена.", "warning")
+        return redirect(url_for("games.game_detail", game_id=game_id))
+
+    error = _apply_tournament_assignment(game)
+    if error:
+        flash(error, "danger")
         return redirect(url_for("games.game_detail", game_id=game_id))
 
     win_side_str = request.form.get("win_side", "none")
@@ -492,6 +537,11 @@ def edit_game(game_id: int):
         return redirect(url_for("games.game_detail", game_id=game_id))
 
     old_player_ids = [s.player_id for s in game.slots]
+
+    error = _apply_tournament_assignment(game)
+    if error:
+        flash(error, "danger")
+        return redirect(url_for("games.game_detail", game_id=game_id))
 
     win_side_str = request.form.get("win_side", "none")
     try:

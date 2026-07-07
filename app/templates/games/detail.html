@@ -212,6 +212,29 @@
   {% if (not game.is_finished or edit_mode) and current_user.is_admin %}
   <!-- Finish/edit game panel -->
   <div class="card-footer">
+    {% if tournaments %}
+    <div class="row g-3 mb-3 pb-3 border-bottom">
+      <div class="col-md-6">
+        <label class="form-label small fw-medium text-muted">🏆 ТУРНИР (можно привязать/сменить)</label>
+        <select name="tournament_id" id="tournamentSelect" class="form-select">
+          <option value="">— Без турнира (обычная игра) —</option>
+          {% for t in tournaments %}
+          <option value="{{ t.id }}" {% if game.tournament_id == t.id %}selected{% endif %}>
+            {{ t.name }}
+            {% if t.status == 'active' %}🟢{% else %}⏳{% endif %}
+            {% if not t.is_ranked %}· нерейтинговый{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6" id="stageBlock" style="{% if not game.tournament_id %}display:none{% endif %}">
+        <label class="form-label small fw-medium text-muted">ЭТАП</label>
+        <select name="stage_id" id="stageSelect" class="form-select">
+          <option value="">— Без этапа —</option>
+        </select>
+      </div>
+    </div>
+    {% endif %}
     <div class="row align-items-end g-3">
       <div class="col-md-4">
         <label class="form-label fw-medium mb-1">🏆 Кто победил?</label>
@@ -258,6 +281,55 @@
 function togglePuCount(checkbox, slotId) {
   const sel = document.getElementById('pu_mafia_' + slotId);
   if (sel) sel.classList.toggle('d-none', !checkbox.checked);
+}
+
+// ── Tournament → Stage cascade (retroactively attach/re-attach a game) ──
+const tournamentStages = {
+  {% if tournaments %}
+  {% for t in tournaments %}
+  {{ t.id }}: [
+    {% for s in t.stages %}
+    { id: {{ s.id }}, name: {{ s.name|tojson }}, status: {{ s.status|tojson }}, type: {{ s.type.value|tojson }} },
+    {% endfor %}
+  ],
+  {% endfor %}
+  {% endif %}
+};
+const currentStageId = {{ game.stage_id | tojson }};
+
+const tournamentSelect = document.getElementById('tournamentSelect');
+const stageBlock = document.getElementById('stageBlock');
+const stageSelect = document.getElementById('stageSelect');
+
+function updateGameStages() {
+  if (!tournamentSelect) return;
+  const tid = parseInt(tournamentSelect.value);
+  if (!tid) {
+    stageBlock.style.display = 'none';
+    return;
+  }
+  const stages = tournamentStages[tid] || [];
+  stageSelect.innerHTML = '<option value="">— Без этапа —</option>';
+  if (stages.length === 0) {
+    stageBlock.style.display = 'none';
+    return;
+  }
+  stageBlock.style.display = 'block';
+  stages.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    const icon = s.type === 'final' ? '🏆' : s.type === 'group' ? '📊' : '⚔️';
+    const statusLabel = s.status === 'active' ? '🟢' : s.status === 'finished' ? '✅' : '⏳';
+    opt.textContent = `${icon} ${s.name} ${statusLabel}`;
+    opt.disabled = s.status !== 'active' && s.id !== currentStageId;
+    if (s.id === currentStageId) opt.selected = true;
+    stageSelect.appendChild(opt);
+  });
+}
+
+if (tournamentSelect) {
+  tournamentSelect.addEventListener('change', updateGameStages);
+  if (tournamentSelect.value) updateGameStages();
 }
 </script>
 {% endblock %}
