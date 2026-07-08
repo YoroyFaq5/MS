@@ -74,103 +74,142 @@
   </div>
 </div>
 
-<div class="row g-4">
-  <!-- Top Players -->
-  <div class="col-lg-6 fade-in-up" style="--d:100ms">
-    <div class="card panel h-100">
-      <div class="card-header panel-header d-flex justify-content-between align-items-center">
-        <span class="panel-header__title"><i class="bi bi-trophy-fill text-warning me-2"></i>Топ игроков</span>
+<!-- Топ игроков -->
+<div class="fade-in-up" style="--d:100ms">
+  <div class="card panel">
+    <div class="card-header panel-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span class="panel-header__title"><i class="bi bi-trophy-fill text-warning me-2"></i>Топ игроков</span>
+      <div class="d-flex align-items-center gap-3">
+        <div class="side-meter" title="Город {{ city_win_pct }}% · Мафия {{ mafia_win_pct }}% побед за последние {{ [50, total_games] | min }} игр">
+          <span class="side-meter__label">Город</span>
+          <div class="side-meter__bar"><div class="side-meter__fill" style="width:{{ city_win_pct }}%"></div></div>
+          <span class="side-meter__label">Мафия</span>
+        </div>
         <a href="{{ url_for('ratings.leaderboard') }}" class="btn btn-sm btn-outline-secondary">Все →</a>
       </div>
-      <div class="card-body p-0">
-        {% if top_players %}
-        <div class="table-responsive">
-          <table class="table table-hover mb-0 align-middle">
-            <thead>
-              <tr>
-                <th class="ps-3">#</th>
-                <th>Игрок</th>
-                <th class="text-center">Игр</th>
-                <th class="text-end pe-3">Очки</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for r in top_players %}
-              <tr>
-                <td class="ps-3">
-                  {% if r.rank == 1 %}<span class="badge bg-warning text-dark">🥇</span>
-                  {% elif r.rank == 2 %}<span class="badge bg-secondary">🥈</span>
-                  {% elif r.rank == 3 %}<span class="badge" style="background:#cd7f32">🥉</span>
-                  {% else %}<span class="text-muted">{{ r.rank }}</span>{% endif %}
-                </td>
-                <td>
-                  <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}"
-                     class="text-decoration-none fw-medium">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</a>
-                </td>
-                <td class="text-center text-muted">{{ r.games_played }}</td>
-                <td class="text-end pe-3 fw-semibold text-success">{{ r.total_score|round(2) }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <div class="text-center text-muted py-5">
-          <i class="bi bi-bar-chart fs-1 d-block mb-2 opacity-25"></i>
-          Рейтинг появится после первой игры
-        </div>
-        {% endif %}
+    </div>
+    <div class="card-body p-0">
+      {% if top_players %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle rank-table">
+          <thead>
+            <tr>
+              <th class="ps-3">#</th>
+              <th>Игрок</th>
+              <th class="text-end">Рейтинг</th>
+              <th class="text-center">30д</th>
+              <th class="text-center">Игр</th>
+              <th class="text-center">WR</th>
+              <th class="text-center">Серия</th>
+              <th class="text-end pe-3">Форма</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in top_players %}
+            {% set form = recent_form.get(r.player_id) %}
+            <tr class="rank-row {% if r.rank <= 3 %}rank-row--top{{ r.rank }}{% endif %}">
+              <td class="ps-3"><span class="rank-badge">{{ r.rank }}</span></td>
+              <td>
+                <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}" class="text-decoration-none fw-medium">
+                  {{ player_name(r, equipped_bulk.get(r.player_id, {})) }}
+                </a>
+              </td>
+              <td class="text-end tabular-nums fw-semibold">{{ r.elo | round | int }}</td>
+              <td class="text-center">
+                {% if r.rank_movement is none %}
+                  <span class="elo-flat small">новый</span>
+                {% elif r.rank_movement > 0 %}
+                  <span class="elo-up small"><i class="bi bi-caret-up-fill"></i> {{ r.rank_movement }}</span>
+                {% elif r.rank_movement < 0 %}
+                  <span class="elo-down small"><i class="bi bi-caret-down-fill"></i> {{ -r.rank_movement }}</span>
+                {% else %}
+                  <span class="elo-flat small">— 0</span>
+                {% endif %}
+              </td>
+              <td class="text-center text-muted tabular-nums">{{ r.games_played }}</td>
+              <td class="text-center tabular-nums">{{ r.win_rate }}%</td>
+              <td class="text-center">
+                {% if form and form.streak_count > 0 %}
+                <span class="streak-chip {% if form.streak_won %}streak-chip--win{% else %}streak-chip--loss{% endif %}">
+                  {{ form.streak_count }}{{ 'W' if form.streak_won else 'L' }}
+                </span>
+                {% else %}
+                <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+              <td class="text-end pe-3">
+                {% set pts = sparklines.get(r.player_id) %}
+                {% if pts %}
+                <svg viewBox="0 0 56 18" width="56" height="18" class="form-sparkline" preserveAspectRatio="none">
+                  <polyline points="{{ pts }}" />
+                </svg>
+                {% else %}
+                <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-bar-chart fs-1 d-block mb-2 opacity-25"></i>
+        Рейтинг появится после первой игры
+      </div>
+      {% endif %}
     </div>
   </div>
+</div>
 
-  <!-- Recent Games -->
-  <div class="col-lg-6 fade-in-up" style="--d:140ms">
-    <div class="card panel h-100">
-      <div class="card-header panel-header d-flex justify-content-between align-items-center">
-        <span class="panel-header__title"><i class="bi bi-clock-history text-info me-2"></i>Последние игры</span>
-        <a href="{{ url_for('games.list_games') }}" class="btn btn-sm btn-outline-secondary">Все →</a>
+<!-- Последние игры -->
+<div class="fade-in-up mt-4" style="--d:140ms">
+  <div class="card panel">
+    <div class="card-header panel-header d-flex justify-content-between align-items-center">
+      <span class="panel-header__title"><i class="bi bi-clock-history text-info me-2"></i>Последние игры</span>
+      <a href="{{ url_for('games.list_games') }}" class="btn btn-sm btn-outline-secondary">Все →</a>
+    </div>
+    <div class="card-body">
+      {% if recent_games %}
+      <div class="game-feed">
+        {% for game in recent_games %}
+        <a href="{{ url_for('games.game_detail', game_id=game.id) }}"
+           class="game-event {% if game.win_side.value == 'city' %}game-event--city{% elif game.win_side.value == 'mafia' %}game-event--mafia{% endif %}">
+          <span class="game-event__side-icon">
+            {% if game.win_side.value == 'city' %}<i class="bi bi-shield-fill"></i>
+            {% elif game.win_side.value == 'mafia' %}<i class="bi bi-mask"></i>
+            {% else %}<i class="bi bi-dash-circle"></i>{% endif %}
+          </span>
+          <span class="game-event__main">
+            <span class="game-event__title">
+              Игра #{{ game.id }}
+              <span class="game-event__winner">
+                {% if game.win_side.value == 'city' %}— победил город
+                {% elif game.win_side.value == 'mafia' %}— победила мафия
+                {% else %}— ничья{% endif %}
+              </span>
+            </span>
+            {% if game.key_event %}
+            <span class="game-event__highlight">
+              <i class="bi bi-search"></i>
+              ПУ {{ player_name(game.key_event.player, equipped_bulk.get(game.key_event.player.id, {})) }}
+              вычислил {{ game.key_event.count }} мафии в лучшем ходе
+            </span>
+            {% endif %}
+          </span>
+          <span class="game-event__meta">
+            <span class="game-event__players"><i class="bi bi-people"></i>{{ game.slots|length }}</span>
+            <span class="game-event__date">{{ game.played_at.strftime('%d.%m') }}</span>
+          </span>
+        </a>
+        {% endfor %}
       </div>
-      <div class="card-body p-0">
-        {% if recent_games %}
-        <div class="table-responsive">
-          <table class="table table-hover mb-0 align-middle">
-            <thead>
-              <tr>
-                <th class="ps-3">Игра</th>
-                <th>Дата</th>
-                <th class="text-end pe-3">Победитель</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for game in recent_games %}
-              <tr>
-                <td class="ps-3">
-                  <a href="{{ url_for('games.game_detail', game_id=game.id) }}"
-                     class="text-decoration-none fw-medium">#{{ game.id }}</a>
-                </td>
-                <td class="text-muted small">{{ game.played_at.strftime('%d.%m.%Y') }}</td>
-                <td class="text-end pe-3">
-                  {% if game.win_side.value == 'mafia' %}
-                    <span class="badge bg-danger">🔫 Мафия</span>
-                  {% elif game.win_side.value == 'city' %}
-                    <span class="badge bg-success">🏙 Город</span>
-                  {% else %}
-                    <span class="badge bg-secondary">Ничья</span>
-                  {% endif %}
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <div class="text-center text-muted py-5">
-          <i class="bi bi-controller fs-1 d-block mb-2 opacity-25"></i>
-          Игры пока не проводились
-        </div>
-        {% endif %}
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-controller fs-1 d-block mb-2 opacity-25"></i>
+        Игры пока не проводились
       </div>
+      {% endif %}
     </div>
   </div>
 </div>

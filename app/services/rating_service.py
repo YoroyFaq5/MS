@@ -11,6 +11,7 @@ Design rules:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import List, Optional, Sequence
 
 from sqlalchemy.orm import contains_eager
@@ -88,6 +89,14 @@ class PlayerRating:
             "don_games": self.don_games,
             "elo": round(self.elo, 1),
         }
+
+
+@dataclass
+class PlayerForm:
+    """Recent-form snapshot for one player — see RatingService.get_recent_form."""
+    results: List[bool] = field(default_factory=list)  # oldest -> newest, True=win
+    streak_won: Optional[bool] = None  # None if no ranked games at all
+    streak_count: int = 0
 
 
 @dataclass
@@ -173,10 +182,16 @@ class RatingService:
     # ── Global rating ────────────────────────────────────────────────────────
 
     @staticmethod
-    def compute_all_ratings() -> List[PlayerRating]:
+    def compute_all_ratings(as_of: Optional[datetime] = None) -> List[PlayerRating]:
         """
         Global rating: only finished, is_ranked=True games count.
-        Original API preserved.
+        Original API preserved (as_of=None keeps the exact old behaviour).
+
+        as_of (optional): restrict to games played on/before this moment —
+        lets a caller reconstruct "what the rating table looked like N
+        days ago" (e.g. for a 30-day rank-movement indicator) by calling
+        this twice, once with as_of=None and once with as_of=<cutoff>,
+        without a separate historical-snapshot table.
 
         Fetches all qualifying slots in a single query and groups them in
         Python, instead of one query per player (was O(active_players)
@@ -188,13 +203,15 @@ class RatingService:
             .filter(Player.is_active == True)
             .all()
         )
-        all_slots = (
+        query = (
             db.session.query(GameSlot)
             .join(Game)
             .options(contains_eager(GameSlot.game))
             .filter(Game.is_finished == True, Game.is_ranked == True)
-            .all()
         )
+        if as_of is not None:
+            query = query.filter(Game.played_at <= as_of)
+        all_slots = query.all()
         slots_by_player: dict[int, list] = {}
         for slot in all_slots:
             slots_by_player.setdefault(slot.player_id, []).append(slot)
@@ -206,6 +223,62 @@ class RatingService:
                 continue
             ratings.append(_slots_to_player_rating(player, slots))
         return _rank(ratings)
+
+    @staticmethod
+    def get_recent_form(player_ids: Sequence[int], limit: int = 8) -> dict:
+        """
+        Last `limit` ranked/finished results per player (for a mini
+        "form" sparkline) plus their current win/loss streak — one batch
+        query for the given player_ids, not one query per player. Meant
+        for a small, already-selected set (e.g. a top-N leaderboard row
+        set on the homepage), not the whole roster.
+
+        Returns {player_id: PlayerForm}. PlayerForm.results is ordered
+        oldest -> newest (so a sparkline reads left-to-right chronologically).
+        """
+        if not player_ids:
+            return {}
+        rows = (
+            db.session.query(GameSlot.player_id, GameSlot.role, Game.win_side)
+            .join(Game)
+            .filter(
+                GameSlot.player_id.in_(list(player_ids)),
+                Game.is_finished == True,
+                Game.is_ranked == True,
+            )
+            .order_by(Game.played_at.desc())
+            .all()
+        )
+        by_player: dict[int, list] = {}
+        for player_id, role, win_side in rows:
+            by_player.setdefault(player_id, []).append((role, win_side))
+
+        forms: dict[int, PlayerForm] = {}
+        for pid in player_ids:
+            entries = by_player.get(pid, [])[:limit]  # newest-first, capped
+            results = []
+            for role, win_side in entries:
+                is_mafia_side = role in (Role.MAFIA, Role.DON)
+                won = (
+                    (is_mafia_side and win_side == WinSide.MAFIA)
+                    or (not is_mafia_side and win_side == WinSide.CITY)
+                )
+                results.append(won)
+
+            streak_won = results[0] if results else None
+            streak_count = 0
+            for won in results:
+                if won == streak_won:
+                    streak_count += 1
+                else:
+                    break
+
+            forms[pid] = PlayerForm(
+                results=list(reversed(results)),
+                streak_won=streak_won,
+                streak_count=streak_count,
+            )
+        return forms
 
     @staticmethod
     def get_global_rating() -> List[PlayerRating]:

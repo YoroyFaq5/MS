@@ -504,6 +504,149 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 
 .titles-grid--compact { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
 
+/* ============================================================
+   Топ игроков / Последние игры — analytics-product density
+   ============================================================
+   Deliberately restrained: existing --ms-* palette only, 1px hairline
+   borders, no gradients/glass/neon. Tabular-nums keeps every numeric
+   column visually aligned like a real data product (Stripe/Linear/F1
+   timing), not a Bootstrap table with numbers in prose font.
+   ============================================================ */
+
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Город/Мафия win-rate meter — a single thin two-color bar, not a chart */
+.side-meter {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .68rem;
+  color: var(--ms-muted);
+}
+.side-meter__bar {
+  width: 64px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--ms-wine-light);
+  overflow: hidden;
+}
+.side-meter__fill {
+  height: 100%;
+  background: var(--ms-gold-light);
+}
+
+.rank-table thead th {
+  font-size: .65rem;
+}
+
+.rank-row { transition: background .15s ease; }
+.rank-row:hover td { background: rgba(199,165,82,.04); }
+
+/* Top-3 — a thin left accent + slightly stronger rank badge, reusing the
+   same gold/silver/bronze ladder as .podium-1/2/3 elsewhere on the site
+   (consistency, not a new color language) instead of medal emoji. */
+.rank-row--top1 td:first-child { box-shadow: inset 3px 0 0 var(--ms-gold-light); }
+.rank-row--top2 td:first-child { box-shadow: inset 3px 0 0 #B8B8B8; }
+.rank-row--top3 td:first-child { box-shadow: inset 3px 0 0 #B08D57; }
+.rank-row--top1 .rank-badge { color: var(--ms-gold-light); font-weight: 700; }
+.rank-row--top2 .rank-badge { color: #B8B8B8; font-weight: 700; }
+.rank-row--top3 .rank-badge { color: #B08D57; font-weight: 700; }
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  color: var(--ms-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: .8rem;
+}
+
+.streak-chip {
+  display: inline-block;
+  padding: .1rem .45rem;
+  border-radius: 5px;
+  font-size: .72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.streak-chip--win  { color: var(--ms-gold-light); background: rgba(199,165,82,.1); }
+.streak-chip--loss { color: var(--ms-wine-light); background: rgba(142,28,28,.12); }
+
+.form-sparkline { display: block; margin-left: auto; opacity: .9; }
+.form-sparkline polyline {
+  fill: none;
+  stroke: var(--ms-gold-light);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── Последние игры — event feed, not a spreadsheet ──────────────────── */
+
+.game-feed { display: flex; flex-direction: column; gap: .3rem; }
+
+.game-event {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  padding: .65rem .75rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  border-left: 2px solid var(--ms-border);
+  text-decoration: none;
+  color: var(--ms-text);
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+.game-event:hover {
+  background: rgba(199,165,82,.05);
+  border-color: var(--ms-border);
+  transform: translateX(2px);
+  color: var(--ms-text);
+}
+.game-event--city  { border-left-color: var(--ms-gold-light); }
+.game-event--mafia { border-left-color: var(--ms-wine-light); }
+
+.game-event__side-icon {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-size: .85rem;
+  background: rgba(138,138,138,.1);
+  color: var(--ms-muted);
+}
+.game-event--city  .game-event__side-icon { background: rgba(199,165,82,.12); color: var(--ms-gold-light); }
+.game-event--mafia .game-event__side-icon { background: rgba(142,28,28,.14); color: var(--ms-wine-light); }
+
+.game-event__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
+.game-event__title { font-size: .85rem; font-weight: 600; }
+.game-event__winner { font-weight: 400; color: var(--ms-muted); }
+.game-event__highlight {
+  font-size: .72rem;
+  color: var(--ms-gold-light);
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+}
+
+.game-event__meta {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  font-size: .72rem;
+  color: var(--ms-muted);
+}
+.game-event__players { display: inline-flex; align-items: center; gap: .25rem; }
+
+@media (max-width: 767.98px) {
+  .side-meter { display: none; }
+  .rank-table th:nth-child(4), .rank-table td:nth-child(4),
+  .rank-table th:nth-child(8), .rank-table td:nth-child(8) { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fade-in-up, .stat-card .stat-value { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
