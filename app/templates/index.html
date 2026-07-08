@@ -10,7 +10,6 @@
 <div class="hero-section text-center fade-in-up" style="--d:0ms">
   <div class="brand-monogram brand-monogram-lg mx-auto mb-3">MS</div>
   <h1 class="display-5 fw-bold mb-1">MAFIA STYLE</h1>
-  <p class="hero-slogan mb-3">Играй. Побеждай. Стань легендой.</p>
 
   <div class="hero-stats">
     <div class="hero-stat">
@@ -29,7 +28,7 @@
     {% endif %}
     <div class="hero-stat">
       <i class="bi bi-lightning-charge"></i>
-      <span><strong>{{ active_tournaments_count }}</strong> активных турнира{{ 'ов' if active_tournaments_count != 1 else '' }}</span>
+      <span><strong>{{ active_tournaments_count }}</strong> {{ active_tournaments_label }}</span>
     </div>
   </div>
 

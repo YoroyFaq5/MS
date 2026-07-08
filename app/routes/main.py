@@ -18,6 +18,19 @@ def _naive(dt):
     return dt.replace(tzinfo=None) if dt and dt.tzinfo else dt
 
 
+def _ru_plural(n: int, one: str, few: str, many: str) -> str:
+    """Russian plural: 1 турнир / 2 турнира / 5 турниров / 21 турнир..."""
+    n_abs = abs(n) % 100
+    n1 = n_abs % 10
+    if 10 < n_abs < 20:
+        return many
+    if 1 < n1 < 5:
+        return few
+    if n1 == 1:
+        return one
+    return many
+
+
 def _sparkline_points(results: list, width: int = 56, height: int = 18, pad: float = 3) -> str:
     """
     SVG <polyline points="..."> for a tiny binary win/loss form sparkline —
@@ -144,6 +157,7 @@ def index():
         .count()
     )
     active_tournaments_count = db.session.query(Tournament).filter(Tournament.status == "active").count()
+    active_tournaments_label = _ru_plural(active_tournaments_count, "активный турнир", "активных турнира", "активных турниров")
 
     # ── Лента активности клуба: последние достижения + выданные титулы,
     # объединённые в одну хронологическую ленту (никаких вымышленных
@@ -201,6 +215,7 @@ def index():
         games_today=games_today,
         active_this_week=active_this_week,
         active_tournaments_count=active_tournaments_count,
+        active_tournaments_label=active_tournaments_label,
         activity_feed=activity_feed,
         city_win_pct=city_win_pct,
         mafia_win_pct=100 - city_win_pct,

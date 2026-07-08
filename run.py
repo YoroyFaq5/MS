@@ -545,7 +545,7 @@ def seed_achievements():
          AchievementCategory.RATING, Rarity.RARE, AchievementTrigger.GAME, False),
         ("elo_1800", "Элита", "ELO ≥ 1800.", "bi-graph-up-arrow",
          AchievementCategory.RATING, Rarity.EPIC, AchievementTrigger.GAME, False),
-        ("top1_global", "Вершина рейтинга", "1-е место в общем рейтинге.", "bi-crown",
+        ("top1_global", "Вершина рейтинга", "1-е место в общем рейтинге.", "bi-award-fill",
          AchievementCategory.RATING, Rarity.LEGENDARY, AchievementTrigger.GAME, True),
         # Tournaments
         ("tournament_win_1", "Чемпион", "1-е место в турнире.", "bi-trophy-fill",
@@ -607,7 +607,7 @@ def seed_titles():
         ("season_best_mafia", "Лучший мафиози сезона", "Лучший результат за роль мафии в этом сезоне.",
          "bi-mask", Rarity.RARE, TitleType.SEASONAL),
         ("season_best_don", "Лучший дон сезона", "Лучший результат за роль дона в этом сезоне.",
-         "bi-crown", Rarity.EPIC, TitleType.SEASONAL),
+         "bi-suit-spade-fill", Rarity.EPIC, TitleType.SEASONAL),
         # Вечные (текущие рекордсмены клуба)
         ("club_legend", "Легенда клуба", "Максимальная сумма бонусных баллов, умноженная на общий винрейт.",
          "bi-gem", Rarity.LEGENDARY, TitleType.ETERNAL),
