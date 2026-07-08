@@ -3,25 +3,83 @@
 {% block title %}Главная{% endblock %}
 
 {% block content %}
+{% set RARITY_LABEL = {'common': '🟢 Обычный', 'rare': '🔵 Редкий', 'epic': '🟣 Эпический',
+                        'legendary': '🟠 Легендарный', 'mythic': '🔴 Мифический', 'ultra': '🔴 Ультра'} %}
+
 <!-- Hero -->
-<div class="hero-section mb-5 text-center">
+<div class="hero-section text-center fade-in-up" style="--d:0ms">
   <div class="brand-monogram brand-monogram-lg mx-auto mb-3">MS</div>
   <h1 class="display-5 fw-bold mb-1">MAFIA STYLE</h1>
-  <p class="text-uppercase brand-tagline mb-3">Kazan · Est 2010</p>
-  <div class="d-flex gap-3 justify-content-center mt-4">
-    {% if current_user.is_admin %}
+  <p class="hero-slogan mb-3">Играй. Побеждай. Стань легендой.</p>
+
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <i class="bi bi-controller"></i>
+      <span><strong>{{ games_today }}</strong> игр сегодня</span>
+    </div>
+    <div class="hero-stat">
+      <i class="bi bi-fire"></i>
+      <span><strong>{{ active_this_week }}</strong> играло на этой неделе</span>
+    </div>
+    {% if current_season %}
+    <div class="hero-stat">
+      <i class="bi bi-calendar2-range"></i>
+      <span>сезон <strong>{{ current_season.number }}</strong></span>
+    </div>
+    {% endif %}
+    <div class="hero-stat">
+      <i class="bi bi-lightning-charge"></i>
+      <span><strong>{{ active_tournaments_count }}</strong> активных турнира{{ 'ов' if active_tournaments_count != 1 else '' }}</span>
+    </div>
+  </div>
+
+  {% if current_user.is_admin %}
+  <div class="mt-4">
     <a href="{{ url_for('games.new_game') }}" class="btn btn-danger btn-lg px-4">
       <i class="bi bi-plus-circle me-2"></i>Новая игра
     </a>
-    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Статистика клуба -->
+<div class="row g-3 mb-4 fade-in-up" style="--d:60ms">
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <i class="bi bi-people-fill stat-icon text-info mb-1"></i>
+      <div class="stat-value">{{ total_players }}</div>
+      <div class="stat-label">Игроков</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <i class="bi bi-controller stat-icon text-success mb-1"></i>
+      <div class="stat-value">{{ total_games }}</div>
+      <div class="stat-label">Игр</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <i class="bi bi-trophy-fill stat-icon text-warning mb-1"></i>
+      <div class="stat-value">{{ total_tournaments }}</div>
+      <div class="stat-label">Турниров</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card card p-3 text-center h-100">
+      <i class="bi bi-patch-check-fill stat-icon text-danger mb-1"></i>
+      <div class="stat-value">{{ total_titles_awarded }}</div>
+      <div class="stat-label">Титулов</div>
+    </div>
   </div>
 </div>
+
 <div class="row g-4">
   <!-- Top Players -->
-  <div class="col-lg-6">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="fw-semibold"><i class="bi bi-trophy-fill text-warning me-2"></i>Топ игроков</span>
+  <div class="col-lg-6 fade-in-up" style="--d:100ms">
+    <div class="card panel h-100">
+      <div class="card-header panel-header d-flex justify-content-between align-items-center">
+        <span class="panel-header__title"><i class="bi bi-trophy-fill text-warning me-2"></i>Топ игроков</span>
         <a href="{{ url_for('ratings.leaderboard') }}" class="btn btn-sm btn-outline-secondary">Все →</a>
       </div>
       <div class="card-body p-0">
@@ -67,10 +125,10 @@
   </div>
 
   <!-- Recent Games -->
-  <div class="col-lg-6">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="fw-semibold"><i class="bi bi-clock-history text-info me-2"></i>Последние игры</span>
+  <div class="col-lg-6 fade-in-up" style="--d:140ms">
+    <div class="card panel h-100">
+      <div class="card-header panel-header d-flex justify-content-between align-items-center">
+        <span class="panel-header__title"><i class="bi bi-clock-history text-info me-2"></i>Последние игры</span>
         <a href="{{ url_for('games.list_games') }}" class="btn btn-sm btn-outline-secondary">Все →</a>
       </div>
       <div class="card-body p-0">
@@ -116,18 +174,17 @@
     </div>
   </div>
 </div>
-{% set RARITY_LABEL = {'common': '🟢 Обычный', 'rare': '🔵 Редкий', 'epic': '🟣 Эпический',
-                        'legendary': '🟠 Легендарный', 'mythic': '🔴 Мифический', 'ultra': '🔴 Ультра'} %}
-{% if club_titles or current_leaders %}
-<div class="titles-showcase mt-4">
+
+<!-- Титулы клуба -->
+{% if club_titles %}
+<div class="titles-showcase mt-4 fade-in-up" style="--d:180ms">
   <div class="titles-showcase__header">
     <div>
       <h3 class="titles-showcase__title">🏆 Титулы клуба</h3>
-      <div class="titles-showcase__subtitle">Действующие рекордсмены{% if current_season %} и номинации «{{ current_season.name }}»{% endif %}</div>
+      <div class="titles-showcase__subtitle">Действующие рекордсмены — держатся, пока не будут побиты</div>
     </div>
     <a href="{{ url_for('titles.nominations') }}" class="btn btn-sm btn-outline-secondary">Все номинации →</a>
   </div>
-
   <div class="titles-grid">
     {% for pt in club_titles %}
     {% set flavor = TitleService.get_title_flavor(pt.title.code) %}
@@ -142,23 +199,7 @@
       </a>
       <div class="title-card__tooltip">
         <div class="title-card__tooltip-row"><strong>{{ RARITY_LABEL.get(pt.title.rarity.value, pt.title.rarity.value) }}</strong></div>
-        <div class="title-card__tooltip-row">Действующий рекорд клуба — держится, пока не будет побит.</div>
-      </div>
-    </div>
-    {% endfor %}
-
-    {% for entry in current_leaders %}
-    <div class="title-card title-card--nomination" tabindex="0">
-      <div class="title-card__icon"><i class="bi {{ entry.title.icon or 'bi-award' }}"></i></div>
-      <div class="title-card__name">{{ entry.title.name }}</div>
-      <div class="title-card__desc">{{ entry.title.description or '' }}</div>
-      <a href="{{ url_for('profile.view_profile', player_id=entry.player.id) }}" class="title-card__holder">
-        {{ player_name(entry.player, equipped_bulk.get(entry.player.id, {})) }}
-      </a>
-      <div class="title-card__season-chip">С{{ current_season.number }} · {{ current_season.year }}</div>
-      <div class="title-card__tooltip">
-        <div class="title-card__tooltip-row">Лидирует по текущим результатам сезона.</div>
-        <div class="title-card__tooltip-row">Закрепится по итогам закрытия сезона.</div>
+        <div class="title-card__tooltip-row">Действующий рекорд клуба.</div>
       </div>
     </div>
     {% endfor %}
@@ -166,43 +207,26 @@
 </div>
 {% endif %}
 
-<div class="row g-4 mt-1 justify-content-center">
-  <!-- Top Rich -->
-  <div class="col-lg-6">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="fw-semibold"><i class="bi bi-coin text-warning me-2"></i>Топ богачей</span>
+<!-- Топ богачей | Номинации сезона -->
+<div class="row g-4 mt-1">
+  <div class="col-lg-6 fade-in-up" style="--d:220ms">
+    <div class="card panel h-100">
+      <div class="card-header panel-header d-flex justify-content-between align-items-center">
+        <span class="panel-header__title"><i class="bi bi-coin text-warning me-2"></i>Топ богачей</span>
         <a href="{{ url_for('auth.admin_economy') }}" class="btn btn-sm btn-outline-secondary">Все →</a>
       </div>
-      <div class="card-body p-0">
+      <div class="card-body">
         {% if top_rich %}
-        <div class="table-responsive">
-          <table class="table table-hover mb-0 align-middle">
-            <thead>
-              <tr>
-                <th class="ps-3">#</th>
-                <th>Игрок</th>
-                <th class="text-end pe-3">Монет</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for p in top_rich %}
-              <tr>
-                <td class="ps-3">
-                  {% if loop.index == 1 %}<span class="badge bg-warning text-dark">🥇</span>
-                  {% elif loop.index == 2 %}<span class="badge bg-secondary">🥈</span>
-                  {% elif loop.index == 3 %}<span class="badge" style="background:#cd7f32">🥉</span>
-                  {% else %}<span class="text-muted">{{ loop.index }}</span>{% endif %}
-                </td>
-                <td>
-                  <a href="{{ url_for('profile.view_profile', player_id=p.id) }}"
-                     class="text-decoration-none fw-medium">{{ player_name(p, equipped_bulk.get(p.id, {})) }}</a>
-                </td>
-                <td class="text-end pe-3 fw-semibold text-warning">{{ (p.coins or 0) | int }} 🪙</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="rich-list">
+          {% for p in top_rich %}
+          <a href="{{ url_for('profile.view_profile', player_id=p.id) }}" class="rich-row {% if loop.index <= 3 %}rich-row--top{{ loop.index }}{% endif %}">
+            <span class="rich-row__rank">
+              {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
+            </span>
+            <span class="rich-row__name">{{ player_name(p, equipped_bulk.get(p.id, {})) }}</span>
+            <span class="rich-row__coins"><i class="bi bi-coin"></i>{{ (p.coins or 0) | int }}</span>
+          </a>
+          {% endfor %}
         </div>
         {% else %}
         <div class="text-center text-muted py-5">
@@ -213,6 +237,61 @@
       </div>
     </div>
   </div>
-</div>
-{% endblock %}
 
+  <div class="col-lg-6 fade-in-up" style="--d:260ms">
+    <div class="card panel h-100">
+      <div class="card-header panel-header d-flex justify-content-between align-items-center">
+        <span class="panel-header__title"><i class="bi bi-stars text-warning me-2"></i>Номинации сезона</span>
+        {% if current_season %}<span class="badge bg-warning-subtle text-warning border border-warning-subtle">{{ current_season.name }}</span>{% endif %}
+      </div>
+      <div class="card-body">
+        {% if current_leaders %}
+        <div class="titles-grid titles-grid--compact">
+          {% for entry in current_leaders %}
+          <div class="title-card title-card--nomination" tabindex="0">
+            <div class="title-card__icon"><i class="bi {{ entry.title.icon or 'bi-award' }}"></i></div>
+            <div class="title-card__name">{{ entry.title.name }}</div>
+            <a href="{{ url_for('profile.view_profile', player_id=entry.player.id) }}" class="title-card__holder">
+              {{ player_name(entry.player, equipped_bulk.get(entry.player.id, {})) }}
+            </a>
+            <div class="title-card__tooltip">
+              <div class="title-card__tooltip-row">Лидирует по текущим результатам сезона.</div>
+              <div class="title-card__tooltip-row">Закрепится по итогам закрытия сезона.</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-stars fs-1 d-block mb-2 opacity-25"></i>
+          {% if current_season %}Лидеры сезона ещё не определены{% else %}Активный сезон не найден{% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Последние достижения -->
+{% if activity_feed %}
+<div class="card panel mt-4 fade-in-up" style="--d:300ms">
+  <div class="card-header panel-header d-flex justify-content-between align-items-center">
+    <span class="panel-header__title"><i class="bi bi-activity text-danger me-2"></i>Последние достижения</span>
+  </div>
+  <div class="card-body">
+    <div class="activity-feed">
+      {% for e in activity_feed %}
+      <a href="{{ url_for('profile.view_profile', player_id=e.player_id) }}" class="activity-item">
+        <span class="activity-item__icon activity-item__icon--{{ e.rarity }}"><i class="bi {{ e.icon }}"></i></span>
+        <span class="activity-item__text">
+          <strong>{{ player_name(e.player, equipped_bulk.get(e.player_id, {})) }}</strong>
+          {% if e.kind == 'achievement' %}получил(а) достижение{% else %}получил(а) титул{% endif %}
+          «{{ e.name }}»
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

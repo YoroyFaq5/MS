@@ -53,11 +53,20 @@
 /* Base */
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: var(--ms-bg);
   color: var(--ms-text);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  /* Деликатная фоновая текстура — едва заметное золотое свечение сверху +
+     тончайшие диагональные линии. Настолько слабо (2-3% альфа), чтобы
+     читалось подсознательно, а не как узор. Фиксирован к вьюпорту
+     (attachment: fixed), чтобы не скроллился вместе с длинным контентом
+     и не создавал видимых "швов" между секциями. */
+  background-color: var(--ms-bg);
+  background-image:
+    radial-gradient(ellipse 900px 500px at 50% -10%, rgba(199,165,82,.05), transparent 60%),
+    repeating-linear-gradient(135deg, rgba(199,165,82,.015) 0px, rgba(199,165,82,.015) 1px, transparent 1px, transparent 64px);
+  background-attachment: fixed;
 }
 
 main { flex: 1; }
@@ -329,11 +338,174 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 /* Hero section — fluid sizing so it never overflows narrow screens */
 .hero-section {
   padding: clamp(1.5rem, 5vw, 3rem) 0 1rem;
+  margin-bottom: 2rem;
+  position: relative;
 }
 
 .hero-section h1,
 .hero-section .display-5 {
   font-size: clamp(1.75rem, 4.5vw + 1rem, 3rem);
+}
+
+.hero-slogan {
+  color: var(--ms-text-dim);
+  font-size: clamp(.9rem, .8rem + .4vw, 1.05rem);
+  letter-spacing: .02em;
+}
+
+.hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: .5rem .75rem;
+  margin-top: 1rem;
+}
+
+.hero-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .4rem .85rem;
+  border-radius: 99px;
+  background: var(--ms-surface-raised);
+  border: 1px solid var(--ms-border);
+  font-size: .78rem;
+  color: var(--ms-muted);
+}
+.hero-stat i { color: var(--ms-gold-light); font-size: .85rem; }
+.hero-stat strong { color: var(--ms-text); font-weight: 700; }
+
+/* ============================================================
+   Homepage — unified panel language + composition helpers
+   ============================================================
+   .panel is a semantic alias over the existing .card (same visuals) so
+   every homepage block — table cards, rich list, activity feed, titles
+   showcase — reads as one consistent surface language (item 9 of the
+   redesign brief) instead of a mix of bare Bootstrap tables and custom
+   components with slightly different radii/shadows/hover behavior.
+   ============================================================ */
+
+.panel {
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.panel:hover {
+  box-shadow: 0 10px 28px rgba(0,0,0,.4);
+  border-color: rgba(199,165,82,.22);
+}
+
+.panel-header {
+  position: relative;
+}
+.panel-header__title {
+  font-weight: 600;
+  font-size: .95rem;
+}
+
+/* Entrance animation — sections fade/slide in on load, staggered via a
+   per-element --d custom property. Pure CSS, fires once on paint. */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in-up {
+  animation: fade-in-up .55s cubic-bezier(.2,.7,.3,1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Stat card numbers — a light "pop" on load rather than a real JS
+   counter, per "без тяжёлых JS-анимаций". */
+@keyframes stat-pop {
+  from { opacity: 0; transform: scale(.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.stat-card .stat-value { animation: stat-pop .4s ease .1s both; }
+.stat-icon { font-size: 1.1rem; display: block; opacity: .85; }
+
+/* ── Топ богачей — coin-themed list instead of a plain table ─────────── */
+
+.rich-list { display: flex; flex-direction: column; gap: .35rem; }
+
+.rich-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .55rem .75rem;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--ms-text);
+  border: 1px solid transparent;
+  transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+.rich-row:hover {
+  background: rgba(199,165,82,.07);
+  border-color: var(--ms-border);
+  transform: translateX(2px);
+  color: var(--ms-text);
+}
+
+.rich-row__rank {
+  width: 26px;
+  text-align: center;
+  font-size: .85rem;
+  color: var(--ms-muted);
+  flex-shrink: 0;
+}
+.rich-row__name { flex: 1; font-weight: 500; font-size: .875rem; }
+.rich-row__coins {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  font-weight: 700;
+  color: var(--ms-gold-light);
+  font-size: .85rem;
+  background: rgba(199,165,82,.1);
+  padding: .2rem .55rem;
+  border-radius: 99px;
+}
+.rich-row__coins i { color: var(--ms-gold); }
+
+.rich-row--top1 { background: rgba(212,176,106,.07); border-color: rgba(212,176,106,.25); }
+.rich-row--top2 { background: rgba(184,184,184,.05); border-color: rgba(184,184,184,.18); }
+.rich-row--top3 { background: rgba(176,141,87,.06); border-color: rgba(176,141,87,.2); }
+
+/* ── Активность клуба — timeline лента ─────────────────────────────── */
+
+.activity-feed { display: flex; flex-direction: column; gap: .15rem; }
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .55rem .5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--ms-text-dim);
+  transition: background .18s ease;
+}
+.activity-item:hover { background: rgba(199,165,82,.06); color: var(--ms-text); }
+
+.activity-item__icon {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: rgba(138,138,138,.12);
+  color: var(--ms-muted);
+  font-size: .85rem;
+}
+.activity-item__icon--rare      { background: rgba(184,184,184,.14); color: #B8B8B8; }
+.activity-item__icon--epic      { background: rgba(142,28,28,.16); color: var(--ms-wine-light); }
+.activity-item__icon--legendary,
+.activity-item__icon--ultra     { background: rgba(212,176,106,.16); color: var(--ms-gold-light); }
+.activity-item__icon--mythic    { background: rgba(157,78,221,.14); color: #9d4edd; }
+
+.activity-item__text { font-size: .85rem; line-height: 1.4; }
+.activity-item__text strong { color: var(--ms-text); }
+
+.titles-grid--compact { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-up, .stat-card .stat-value { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
 
 /* Stat cards */
