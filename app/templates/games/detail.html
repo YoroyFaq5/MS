@@ -172,9 +172,16 @@
             <td class="text-end pe-4 fw-bold {% if slot.total_score > 0 %}text-success{% endif %}">
               {{ slot.total_score|round(2) }}
               {% if slot.compensation_score > 0 %}
-                <span class="badge bg-warning text-dark ms-1" title="Компенсационные баллы (п.8.6, ФСМ)">
+                {% if slot.compensation_score_visible %}
+                <span class="badge bg-warning text-dark ms-1" title="Компенсационные баллы (п.8.6, ФСМ) — учтены в итоге">
                   К +{{ slot.compensation_score }}
                 </span>
+                {% else %}
+                <span class="badge bg-secondary text-body border ms-1"
+                      title="Компенсационные баллы (п.8.6, ФСМ) — промежуточное значение, посчитается в итог после завершения турнира">
+                  К +{{ slot.compensation_score }} ⏳
+                </span>
+                {% endif %}
               {% endif %}
             </td>
           </tr>
@@ -209,9 +216,16 @@
             <td class="text-end pe-4 fw-bold {% if slot.total_score > 0 %}text-success{% endif %}">
               {{ slot.total_score|round(2) }}
               {% if slot.compensation_score > 0 %}
-                <span class="badge bg-warning text-dark ms-1" title="Компенсационные баллы (п.8.6, ФСМ)">
+                {% if slot.compensation_score_visible %}
+                <span class="badge bg-warning text-dark ms-1" title="Компенсационные баллы (п.8.6, ФСМ) — учтены в итоге">
                   К +{{ slot.compensation_score }}
                 </span>
+                {% else %}
+                <span class="badge bg-secondary text-body border ms-1"
+                      title="Компенсационные баллы (п.8.6, ФСМ) — промежуточное значение, посчитается в итог после завершения турнира">
+                  К +{{ slot.compensation_score }} ⏳
+                </span>
+                {% endif %}
               {% endif %}
             </td>
           </tr>
