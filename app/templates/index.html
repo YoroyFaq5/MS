@@ -95,7 +95,7 @@
             <tr>
               <th class="ps-3">#</th>
               <th>Игрок</th>
-              <th class="text-end">Рейтинг</th>
+              <th class="text-end">Очки</th>
               <th class="text-center">30д</th>
               <th class="text-center">Игр</th>
               <th class="text-center">WR</th>
@@ -113,7 +113,10 @@
                   {{ player_name(r, equipped_bulk.get(r.player_id, {})) }}
                 </a>
               </td>
-              <td class="text-end tabular-nums fw-semibold">{{ r.elo | round | int }}</td>
+              <td class="text-end tabular-nums">
+                <div class="fw-semibold">{{ r.total_score | round(1) }}</div>
+                <div class="text-muted small">{{ r.elo | round | int }} ELO</div>
+              </td>
               <td class="text-center">
                 {% if r.rank_movement is none %}
                   <span class="elo-flat small">новый</span>
