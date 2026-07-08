@@ -30,7 +30,18 @@
       {% else %}
         <span class="badge bg-warning-subtle text-warning border border-warning-subtle">👥 Командный</span>
       {% endif %}
-      {% if tournament.is_ranked %}
+      {% if current_user.is_authenticated and current_user.is_admin %}
+        <form method="POST" action="{{ url_for('tournaments.toggle_ranked', tournament_id=tournament.id) }}"
+              class="d-inline"
+              onsubmit="return confirm('{{ 'Сделать турнир нерейтинговым?' if tournament.is_ranked else 'Сделать турнир рейтинговым?' }} Уже завершённые игры сохранят прежнее значение.')">
+          <button type="submit" class="badge border-0
+            {% if tournament.is_ranked %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}"
+            title="Нажмите, чтобы переключить">
+            {% if tournament.is_ranked %}📈 Рейтинговый{% else %}🏖 Нерейтинговый{% endif %}
+            <i class="bi bi-arrow-repeat ms-1"></i>
+          </button>
+        </form>
+      {% elif tournament.is_ranked %}
         <span class="badge bg-success-subtle text-success border border-success-subtle">📈 Рейтинговый</span>
       {% else %}
         <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">🏖 Нерейтинговый</span>

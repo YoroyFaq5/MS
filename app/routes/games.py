@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, flash, abort, jsonify
@@ -262,6 +264,18 @@ def new_game():
         tournament_id = request.form.get("tournament_id", type=int) or None
         stage_id = request.form.get("stage_id", type=int) or None
 
+        # Дата/время игры — необязательное поле, нужно в первую очередь для
+        # внесения старых игр задним числом (например, при переносе истории
+        # с другого сайта). Пустое значение или мусор — тихо остаёмся на
+        # дефолте модели (datetime.now(timezone.utc)).
+        played_at = None
+        played_at_str = request.form.get("played_at", "").strip()
+        if played_at_str:
+            try:
+                played_at = datetime.fromisoformat(played_at_str)
+            except ValueError:
+                played_at = None
+
         is_ranked = True
         t = None
         if tournament_id:
@@ -337,7 +351,10 @@ def new_game():
                     **_new_game_form_context(tournaments, tournament_id, stage_id),
                 )
 
-        game = Game(notes=notes, tournament_id=tournament_id, stage_id=stage_id, is_ranked=is_ranked)
+        game_kwargs = dict(notes=notes, tournament_id=tournament_id, stage_id=stage_id, is_ranked=is_ranked)
+        if played_at is not None:
+            game_kwargs["played_at"] = played_at
+        game = Game(**game_kwargs)
         db.session.add(game)
         db.session.flush()
 
@@ -578,6 +595,17 @@ def edit_game(game_id: int):
     except ValueError:
         flash("Неверное значение победителя.", "danger")
         return redirect(url_for("games.game_detail", game_id=game_id))
+
+    # Дата/время — редактируемо и здесь (например, поправить неверно
+    # внесённую задним числом дату). Меняем ДО вызова EditGameOrchestrator,
+    # чтобы пересчёт цепочки ELO (сортировка по played_at) сразу учёл
+    # новую хронологическую позицию игры, а не старую.
+    played_at_str = request.form.get("played_at", "").strip()
+    if played_at_str:
+        try:
+            game.played_at = datetime.fromisoformat(played_at_str)
+        except ValueError:
+            pass
 
     for slot in game.slots:
         pid_str = request.form.get(f"player_{slot.id}", "").strip()

@@ -116,6 +116,13 @@
 
   <div class="card mb-4">
     <div class="card-body">
+      <div class="row g-3 mb-3">
+        <div class="col-md-5">
+          <label class="form-label fw-medium">🕒 Дата и время игры</label>
+          <input type="datetime-local" name="played_at" class="form-control">
+          <div class="form-text">Оставьте пустым — будет использовано текущее время. Пригодится при внесении старых игр задним числом.</div>
+        </div>
+      </div>
       <label class="form-label fw-medium">📝 Заметки (необязательно)</label>
       <textarea name="notes" class="form-control" rows="2" placeholder="Любые заметки об игре..."></textarea>
     </div>

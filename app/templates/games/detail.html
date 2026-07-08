@@ -249,6 +249,13 @@
     </div>
     {% endif %}
     <div class="row align-items-end g-3">
+      {% if edit_mode %}
+      <div class="col-md-3">
+        <label class="form-label fw-medium mb-1">🕒 Дата и время</label>
+        <input type="datetime-local" name="played_at" class="form-control"
+               value="{{ game.played_at.strftime('%Y-%m-%dT%H:%M') }}">
+      </div>
+      {% endif %}
       <div class="col-md-4">
         <label class="form-label fw-medium mb-1">🏆 Кто победил?</label>
         <select name="win_side" class="form-select" required>

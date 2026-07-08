@@ -121,6 +121,32 @@ def tournament_detail(tournament_id: int):
     )
 
 
+@tournaments_bp.route("/<int:tournament_id>/toggle-ranked", methods=["POST"])
+@admin_required
+def toggle_ranked(tournament_id: int):
+    """
+    Флаг is_ranked на Tournament — это шаблон "по умолчанию" для НОВЫХ
+    игр этого турнира (см. games.py::new_game/_apply_tournament_assignment,
+    которые копируют его в Game.is_ranked в момент создания/сохранения
+    игры), а не живое свойство, которое переносится на уже существующие
+    записи само по себе. Переключение здесь сразу подхватят новые игры и
+    уже созданные незавершённые (при их завершении); уже завершённые игры
+    сохранят свой прежний снимок is_ranked, пока их не пересохранят через
+    режим редактирования — предупреждаем об этом прямо в сообщении.
+    """
+    t = _get_tournament_or_404(tournament_id)
+    t.is_ranked = not t.is_ranked
+    db.session.commit()
+    flash(
+        f"Турнир «{t.name}» теперь "
+        f"{'рейтинговый 📈' if t.is_ranked else 'нерейтинговый 🏖'}. "
+        f"Уже завершённые игры сохраняют старое значение — поменяется только "
+        f"у новых и у пересохранённых через редактирование.",
+        "success",
+    )
+    return redirect(url_for("tournaments.tournament_detail", tournament_id=tournament_id))
+
+
 @tournaments_bp.route("/<int:tournament_id>/delete", methods=["POST"])
 @admin_required
 def delete_tournament(tournament_id: int):
