@@ -1,15 +1,200 @@
 {% extends "base.html" %}
+{% from "_macros.html" import shop_item_preview %}
 {% block title %}Инвентарь{% endblock %}
 
-{% block content %}
-{% set CATEGORY_LABELS = {'profile_customization': '🖼️ Кастомизация профиля', 'nickname': '✨ Никнейм', 'physical': '📦 Физические товары'} %}
-{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark', 'mythic': 'bg-danger', 'ultra': 'bg-warning text-dark'} %}
+{% block head %}
+<style>
+/* ============================================================
+   Инвентарь — тот же премиальный язык, что на /shop, /players и т.д.
+   ============================================================ */
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h2 class="mb-0 fw-bold">🎒 Инвентарь</h2>
-    <p class="text-muted small mb-0">Купленные предметы — экипируйте, чтобы применить оформление профиля</p>
+.inv-hero {
+  position: relative; overflow: hidden;
+  background: var(--ms-surface); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+  padding: clamp(1.5rem, 3vw, 2.5rem); margin-bottom: 1.5rem;
+  transition: transform .35s cubic-bezier(.2,.7,.3,1), box-shadow .35s ease, border-color .35s ease;
+}
+.inv-hero:hover { transform: translateY(-2px); border-color: rgba(199,165,82,.24); box-shadow: 0 20px 48px rgba(0,0,0,.4); }
+
+.inv-hero__bg { position: absolute; inset: 0; pointer-events: none; --mx: 0; --my: 0; }
+.inv-hero__lines {
+  position: absolute; inset: 0; opacity: .5;
+  background-image: repeating-linear-gradient(115deg, rgba(199,165,82,.05) 0px, rgba(199,165,82,.05) 1px, transparent 1px, transparent 64px);
+  -webkit-mask-image: linear-gradient(90deg, black, transparent 75%);
+  mask-image: linear-gradient(90deg, black, transparent 75%);
+}
+.inv-hero__glow {
+  position: absolute; width: 380px; height: 380px; border-radius: 50%; filter: blur(70px);
+  transition: transform .4s ease-out;
+  transform: translate3d(calc(var(--mx, 0) * 12px), calc(var(--my, 0) * 8px), 0);
+}
+.inv-hero__glow--1 { top: -160px; left: -60px; background: radial-gradient(circle, rgba(199,165,82,.16), transparent 70%); }
+.inv-hero__glow--2 { bottom: -180px; left: 220px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(212,176,106,.1), transparent 70%); transition-delay: .05s; }
+
+.inv-hero__particles { position: absolute; inset: 0; transform: translate3d(calc(var(--mx, 0) * 6px), calc(var(--my, 0) * 4px), 0); transition: transform .4s ease-out; }
+.inv-hero__particles span {
+  position: absolute; width: 3px; height: 3px; border-radius: 50%;
+  background: var(--ms-gold-light); opacity: 0; animation: inv-dust 7s ease-in-out infinite;
+}
+.inv-hero__particles span:nth-child(1) { top: 18%; left: 12%; animation-delay: 0s; }
+.inv-hero__particles span:nth-child(2) { top: 60%; left: 24%; animation-delay: 1.6s; }
+.inv-hero__particles span:nth-child(3) { top: 30%; left: 34%; animation-delay: 3.1s; }
+.inv-hero__particles span:nth-child(4) { top: 75%; left: 8%;  animation-delay: 4.4s; }
+.inv-hero__particles span:nth-child(5) { top: 45%; left: 42%; animation-delay: 5.6s; }
+@keyframes inv-dust {
+  0%   { opacity: 0; transform: translateY(6px); }
+  15%  { opacity: .5; }
+  50%  { opacity: .25; transform: translateY(-10px); }
+  85%  { opacity: 0; transform: translateY(-18px); }
+  100% { opacity: 0; }
+}
+
+.inv-hero__content { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 2rem 2.5rem; }
+.inv-hero__main { display: flex; align-items: center; gap: 1.25rem; }
+.inv-hero__monogram {
+  flex-shrink: 0; width: 76px; height: 76px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(199,165,82,.3); border-radius: 50%;
+  font-size: 1.6rem; color: var(--ms-gold-light);
+  background: radial-gradient(circle, rgba(199,165,82,.08), transparent 75%);
+}
+.inv-hero__count-wrap { display: flex; flex-direction: column; }
+.inv-hero__eyebrow { font-size: .68rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ms-muted); margin-bottom: .15rem; }
+.inv-hero__count {
+  font-family: 'Playfair Display', Georgia, serif; font-weight: 700;
+  font-size: clamp(2.75rem, 3.2vw + 1.5rem, 4.5rem); line-height: 1.2; white-space: nowrap;
+  background: linear-gradient(180deg, #F3E4B8 0%, #D4B06A 32%, #C7A552 58%, #9C7C3E 82%, #C7A552 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 10px rgba(0,0,0,.5));
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "lnum" 1;
+}
+.inv-hero__count-label { font-size: .82rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ms-text-dim); margin-top: .1rem; }
+.inv-hero__tagline { font-size: .78rem; color: var(--ms-muted); margin-top: .5rem; }
+
+.inv-hero__stats { display: flex; flex-wrap: wrap; gap: 1rem; margin-left: auto; }
+.inv-hero__stat {
+  display: flex; align-items: center; gap: 1rem;
+  min-width: 200px; max-width: 250px;
+  padding: 1.15rem 1.5rem;
+  background: var(--ms-surface-raised); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+}
+.inv-hero__stat-icon {
+  flex-shrink: 0; width: 52px; height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 1.3rem;
+  background: rgba(199,165,82,.16); color: var(--ms-gold-light);
+}
+.inv-hero__stat-body { min-width: 0; }
+.inv-hero__stat-value { font-size: 1.35rem; font-weight: 700; line-height: 1.2; color: var(--ms-gold-light); white-space: nowrap; }
+.inv-hero__stat-label { font-size: .82rem; color: var(--ms-text-dim); white-space: nowrap; margin-top: .1rem; }
+.inv-hero__stat-sub { font-size: .72rem; color: var(--ms-muted); margin-top: .1rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .inv-hero, .inv-hero__glow, .inv-hero__particles { transition: none; }
+  .inv-hero__particles span { animation: none; opacity: 0; }
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────── */
+.inv-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
+.inv-section-title { font-weight: 700; font-size: 1rem; margin: 1.5rem 0 .9rem; display: flex; align-items: center; gap: .5rem; }
+.inv-section-title i { color: var(--ms-gold-light); }
+
+/* ── Карточки ─────────────────────────────────────────────────────── */
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.1rem; }
+
+.inv-card {
+  position: relative;
+  background: var(--ms-surface);
+  border-radius: var(--ms-radius);
+  padding: 1.15rem;
+  transition: transform .2s cubic-bezier(.2,.7,.3,1), box-shadow .2s ease;
+}
+.inv-card:hover { transform: translateY(-4px); box-shadow: 0 16px 34px rgba(0,0,0,.4); }
+.inv-card--equipped { border-color: rgba(199,165,82,.35) !important; }
+
+.inv-card__equipped-badge {
+  position: absolute; top: 10px; right: 10px; z-index: 1;
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .18rem .55rem; border-radius: 99px;
+  background: rgba(199,165,82,.18); color: var(--ms-gold-light);
+  font-size: .64rem; font-weight: 700;
+}
+
+.inv-card__preview {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 76px; margin-bottom: .9rem; padding: .6rem;
+  background: var(--ms-surface-raised); border-radius: var(--ms-radius);
+  overflow: hidden;
+}
+
+.inv-card__head { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; margin-bottom: .3rem; }
+.inv-card__name { font-weight: 700; font-size: .95rem; }
+.inv-card__meta { font-size: .7rem; color: var(--ms-muted); margin-bottom: .8rem; }
+
+.rarity-pill { display: inline-flex; align-items: center; padding: .16rem .5rem; border-radius: 99px; font-size: .62rem; font-weight: 700; letter-spacing: .02em; white-space: nowrap; flex-shrink: 0; }
+.rarity-pill--common    { background: rgba(138,138,138,.12); color: var(--ms-muted); }
+.rarity-pill--rare      { background: rgba(184,184,184,.14); color: #B8B8B8; }
+.rarity-pill--epic      { background: rgba(142,28,28,.16);   color: var(--ms-wine-light); }
+.rarity-pill--legendary { background: rgba(199,165,82,.16);  color: var(--ms-gold-light); }
+.rarity-pill--mythic    { background: rgba(157,78,221,.16);  color: #c090ee; }
+.rarity-pill--ultra     { background: rgba(255,215,0,.16);   color: #ffd700; }
+
+.inv-empty-hint {
+  background: var(--ms-surface); border-radius: var(--ms-radius); padding: 4rem 2rem;
+  text-align: center; color: var(--ms-muted);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% set CATEGORY_LABELS = {'profile_customization': 'Кастомизация профиля', 'nickname': 'Никнейм', 'physical': 'Физические товары'} %}
+{% set CATEGORY_ICONS = {'profile_customization': 'bi-image', 'nickname': 'bi-stars', 'physical': 'bi-box-seam'} %}
+{% set RARITY_LABELS = {'common': 'Обычная', 'rare': 'Редкая', 'epic': 'Эпическая', 'legendary': 'Легендарная', 'mythic': 'Мифическая', 'ultra': 'Ультра'} %}
+
+<div class="inv-hero fade-in-up" id="inv-hero">
+  <div class="inv-hero__bg" aria-hidden="true">
+    <div class="inv-hero__lines"></div>
+    <div class="inv-hero__glow inv-hero__glow--1"></div>
+    <div class="inv-hero__glow inv-hero__glow--2"></div>
+    <div class="inv-hero__particles"><span></span><span></span><span></span><span></span><span></span></div>
   </div>
+
+  <div class="inv-hero__content">
+    <div class="inv-hero__main">
+      <div class="inv-hero__monogram fade-in-up" style="--d:60ms"><i class="bi bi-backpack4-fill"></i></div>
+      <div class="inv-hero__count-wrap fade-in-up" style="--d:140ms">
+        <div class="inv-hero__eyebrow">Ваша коллекция</div>
+        <div class="inv-hero__count" data-count-to="{{ total_items }}">0</div>
+        <div class="inv-hero__count-label">предметов в инвентаре</div>
+        <div class="inv-hero__tagline">Инвентарь MafiaStyle</div>
+      </div>
+    </div>
+
+    {% if total_items %}
+    <div class="inv-hero__stats">
+      <div class="inv-hero__stat fade-in-up" style="--d:220ms">
+        <div class="inv-hero__stat-icon"><i class="bi bi-check2-circle"></i></div>
+        <div class="inv-hero__stat-body">
+          <div class="inv-hero__stat-value">{{ equipped_count }}</div>
+          <div class="inv-hero__stat-label">Экипировано</div>
+          <div class="inv-hero__stat-sub">активное оформление</div>
+        </div>
+      </div>
+      <div class="inv-hero__stat fade-in-up" style="--d:280ms">
+        <div class="inv-hero__stat-icon"><i class="bi bi-gem"></i></div>
+        <div class="inv-hero__stat-body">
+          <div class="inv-hero__stat-value">{{ exclusive_count }}</div>
+          <div class="inv-hero__stat-label">Эксклюзивных</div>
+          <div class="inv-hero__stat-sub">Mythic / Ultra</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="inv-toolbar">
+  <span></span>
   <a href="{{ url_for('shop.list_items') }}" class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-shop me-1"></i>В магазин
   </a>
@@ -19,71 +204,111 @@
   {% for cat in categories %}
     {% set cat_items = grouped.get(cat.value) %}
     {% if cat_items %}
-    <h5 class="fw-semibold mt-4 mb-3">{{ CATEGORY_LABELS.get(cat.value, cat.value) }}</h5>
-    <div class="row g-3 mb-3">
+    <div class="inv-section-title"><i class="bi {{ CATEGORY_ICONS.get(cat.value, 'bi-tag') }}"></i>{{ CATEGORY_LABELS.get(cat.value, cat.value) }}</div>
+    <div class="inv-grid mb-3">
       {% for inv in cat_items %}
-      <div class="col-md-6 col-xl-4">
-        <div class="card h-100 rarity-{{ inv.item.rarity.value }} position-relative">
-          {% if inv.is_equipped %}
-          <span class="badge bg-success equip-slot-badge"><i class="bi bi-check-lg"></i> Экипировано</span>
-          {% endif %}
-          <div class="card-body p-4">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-              <h6 class="fw-semibold mb-0">{{ inv.item.name }}</h6>
-              <span class="badge {{ RARITY_BADGE.get(inv.item.rarity.value, 'bg-secondary') }}">
-                {{ inv.item.rarity.value }}
-              </span>
-            </div>
-            <div class="text-muted small mb-3">слот «{{ inv.item.subcategory }}»</div>
+      <div class="inv-card tournament-card rarity-{{ inv.item.rarity.value }}{% if inv.is_equipped %} inv-card--equipped{% endif %}">
+        {% if inv.is_equipped %}
+        <span class="inv-card__equipped-badge"><i class="bi bi-check-lg"></i>Экипировано</span>
+        {% endif %}
+        <div class="inv-card__preview">{{ shop_item_preview(inv.item) }}</div>
 
-            {% if inv.item.category.value == 'physical' %}
-            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
-              Физический товар — выдаётся вручную
-            </span>
-            {% elif inv.is_equipped %}
-            <form method="POST" action="{{ url_for('inventory.unequip', inventory_item_id=inv.id) }}">
-              <button type="submit" class="btn btn-sm btn-outline-danger w-100">Снять</button>
-            </form>
-            {% else %}
-            <form method="POST" action="{{ url_for('inventory.equip', inventory_item_id=inv.id) }}">
-              <button type="submit" class="btn btn-sm btn-danger w-100">Экипировать</button>
-            </form>
-            {% endif %}
-
-            {% if not inv.is_equipped and inv.item.is_transferable %}
-            <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-2"
-                    data-bs-toggle="collapse" data-bs-target="#gift-{{ inv.id }}">
-              <i class="bi bi-gift me-1"></i>Подарить
-            </button>
-            <div class="collapse mt-2" id="gift-{{ inv.id }}">
-              <form method="POST" action="{{ url_for('gifts.send') }}" class="d-flex flex-column gap-1">
-                <input type="hidden" name="inventory_item_id" value="{{ inv.id }}">
-                <select name="to_player_id" class="form-select form-select-sm" required>
-                  <option value="">— получатель —</option>
-                  {% for p in other_players %}
-                  <option value="{{ p.id }}">{{ p.display_name }}</option>
-                  {% endfor %}
-                </select>
-                {% if inv.item.giftable_message %}
-                <input type="text" name="message" class="form-control form-control-sm" placeholder="сообщение (необязательно)" maxlength="255">
-                {% endif %}
-                <button type="submit" class="btn btn-sm btn-secondary">Отправить подарок</button>
-              </form>
-            </div>
-            {% endif %}
-          </div>
+        <div class="inv-card__head">
+          <div class="inv-card__name">{{ inv.item.name }}</div>
+          <span class="rarity-pill rarity-pill--{{ inv.item.rarity.value }}">{{ RARITY_LABELS.get(inv.item.rarity.value, inv.item.rarity.value) }}</span>
         </div>
+        <div class="inv-card__meta">слот «{{ inv.item.subcategory }}»{% if inv.item.category.value == 'physical' %} · физический{% endif %}</div>
+
+        {% if inv.item.category.value == 'physical' %}
+        <span class="rarity-pill rarity-pill--common"><i class="bi bi-truck me-1"></i>Выдаётся вручную</span>
+        {% elif inv.is_equipped %}
+        <form method="POST" action="{{ url_for('inventory.unequip', inventory_item_id=inv.id) }}">
+          <button type="submit" class="btn btn-sm btn-outline-danger w-100">Снять</button>
+        </form>
+        {% else %}
+        <form method="POST" action="{{ url_for('inventory.equip', inventory_item_id=inv.id) }}">
+          <button type="submit" class="btn btn-sm btn-danger w-100">Экипировать</button>
+        </form>
+        {% endif %}
+
+        {% if not inv.is_equipped and inv.item.is_transferable %}
+        <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-2"
+                data-bs-toggle="collapse" data-bs-target="#gift-{{ inv.id }}">
+          <i class="bi bi-gift me-1"></i>Подарить
+        </button>
+        <div class="collapse mt-2" id="gift-{{ inv.id }}">
+          <form method="POST" action="{{ url_for('gifts.send') }}" class="d-flex flex-column gap-1">
+            <input type="hidden" name="inventory_item_id" value="{{ inv.id }}">
+            <select name="to_player_id" class="form-select form-select-sm" required>
+              <option value="">— получатель —</option>
+              {% for p in other_players %}
+              <option value="{{ p.id }}">{{ p.display_name }}</option>
+              {% endfor %}
+            </select>
+            {% if inv.item.giftable_message %}
+            <input type="text" name="message" class="form-control form-control-sm" placeholder="сообщение (необязательно)" maxlength="255">
+            {% endif %}
+            <button type="submit" class="btn btn-sm btn-secondary">Отправить подарок</button>
+          </form>
+        </div>
+        {% endif %}
       </div>
       {% endfor %}
     </div>
     {% endif %}
   {% endfor %}
 {% else %}
-<div class="card">
-  <div class="card-body text-center text-muted py-5">
-    <i class="bi bi-backpack4 fs-1 d-block mb-2 opacity-25"></i>
-    Инвентарь пуст — загляните в <a href="{{ url_for('shop.list_items') }}">магазин</a>
-  </div>
+<div class="inv-empty-hint">
+  <i class="bi bi-backpack4 fs-1 d-block mb-2 opacity-25"></i>
+  Инвентарь пуст — загляните в <a href="{{ url_for('shop.list_items') }}">магазин</a>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const hero = document.getElementById('inv-hero');
+  if (!hero) return;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const countEl = hero.querySelector('[data-count-to]');
+  if (countEl) {
+    const target = parseInt(countEl.dataset.countTo, 10) || 0;
+    if (reduceMotion || target === 0) {
+      countEl.textContent = String(target);
+    } else {
+      const duration = 1200;
+      const start = performance.now();
+      const ease = t => 1 - Math.pow(1 - t, 3);
+      const tick = now => {
+        const p = Math.min(1, (now - start) / duration);
+        countEl.textContent = String(Math.round(ease(p) * target));
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+  }
+
+  if (!reduceMotion && window.matchMedia('(hover: hover)').matches) {
+    const bg = hero.querySelector('.inv-hero__bg');
+    let raf = null;
+    hero.addEventListener('mousemove', (e) => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const r = hero.getBoundingClientRect();
+        const mx = ((e.clientX - r.left) / r.width - 0.5) * 2;
+        const my = ((e.clientY - r.top) / r.height - 0.5) * 2;
+        bg.style.setProperty('--mx', mx.toFixed(3));
+        bg.style.setProperty('--my', my.toFixed(3));
+        raf = null;
+      });
+    });
+    hero.addEventListener('mouseleave', () => {
+      bg.style.setProperty('--mx', 0);
+      bg.style.setProperty('--my', 0);
+    });
+  }
+})();
+</script>
 {% endblock %}

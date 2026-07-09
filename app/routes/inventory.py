@@ -29,9 +29,16 @@ def list_inventory():
         .all()
     )
 
+    # Hero-стата — из уже загруженного списка, без новых запросов.
+    total_items = len(items)
+    equipped_count = sum(1 for inv in items if inv.is_equipped)
+    exclusive_count = sum(1 for inv in items if inv.item.rarity.value in ("mythic", "ultra"))
+
     return render_template(
         "inventory/list.html", grouped=grouped, categories=list(ShopCategory),
         other_players=other_players,
+        total_items=total_items, equipped_count=equipped_count,
+        exclusive_count=exclusive_count,
     )
 
 
