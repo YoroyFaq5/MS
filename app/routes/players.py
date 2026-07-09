@@ -13,7 +13,21 @@ players_bp = Blueprint("players", __name__)
 def list_players():
     players = db.session.query(Player).order_by(Player.name).all()
     equipped_bulk = ShopService.get_equipped_bulk([p.id for p in players])
-    return render_template("players/list.html", players=players, equipped_bulk=equipped_bulk)
+    avatars = {p.id: p.avatar_url for p in players}
+
+    # Hero-стата — считается из уже загруженного списка, без новых
+    # запросов. Неактивные игроки по-прежнему видны в самой таблице
+    # (как и раньше), просто не участвуют в этих агрегатах.
+    active_players = [p for p in players if p.is_active]
+    active_count = len(active_players)
+    avg_elo = round(sum(p.elo for p in active_players) / active_count, 1) if active_count else 0
+    newest_player = max(active_players, key=lambda p: p.created_at) if active_players else None
+
+    return render_template(
+        "players/list.html", players=players, equipped_bulk=equipped_bulk,
+        avatars=avatars, active_count=active_count, avg_elo=avg_elo,
+        newest_player=newest_player,
+    )
 
 
 @players_bp.route("/add", methods=["GET", "POST"])
