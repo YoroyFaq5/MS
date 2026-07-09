@@ -14,3 +14,6 @@ PROJECT_CONTEXT.md
 legacy_export/
 legacy_export_test/
 *.sql
+
+# Загруженные пользователями аватары — файлы на диске сервера, не в git.
+app/static/uploads/

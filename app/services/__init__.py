@@ -5,6 +5,7 @@ from .permission_service import PermissionService, Permission, PermissionDenied
 from .economy_service import EconomyService, EconomyResult
 from .fantasy_service import FantasyService, FantasyResult
 from .profile_service import ProfileService, ProfileResult
+from .avatar_service import AvatarService
 from .shop_service import ShopService, ShopResult
 from .admin_shop_service import AdminShopService
 from .achievement_service import AchievementService, AchievementResult
@@ -25,6 +26,7 @@ __all__ = [
     "EconomyService", "EconomyResult",
     "FantasyService", "FantasyResult",
     "ProfileService", "ProfileResult",
+    "AvatarService",
     "ShopService", "ShopResult",
     "AdminShopService",
     "AchievementService", "AchievementResult",

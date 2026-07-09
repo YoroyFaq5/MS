@@ -166,7 +166,13 @@
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle d-flex align-items-center gap-2"
                href="#" data-bs-toggle="dropdown">
-              <span class="user-avatar">{{ current_user.display_name[0]|upper }}</span>
+              <span class="user-avatar">
+                {% if current_user.player and current_user.player.avatar_url %}
+                <img src="{{ current_user.player.avatar_url }}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
+                {% else %}
+                {{ current_user.display_name[0]|upper }}
+                {% endif %}
+              </span>
               <span class="d-none d-lg-inline">{{ player_name(current_user, current_user_equipped) }}</span>
             </a>
             <ul class="dropdown-menu dropdown-menu-end">

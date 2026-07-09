@@ -1,11 +1,11 @@
 from datetime import datetime, timezone, timedelta
 
-from flask import Blueprint, render_template, redirect, url_for, flash, abort, request, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, abort, request, current_app, jsonify
 from flask_login import current_user
 
 from app import db
 from app.models import Player, Title
-from app.services import ProfileService, AchievementService, PermissionService, TitleService, ChartDataService
+from app.services import ProfileService, AchievementService, PermissionService, TitleService, ChartDataService, AvatarService
 from app.services.shop_service import ShopService
 from app.services.nomination_service import NominationService
 from app.services.season_service import SeasonService
@@ -34,6 +34,26 @@ def own_profile():
         flash("Привяжите аккаунт к игроку, чтобы открыть профиль.", "warning")
         return redirect(url_for("auth.link_player_page"))
     return redirect(url_for("profile.view_profile", player_id=current_user.player_id))
+
+
+@profile_bp.route("/avatar", methods=["POST"])
+@login_required
+def upload_avatar():
+    if not current_user.player_id:
+        return jsonify(ok=False, message="Профиль не привязан к игроку."), 403
+    player = db.session.get(Player, current_user.player_id)
+    result = AvatarService.save_avatar(player, request.files.get("avatar"))
+    return jsonify(ok=result.ok, message=result.message, avatar_url=result.data if result.ok else None), (200 if result.ok else 400)
+
+
+@profile_bp.route("/avatar/remove", methods=["POST"])
+@login_required
+def remove_avatar():
+    if not current_user.player_id:
+        return jsonify(ok=False, message="Профиль не привязан к игроку."), 403
+    player = db.session.get(Player, current_user.player_id)
+    result = AvatarService.remove_avatar(player)
+    return jsonify(ok=result.ok, message=result.message), (200 if result.ok else 400)
 
 
 @profile_bp.route("/<int:player_id>")

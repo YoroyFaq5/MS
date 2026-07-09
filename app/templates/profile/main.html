@@ -8,6 +8,46 @@
   padding: 1.5rem;
   background: var(--ms-surface-raised);
 }
+
+/* Larger avatar on the profile banner specifically (base .avatar-circle
+   stays 56px everywhere else — shop previews, admin form). Scoped via
+   .profile-banner so nothing outside this page is affected. */
+.profile-banner .avatar-circle {
+  width: 84px;
+  height: 84px;
+  font-size: 2.1rem;
+}
+
+.avatar-edit-wrap { position: relative; flex-shrink: 0; }
+
+.avatar-edit-btn, .avatar-remove-btn {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid var(--ms-surface-raised);
+  cursor: pointer;
+  transition: transform .15s ease, background .15s ease;
+}
+.avatar-edit-btn {
+  width: 30px; height: 30px;
+  bottom: -2px; right: -2px;
+  background: var(--ms-gold);
+  color: #0D0D0D;
+  font-size: .8rem;
+}
+.avatar-edit-btn:hover { transform: scale(1.08); background: var(--ms-gold-light); }
+.avatar-edit-btn:disabled { opacity: .55; cursor: wait; transform: none; }
+
+.avatar-remove-btn {
+  width: 22px; height: 22px;
+  top: -2px; right: -2px;
+  background: var(--ms-wine);
+  color: var(--ms-text);
+  font-size: .6rem;
+}
+.avatar-remove-btn:hover { background: var(--ms-wine-light); }
 </style>
 {% endblock %}
 
@@ -22,12 +62,25 @@
 <div class="profile-banner mb-4{% if background and background.item.data.theme %} fx-bg-themed fx-bg-theme-{{ background.item.data.theme }}{% endif %}"
      {% if background and background.item.data.image_url and not background.item.data.theme %}style="background-image:url('{{ background.item.data.image_url }}'); background-size:cover;"{% endif %}>
   <div class="d-flex align-items-center gap-3 flex-wrap">
-    <div class="avatar-circle {% if frame %}profile-frame{% if frame.item.data.theme or frame.item.data.effect == 'rainbow' %} fx-frame-themed fx-frame-theme-{{ frame.item.data.theme or 'rainbow' }}{% elif frame.item.data.effect == 'glow' %} fx-frame-glow{% endif %}{% endif %}"
-         {% if frame and frame.item.data.color and not frame.item.data.theme and frame.item.data.effect != 'rainbow' %}style="border-color:{{ frame.item.data.color }};--fx-color:{{ frame.item.data.color }}"{% endif %}>
-      {% if profile.avatar_url %}
-        <img src="{{ profile.avatar_url }}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
-      {% else %}
-        {{ profile.player.display_name[0]|upper }}
+    <div class="avatar-edit-wrap">
+      <div class="avatar-circle {% if frame %}profile-frame{% if frame.item.data.theme or frame.item.data.effect == 'rainbow' %} fx-frame-themed fx-frame-theme-{{ frame.item.data.theme or 'rainbow' }}{% elif frame.item.data.effect == 'glow' %} fx-frame-glow{% endif %}{% endif %}"
+           id="avatar-circle"
+           {% if frame and frame.item.data.color and not frame.item.data.theme and frame.item.data.effect != 'rainbow' %}style="border-color:{{ frame.item.data.color }};--fx-color:{{ frame.item.data.color }}"{% endif %}>
+        {% if profile.avatar_url %}
+          <img src="{{ profile.avatar_url }}" alt="" id="avatar-img" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
+        {% else %}
+          <span id="avatar-initial">{{ profile.player.display_name[0]|upper }}</span>
+        {% endif %}
+      </div>
+      {% if is_own %}
+      <button type="button" class="avatar-edit-btn" id="avatar-edit-btn" title="Изменить аватар">
+        <i class="bi bi-camera-fill"></i>
+      </button>
+      <button type="button" class="avatar-remove-btn" id="avatar-remove-btn" title="Удалить аватар"
+              {% if not profile.avatar_url %}style="display:none"{% endif %}>
+        <i class="bi bi-x-lg"></i>
+      </button>
+      <input type="file" id="avatar-file-input" accept="image/png,image/jpeg,image/gif,image/webp" class="d-none">
       {% endif %}
     </div>
     <div>
@@ -284,3 +337,90 @@
   </div>
 </div>
 {% endblock %}
+
+{% if is_own %}
+{% block scripts %}
+<script>
+(() => {
+  const editBtn = document.getElementById('avatar-edit-btn');
+  const removeBtn = document.getElementById('avatar-remove-btn');
+  const fileInput = document.getElementById('avatar-file-input');
+  const circle = document.getElementById('avatar-circle');
+  if (!editBtn || !fileInput || !circle) return;
+
+  const showAlert = (message, ok) => {
+    let container = document.querySelector('.container-xxl.mt-3');
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'container-xxl mt-3';
+      document.querySelector('main.container-xxl').before(container);
+    }
+    const div = document.createElement('div');
+    div.className = `alert alert-${ok ? 'success' : 'danger'} alert-dismissible fade show d-flex align-items-center gap-2`;
+    div.setAttribute('role', 'alert');
+    div.innerHTML = `<i class="bi bi-${ok ? 'check-circle-fill' : 'exclamation-triangle-fill'}"></i>${message}
+      <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>`;
+    container.appendChild(div);
+    if (ok) setTimeout(() => bootstrap.Alert.getOrCreateInstance(div).close(), 5000);
+  };
+
+  const setAvatarImage = (url) => {
+    circle.innerHTML = `<img src="${url}" alt="" id="avatar-img" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+    removeBtn.style.display = '';
+  };
+
+  const setAvatarInitial = (letter) => {
+    circle.innerHTML = `<span id="avatar-initial">${letter}</span>`;
+    removeBtn.style.display = 'none';
+  };
+
+  const initial = '{{ profile.player.display_name[0]|upper }}';
+
+  editBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files[0];
+    fileInput.value = '';
+    if (!file) return;
+
+    editBtn.disabled = true;
+    const original = editBtn.innerHTML;
+    editBtn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+
+    try {
+      const form = new FormData();
+      form.append('avatar', file);
+      const resp = await fetch('{{ url_for("profile.upload_avatar") }}', { method: 'POST', body: form });
+      const data = await resp.json();
+      if (data.ok) {
+        setAvatarImage(data.avatar_url);
+      }
+      showAlert(data.message, data.ok);
+    } catch (e) {
+      showAlert('Не удалось загрузить аватар. Обновите страницу и попробуйте снова.', false);
+    } finally {
+      editBtn.disabled = false;
+      editBtn.innerHTML = original;
+    }
+  });
+
+  removeBtn.addEventListener('click', async () => {
+    if (!confirm('Удалить аватар?')) return;
+    removeBtn.disabled = true;
+    try {
+      const resp = await fetch('{{ url_for("profile.remove_avatar") }}', { method: 'POST' });
+      const data = await resp.json();
+      if (data.ok) {
+        setAvatarInitial(initial);
+      }
+      showAlert(data.message, data.ok);
+    } catch (e) {
+      showAlert('Не удалось удалить аватар. Обновите страницу и попробуйте снова.', false);
+    } finally {
+      removeBtn.disabled = false;
+    }
+  });
+})();
+</script>
+{% endblock %}
+{% endif %}
