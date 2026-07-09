@@ -18,6 +18,244 @@
    already exists elsewhere in main.css.
    ============================================================ */
 
+/* ============================================================
+   Games list — "club archive" hero
+   ============================================================
+   Reuses --ms-* tokens, the Playfair Display numeral face already
+   used for .brand-monogram/.match-card__result-text, and the same
+   background-clip:text gold-gradient technique already present in
+   main.css's shop-cosmetic "fx-*" effects — applied here statically
+   (no shimmer/animation loop) for a premium-but-quiet number treatment.
+   ============================================================ */
+
+.games-hero {
+  position: relative;
+  overflow: hidden;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  margin-bottom: 1.5rem;
+  transition: transform .35s cubic-bezier(.2,.7,.3,1), box-shadow .35s ease, border-color .35s ease;
+}
+.games-hero:hover {
+  transform: translateY(-2px);
+  border-color: rgba(199,165,82,.24);
+  box-shadow: 0 20px 48px rgba(0,0,0,.4);
+}
+
+/* ── Layer 1-3: background, decorative lines, light ─────────────────── */
+.games-hero__bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --mx: 0;
+  --my: 0;
+}
+.games-hero__lines {
+  position: absolute;
+  inset: 0;
+  opacity: .5;
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(199,165,82,.05) 0px,
+    rgba(199,165,82,.05) 1px,
+    transparent 1px,
+    transparent 64px
+  );
+  -webkit-mask-image: linear-gradient(90deg, black, transparent 75%);
+  mask-image: linear-gradient(90deg, black, transparent 75%);
+}
+.games-hero__glow {
+  position: absolute;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  filter: blur(70px);
+  transition: transform .4s ease-out;
+  transform: translate3d(calc(var(--mx, 0) * 12px), calc(var(--my, 0) * 8px), 0);
+}
+.games-hero__glow--1 {
+  top: -160px;
+  left: -60px;
+  background: radial-gradient(circle, rgba(199,165,82,.16), transparent 70%);
+}
+.games-hero__glow--2 {
+  bottom: -180px;
+  left: 220px;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(212,176,106,.1), transparent 70%);
+  transition-delay: .05s;
+}
+
+.games-hero__particles {
+  position: absolute;
+  inset: 0;
+  transform: translate3d(calc(var(--mx, 0) * 6px), calc(var(--my, 0) * 4px), 0);
+  transition: transform .4s ease-out;
+}
+.games-hero__particles span {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--ms-gold-light);
+  opacity: 0;
+  animation: games-hero-dust 7s ease-in-out infinite;
+}
+.games-hero__particles span:nth-child(1) { top: 18%; left: 12%; animation-delay: 0s; }
+.games-hero__particles span:nth-child(2) { top: 60%; left: 24%; animation-delay: 1.6s; }
+.games-hero__particles span:nth-child(3) { top: 30%; left: 34%; animation-delay: 3.1s; }
+.games-hero__particles span:nth-child(4) { top: 75%; left: 8%;  animation-delay: 4.4s; }
+.games-hero__particles span:nth-child(5) { top: 45%; left: 42%; animation-delay: 5.6s; }
+@keyframes games-hero-dust {
+  0%   { opacity: 0; transform: translateY(6px); }
+  15%  { opacity: .5; }
+  50%  { opacity: .25; transform: translateY(-10px); }
+  85%  { opacity: 0; transform: translateY(-18px); }
+  100% { opacity: 0; }
+}
+
+/* ── Layer 4: content ─────────────────────────────────────────────── */
+.games-hero__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2rem 2.5rem;
+}
+
+.games-hero__main { display: flex; align-items: center; gap: 1.25rem; }
+
+.games-hero__monogram {
+  flex-shrink: 0;
+  width: 76px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(199,165,82,.3);
+  border-radius: 50%;
+  font-size: 1.6rem;
+  color: var(--ms-gold-light);
+  background: radial-gradient(circle, rgba(199,165,82,.08), transparent 75%);
+}
+
+.games-hero__eyebrow {
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+  margin-bottom: .15rem;
+}
+
+.games-hero__count {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(2.75rem, 3.2vw + 1.5rem, 4.5rem);
+  line-height: 1;
+  letter-spacing: -.01em;
+  background: linear-gradient(180deg, #F3E4B8 0%, #D4B06A 32%, #C7A552 58%, #9C7C3E 82%, #C7A552 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 10px rgba(0,0,0,.5));
+  font-variant-numeric: tabular-nums;
+}
+
+.games-hero__count-label {
+  font-size: .82rem;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ms-text-dim);
+  margin-top: -.2rem;
+}
+
+.games-hero__tagline {
+  font-size: .78rem;
+  color: var(--ms-muted);
+  margin-top: .4rem;
+}
+
+.games-hero__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .85rem;
+  margin-left: auto;
+}
+
+.games-hero__stat {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  min-width: 190px;
+  padding: .85rem 1.1rem;
+  background: var(--ms-surface-raised);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+}
+
+.games-hero__stat-icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 1rem;
+}
+.games-hero__stat--city .games-hero__stat-icon { background: rgba(199,165,82,.16); color: var(--ms-gold-light); }
+.games-hero__stat--mafia .games-hero__stat-icon { background: rgba(142,28,28,.18); color: var(--ms-wine-light); }
+
+.games-hero__stat-body { min-width: 0; }
+.games-hero__stat-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.games-hero__stat--city .games-hero__stat-value { color: var(--ms-gold-light); }
+.games-hero__stat--mafia .games-hero__stat-value { color: var(--ms-wine-light); }
+.games-hero__stat-label { font-size: .72rem; color: var(--ms-text-dim); white-space: nowrap; }
+.games-hero__stat-sub { font-size: .66rem; color: var(--ms-muted); }
+
+.games-hero__spark { flex-shrink: 0; width: 60px; height: 22px; opacity: .8; }
+.games-hero__spark polyline {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.games-hero__stat--city .games-hero__spark polyline { stroke: var(--ms-gold-light); }
+.games-hero__stat--mafia .games-hero__spark polyline { stroke: var(--ms-wine-light); }
+
+/* ── Toolbar row: month filter + primary CTA ─────────────────────── */
+.games-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .games-hero, .games-hero__glow, .games-hero__particles { transition: none; }
+  .games-hero__particles span { animation: none; opacity: 0; }
+}
+
+@media (max-width: 767px) {
+  .games-hero__content { gap: 1.5rem; }
+  .games-hero__stats { margin-left: 0; width: 100%; }
+  .games-hero__stat { flex: 1 1 160px; }
+  .games-hero__monogram { width: 60px; height: 60px; font-size: 1.3rem; }
+}
+
 .matches-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
@@ -231,16 +469,58 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h2 class="mb-0 fw-bold">🎮 Игры</h2>
-    <p class="text-muted small mb-0">{{ pagination.total }} завершённых записей</p>
+<div class="games-hero fade-in-up" id="games-hero">
+  <div class="games-hero__bg" aria-hidden="true">
+    <div class="games-hero__lines"></div>
+    <div class="games-hero__glow games-hero__glow--1"></div>
+    <div class="games-hero__glow games-hero__glow--2"></div>
+    <div class="games-hero__particles">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
   </div>
-  {% if current_user.is_admin %}
-  <a href="{{ url_for('games.new_game') }}" class="btn btn-danger">
-    <i class="bi bi-plus-lg me-1"></i>Новая игра
-  </a>
-  {% endif %}
+
+  <div class="games-hero__content">
+    <div class="games-hero__main">
+      <div class="games-hero__monogram fade-in-up" style="--d:60ms"><i class="bi bi-bank2"></i></div>
+      <div class="games-hero__count-wrap fade-in-up" style="--d:140ms">
+        <div class="games-hero__eyebrow">История клуба</div>
+        <div class="games-hero__count" data-count-to="{{ total_finished_games }}">0</div>
+        <div class="games-hero__count-label">партий</div>
+        <div class="games-hero__tagline">Каждая игра — часть нашей легенды</div>
+      </div>
+    </div>
+
+    {% if city_games or mafia_games %}
+    <div class="games-hero__stats">
+      <div class="games-hero__stat games-hero__stat--city fade-in-up" style="--d:220ms">
+        <div class="games-hero__stat-icon"><i class="bi bi-shield-fill"></i></div>
+        <div class="games-hero__stat-body">
+          <div class="games-hero__stat-value">{{ city_win_pct }}%</div>
+          <div class="games-hero__stat-label">Побед города</div>
+          <div class="games-hero__stat-sub">{{ city_games }} партий</div>
+        </div>
+        {% if city_trend_points %}
+        <svg class="games-hero__spark" viewBox="0 0 64 22" preserveAspectRatio="none">
+          <polyline points="{{ city_trend_points }}"></polyline>
+        </svg>
+        {% endif %}
+      </div>
+      <div class="games-hero__stat games-hero__stat--mafia fade-in-up" style="--d:280ms">
+        <div class="games-hero__stat-icon"><i class="bi bi-mask"></i></div>
+        <div class="games-hero__stat-body">
+          <div class="games-hero__stat-value">{{ mafia_win_pct }}%</div>
+          <div class="games-hero__stat-label">Побед мафии</div>
+          <div class="games-hero__stat-sub">{{ mafia_games }} партий</div>
+        </div>
+        {% if mafia_trend_points %}
+        <svg class="games-hero__spark" viewBox="0 0 64 22" preserveAspectRatio="none">
+          <polyline points="{{ mafia_trend_points }}"></polyline>
+        </svg>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
 </div>
 
 {% if pending_games %}
@@ -277,17 +557,26 @@
 </div>
 {% endif %}
 
-{% if available_months %}
-<form method="GET" class="d-flex align-items-center gap-2 mb-3">
-  <label class="text-muted small">Месяц:</label>
-  <select name="month" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()">
-    <option value="">Все</option>
-    {% for m in available_months %}
-    <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ m }}</option>
-    {% endfor %}
-  </select>
-</form>
-{% endif %}
+<div class="games-toolbar">
+  {% if available_months %}
+  <form method="GET" class="d-flex align-items-center gap-2">
+    <label class="text-muted small">Месяц:</label>
+    <select name="month" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()">
+      <option value="">Все</option>
+      {% for m in available_months %}
+      <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ m }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  {% else %}
+  <span></span>
+  {% endif %}
+  {% if current_user.is_admin %}
+  <a href="{{ url_for('games.new_game') }}" class="btn btn-danger">
+    <i class="bi bi-plus-lg me-1"></i>Новая игра
+  </a>
+  {% endif %}
+</div>
 
 {% if finished_games %}
 <div class="matches-grid">
@@ -446,4 +735,54 @@
   {% endif %}
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const hero = document.getElementById('games-hero');
+  if (!hero) return;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const countEl = hero.querySelector('[data-count-to]');
+  if (countEl) {
+    const target = parseInt(countEl.dataset.countTo, 10) || 0;
+    if (reduceMotion || target === 0) {
+      countEl.textContent = target.toLocaleString('ru-RU');
+    } else {
+      const duration = 1200;
+      const start = performance.now();
+      const ease = t => 1 - Math.pow(1 - t, 3);
+      const tick = now => {
+        const p = Math.min(1, (now - start) / duration);
+        countEl.textContent = Math.round(ease(p) * target).toLocaleString('ru-RU');
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+  }
+
+  // Subtle mouse parallax on the ambient light/particle layers — pointer
+  // devices only, skipped entirely under reduced-motion.
+  if (!reduceMotion && window.matchMedia('(hover: hover)').matches) {
+    const bg = hero.querySelector('.games-hero__bg');
+    let raf = null;
+    hero.addEventListener('mousemove', (e) => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const r = hero.getBoundingClientRect();
+        const mx = ((e.clientX - r.left) / r.width - 0.5) * 2;
+        const my = ((e.clientY - r.top) / r.height - 0.5) * 2;
+        bg.style.setProperty('--mx', mx.toFixed(3));
+        bg.style.setProperty('--my', my.toFixed(3));
+        raf = null;
+      });
+    });
+    hero.addEventListener('mouseleave', () => {
+      bg.style.setProperty('--mx', 0);
+      bg.style.setProperty('--my', 0);
+    });
+  }
+})();
+</script>
 {% endblock %}

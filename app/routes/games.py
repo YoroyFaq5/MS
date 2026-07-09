@@ -146,6 +146,25 @@ def _new_game_form_context(tournaments, preselect_tournament=None, preselect_sta
 GAMES_PER_PAGE = 12
 
 
+def _trend_sparkline_points(values: list, width: int = 64, height: int = 22, pad: float = 3) -> str:
+    """
+    SVG <polyline points="..."> for a continuous 0-100 trend line (city
+    win-rate per historical bucket) — same server-side string-math approach
+    as the homepage's binary form sparkline, generalized to percentages.
+    """
+    n = len(values)
+    if n == 0:
+        return ""
+    if n == 1:
+        y = height - pad - (values[0] / 100) * (height - 2 * pad)
+        return f"{pad:.1f},{y:.1f} {width - pad:.1f},{y:.1f}"
+    x_step = (width - 2 * pad) / (n - 1)
+    return " ".join(
+        f"{pad + i * x_step:.1f},{height - pad - (v / 100) * (height - 2 * pad):.1f}"
+        for i, v in enumerate(values)
+    )
+
+
 @games_bp.route("/")
 def list_games():
     from sqlalchemy import select
@@ -189,6 +208,38 @@ def list_games():
     player_ids = {s.player_id for slots in slots_by_game.values() for s in slots}
     equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
 
+    # ── История клуба — общая статистика по ВСЕМ завершённым играм, не
+    # зависит от фильтра по месяцу (это архив клуба целиком, а не текущая
+    # выборка). Тренд — доля побед города по 16 хронологическим отрезкам
+    # истории, реальные данные, ничего не выдумываем.
+    all_sides = (
+        db.session.query(Game.win_side)
+        .filter(Game.is_finished == True)
+        .order_by(Game.played_at.asc())
+        .all()
+    )
+    total_finished_games = len(all_sides)
+    city_games = sum(1 for (ws,) in all_sides if ws == WinSide.CITY)
+    mafia_games = sum(1 for (ws,) in all_sides if ws == WinSide.MAFIA)
+    side_total = city_games + mafia_games
+    city_win_pct = round(city_games / side_total * 100) if side_total else 50
+    mafia_win_pct = 100 - city_win_pct if side_total else 50
+
+    BUCKETS = 16
+    city_trend_values = []
+    if all_sides:
+        chunk_size = max(1, -(-total_finished_games // BUCKETS))
+        last_pct = city_win_pct
+        for i in range(0, total_finished_games, chunk_size):
+            chunk = all_sides[i:i + chunk_size]
+            c = sum(1 for (ws,) in chunk if ws == WinSide.CITY)
+            m = sum(1 for (ws,) in chunk if ws == WinSide.MAFIA)
+            t = c + m
+            last_pct = round(c / t * 100) if t else last_pct
+            city_trend_values.append(last_pct)
+    city_trend_points = _trend_sparkline_points(city_trend_values)
+    mafia_trend_points = _trend_sparkline_points([100 - v for v in city_trend_values])
+
     return render_template(
         "games/list.html",
         pending_games=pending_games,
@@ -198,6 +249,13 @@ def list_games():
         equipped_bulk=equipped_bulk,
         available_months=available_months,
         current_month=month,
+        total_finished_games=total_finished_games,
+        city_games=city_games,
+        mafia_games=mafia_games,
+        city_win_pct=city_win_pct,
+        mafia_win_pct=mafia_win_pct,
+        city_trend_points=city_trend_points,
+        mafia_trend_points=mafia_trend_points,
     )
 
 
