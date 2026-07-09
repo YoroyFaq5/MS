@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from flask import Blueprint, render_template, jsonify
 from app import db
 from app.models import Player
@@ -22,6 +24,16 @@ def leaderboard():
     # Средний винрейт по всем игрокам таблицы — для hero-блока, чисто
     # агрегация уже полученного списка, без новых запросов к БД.
     avg_win_rate = round(sum(r.win_rate for r in ratings) / len(ratings), 1) if ratings else 0.0
+
+    # ── Движение в рейтинге за 30 дней — тот же приём, что на главной
+    # (см. main.py::index): второй проход compute_all_ratings с cutoff-
+    # датой, без отдельной таблицы исторических снапшотов.
+    ratings_30d_ago = RatingService.compute_all_ratings(as_of=datetime.now() - timedelta(days=30))
+    rank_30d_ago = {r.player_id: r.rank for r in ratings_30d_ago}
+    for r in ratings:
+        old_rank = rank_30d_ago.get(r.player_id)
+        r.rank_movement = (old_rank - r.rank) if old_rank is not None else None
+
     return render_template(
         "ratings/leaderboard.html", ratings=ratings,
         equipped_titles=equipped_titles, equipped_bulk=equipped_bulk,

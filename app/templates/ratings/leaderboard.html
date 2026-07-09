@@ -312,6 +312,19 @@
 .rank-row--top1 .lb-avatar { box-shadow: 0 0 0 2px var(--ms-gold-light); }
 .rank-row--top2 .lb-avatar { box-shadow: 0 0 0 2px #B8B8B8; }
 .rank-row--top3 .lb-avatar { box-shadow: 0 0 0 2px #B08D57; }
+
+/* Движение в рейтинге за 30 дней — тот же .elo-up/.elo-down/.elo-flat
+   язык, что уже используется на главной для этой же метрики. */
+.lb-move {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: .64rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.lb-move.elo-flat { font-weight: 600; opacity: .75; }
 </style>
 {% endblock %}
 
@@ -462,7 +475,20 @@
           <tr class="rank-row {% if r.rank <= 3 %}rank-row--top{{ r.rank }}{% endif %}{% if loop.index0 < 15 %} fade-in-up{% endif %}"
               {% if loop.index0 < 15 %}style="--d:{{ loop.index0 * 18 }}ms"{% endif %}
               data-player-name="{{ r.display_name|lower }}">
-            <td class="ps-4"><span class="rank-badge">{{ r.rank }}</span></td>
+            <td class="ps-4">
+              <div class="d-flex align-items-center gap-2">
+                <span class="rank-badge">{{ r.rank }}</span>
+                {% if r.rank_movement is none %}
+                <span class="lb-move elo-flat" title="Новый в рейтинге за последние 30 дней">новый</span>
+                {% elif r.rank_movement > 0 %}
+                <span class="lb-move elo-up" title="Поднялся на {{ r.rank_movement }} за 30 дней"><i class="bi bi-caret-up-fill"></i>{{ r.rank_movement }}</span>
+                {% elif r.rank_movement < 0 %}
+                <span class="lb-move elo-down" title="Опустился на {{ -r.rank_movement }} за 30 дней"><i class="bi bi-caret-down-fill"></i>{{ -r.rank_movement }}</span>
+                {% else %}
+                <span class="lb-move elo-flat" title="Без изменений за 30 дней"><i class="bi bi-dash"></i></span>
+                {% endif %}
+              </div>
+            </td>
             <td>
               <div class="d-flex align-items-center gap-2">
                 <span class="lb-avatar">
