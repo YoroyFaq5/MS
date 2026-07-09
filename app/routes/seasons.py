@@ -154,14 +154,20 @@ def detail(season_id: int):
     from app.services import TitleService
     season_nominations = TitleService.get_season_nominations(season_id)
 
-    # Персонализация ников — один bulk-запрос на все имена этой страницы.
-    # GG-панель ниже не в счёт — она видна только админам (простой текст).
+    # Персонализация ников + аватарки — один bulk-запрос на все имена
+    # этой страницы. GG-панель ниже не в счёт — она видна только
+    # админам (простой текст).
     player_ids = {r.player_id for r in ratings}
     player_ids.update(c.player_id for c in tiebreak_candidates)
     player_ids.update(pt.player_id for pt in season_nominations)
     if season.winner_player_id:
         player_ids.add(season.winner_player_id)
     equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+    avatars = dict(
+        db.session.query(Player.id, Player.avatar_url)
+        .filter(Player.id.in_(player_ids))
+        .all()
+    ) if player_ids else {}
 
     return render_template(
         "seasons/detail.html",
@@ -172,6 +178,7 @@ def detail(season_id: int):
         gg_entries=gg_entries,
         season_nominations=season_nominations,
         equipped_bulk=equipped_bulk,
+        avatars=avatars,
     )
 
 

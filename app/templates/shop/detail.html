@@ -2,92 +2,169 @@
 {% from "_macros.html" import shop_item_preview %}
 {% block title %}{{ item.name }} — Магазин{% endblock %}
 
+{% block head %}
+<style>
+.shop-detail-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--ms-surface);
+  border-radius: var(--ms-radius);
+  padding: 2rem;
+}
+.shop-detail-card--ultra::before, .shop-detail-card--mythic::before {
+  content: "";
+  position: absolute; inset: -30% -10% auto -10%; height: 220px;
+  background: radial-gradient(circle, rgba(255,215,0,.14), transparent 70%);
+  pointer-events: none;
+}
+.shop-detail-card--mythic::before { background: radial-gradient(circle, rgba(157,78,221,.14), transparent 70%); }
+
+.shop-detail-preview {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 2.5rem 1rem;
+  margin-bottom: 1.5rem;
+  background: var(--ms-surface-raised);
+  border-radius: var(--ms-radius);
+  overflow: hidden;
+}
+
+.shop-detail-head { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: .5rem; }
+.shop-detail-name { font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 1.7rem; }
+.shop-detail-meta { position: relative; z-index: 1; font-size: .8rem; color: var(--ms-muted); margin-bottom: 1.25rem; }
+.shop-detail-desc { position: relative; z-index: 1; font-size: .92rem; color: var(--ms-text-dim); margin-bottom: 1.5rem; }
+
+.rarity-pill { display: inline-flex; align-items: center; padding: .22rem .65rem; border-radius: 99px; font-size: .7rem; font-weight: 700; letter-spacing: .02em; white-space: nowrap; flex-shrink: 0; }
+.rarity-pill--common    { background: rgba(138,138,138,.12); color: var(--ms-muted); }
+.rarity-pill--rare      { background: rgba(184,184,184,.14); color: #B8B8B8; }
+.rarity-pill--epic      { background: rgba(142,28,28,.16);   color: var(--ms-wine-light); }
+.rarity-pill--legendary { background: rgba(199,165,82,.16);  color: var(--ms-gold-light); }
+.rarity-pill--mythic    { background: rgba(157,78,221,.16);  color: #c090ee; }
+.rarity-pill--ultra     { background: rgba(255,215,0,.16);   color: #ffd700; }
+
+.shop-owner-panel {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1rem 1.1rem;
+  background: rgba(199,165,82,.06);
+  border: 1px solid rgba(199,165,82,.2);
+  border-radius: var(--ms-radius);
+  margin-bottom: 1.5rem;
+}
+.shop-owner-panel__avatar-ring {
+  flex-shrink: 0; width: 52px; height: 52px; border-radius: 50%; padding: 2px;
+  background: conic-gradient(from 0deg, var(--ms-gold-light), var(--ms-gold), #F3E4B8, var(--ms-gold-light));
+}
+.shop-owner-panel__avatar {
+  width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ms-surface-raised); color: var(--ms-gold-light);
+  font-weight: 700; font-family: 'Playfair Display', Georgia, serif; font-size: 1.2rem;
+}
+.shop-owner-panel__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.shop-owner-panel__label { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ms-muted); }
+.shop-owner-panel__name { font-weight: 700; }
+.shop-owner-panel__price { margin-left: auto; text-align: right; }
+.shop-owner-panel__price-value { font-weight: 700; color: var(--ms-gold-light); font-variant-numeric: tabular-nums; }
+.shop-owner-panel__price-label { font-size: .68rem; color: var(--ms-muted); }
+
+.shop-owner-panel--free { background: rgba(138,138,138,.06); border-color: var(--ms-border); }
+
+.shop-detail-price-row { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+.shop-detail-price { display: inline-flex; align-items: center; gap: .5rem; font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 2rem; color: var(--ms-gold-light); font-variant-numeric: tabular-nums; }
+</style>
+{% endblock %}
+
 {% block content %}
-{% set CATEGORY_LABELS = {'profile_customization': '🖼️ Кастомизация профиля', 'nickname': '✨ Никнейм', 'physical': '📦 Физический товар'} %}
+{% set CATEGORY_LABELS = {'profile_customization': 'Кастомизация профиля', 'nickname': 'Никнейм', 'physical': 'Физический товар'} %}
 {% set RARITY_LABELS = {'common': 'Обычная', 'rare': 'Редкая', 'epic': 'Эпическая', 'legendary': 'Легендарная', 'mythic': 'Мифическая', 'ultra': 'Ультра'} %}
-{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark', 'mythic': 'bg-danger', 'ultra': 'bg-warning text-dark'} %}
 {% set is_unique = item.rarity.value in ('mythic', 'ultra') %}
 
 <div class="mb-3">
-  <a href="{{ url_for('shop.list_items') }}" class="text-muted small">← Назад в магазин</a>
+  <a href="{{ url_for('shop.list_items') }}" class="text-muted small"><i class="bi bi-arrow-left me-1"></i>Назад в магазин</a>
 </div>
 
 <div class="row justify-content-center">
   <div class="col-lg-6">
-    <div class="card rarity-{{ item.rarity.value }}">
-      <div class="card-body p-4">
-        <div class="d-flex align-items-center justify-content-center mb-4 py-4" style="background:var(--ms-surface-raised);border-radius:var(--ms-radius);overflow:hidden;">
-          <div style="transform:scale(1.6);">{{ shop_item_preview(item) }}</div>
-        </div>
-        <div class="d-flex justify-content-between align-items-start mb-2">
-          <h3 class="fw-bold mb-0">{{ item.name }}</h3>
-          <span class="badge {{ RARITY_BADGE.get(item.rarity.value, 'bg-secondary') }}">
-            {{ RARITY_LABELS.get(item.rarity.value, item.rarity.value) }}
-          </span>
-        </div>
-        <div class="text-muted small mb-3">
-          {{ CATEGORY_LABELS.get(item.category.value, item.category.value) }} · слот «{{ item.subcategory }}»
-        </div>
+    <div class="shop-detail-card tournament-card rarity-{{ item.rarity.value }}{% if item.rarity.value in ('mythic', 'ultra') %} shop-detail-card--{{ item.rarity.value }}{% endif %} fade-in-up">
+      <div class="shop-detail-preview"><div style="transform:scale(1.6);">{{ shop_item_preview(item) }}</div></div>
 
-        {% if item.description %}
-        <p class="mb-4">{{ item.description }}</p>
-        {% endif %}
+      <div class="shop-detail-head">
+        <div class="shop-detail-name">{{ item.name }}</div>
+        <span class="rarity-pill rarity-pill--{{ item.rarity.value }}">{{ RARITY_LABELS.get(item.rarity.value, item.rarity.value) }}</span>
+      </div>
+      <div class="shop-detail-meta">{{ CATEGORY_LABELS.get(item.category.value, item.category.value) }} · слот «{{ item.subcategory }}»</div>
 
-        {% if is_unique %}
-        <div class="alert alert-warning-subtle border border-warning-subtle small mb-3">
-          <i class="bi bi-gem me-1"></i>
-          Уникальный предмет — существует только один экземпляр на весь клуб.
-          {% if owner_inv %}
-            Текущий владелец: <strong>{{ owner_inv.player.display_name }}</strong>,
-            заплатил <strong>{{ owner_inv.price_paid | int }}</strong> монет.
-            Перекупить можно только дороже (шаг не менее {{ min_buyout_increment | int }}).
-          {% else %}
-            Пока никем не куплен — можно купить по стартовой цене.
-          {% endif %}
-        </div>
-        {% endif %}
+      {% if item.description %}
+      <p class="shop-detail-desc">{{ item.description }}</p>
+      {% endif %}
 
-        <div class="d-flex align-items-center justify-content-between mb-4">
-          <span class="fw-bold fs-4 text-warning"><i class="bi bi-coin me-1"></i>
-            {{ (owner_inv.price_paid + min_buyout_increment) | int if (is_unique and owner_inv) else item.price | int }}
-          </span>
-          {% if item.category.value == 'physical' %}
-          <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
-            Выдаётся вручную администратором
-          </span>
-          {% endif %}
-        </div>
-
-        {% if not player %}
-        <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary w-100">Войдите, чтобы купить</a>
-        {% elif is_unique and owner_inv and owner_inv.player_id == player.id %}
-        <button class="btn btn-outline-secondary w-100" disabled>Уже у вас</button>
-        {% elif is_unique and owner_inv %}
-        <form method="POST" action="{{ url_for('shop.buyout_item', item_id=item.id) }}"
-              onsubmit="return confirm('Перекупить «{{ item.name }}» у {{ owner_inv.player.display_name }}?')">
-          <div class="input-group mb-2">
-            <span class="input-group-text">🪙</span>
-            <input type="number" name="offer_price" class="form-control"
-                   min="{{ (owner_inv.price_paid + min_buyout_increment) | int }}"
-                   step="{{ min_buyout_increment | int }}"
-                   value="{{ (owner_inv.price_paid + min_buyout_increment) | int }}" required>
+      {% if is_unique %}
+        {% if owner_inv %}
+        <div class="shop-owner-panel">
+          <div class="shop-owner-panel__avatar-ring">
+            <div class="shop-owner-panel__avatar">{{ owner_inv.player.display_name[0]|upper }}</div>
           </div>
-          <button type="submit" class="btn btn-danger w-100">
-            <i class="bi bi-gem me-1"></i>Перекупить
-          </button>
-        </form>
-        {% elif validation and validation.ok %}
-        <form method="POST" action="{{ url_for('shop.purchase_item', item_id=item.id) }}"
-              onsubmit="return confirm('Купить «{{ item.name }}» за {{ item.price | int }} монет?')">
-          <button type="submit" class="btn btn-danger w-100">
-            <i class="bi bi-bag-check me-1"></i>Купить
-          </button>
-        </form>
+          <div>
+            <div class="shop-owner-panel__label">Текущий владелец</div>
+            <div class="shop-owner-panel__name">{{ owner_inv.player.display_name }}</div>
+          </div>
+          <div class="shop-owner-panel__price">
+            <div class="shop-owner-panel__price-value">{{ owner_inv.price_paid|int }}</div>
+            <div class="shop-owner-panel__price-label">монет заплачено</div>
+          </div>
+        </div>
         {% else %}
-        <button class="btn btn-outline-secondary w-100" disabled>
-          {{ validation.message if validation else 'Недоступно' }}
-        </button>
+        <div class="shop-owner-panel shop-owner-panel--free">
+          <div><i class="bi bi-gem fs-4 text-muted"></i></div>
+          <div>
+            <div class="shop-owner-panel__label">Уникальный предмет</div>
+            <div class="fw-semibold">Пока никем не куплен</div>
+          </div>
+        </div>
         {% endif %}
+      {% endif %}
+
+      <div class="shop-detail-price-row">
+        <span class="shop-detail-price"><i class="bi bi-coin"></i>
+          {{ (owner_inv.price_paid + min_buyout_increment) | int if (is_unique and owner_inv) else item.price | int }}
+        </span>
+        {% if item.category.value == 'physical' %}
+        <span class="rarity-pill rarity-pill--common"><i class="bi bi-truck me-1"></i>Выдаётся вручную</span>
+        {% endif %}
+      </div>
+
+      <div class="position-relative" style="z-index:1;">
+      {% if not player %}
+      <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary w-100">Войдите, чтобы купить</a>
+      {% elif is_unique and owner_inv and owner_inv.player_id == player.id %}
+      <button class="btn btn-outline-secondary w-100" disabled>Уже у вас</button>
+      {% elif is_unique and owner_inv %}
+      <form method="POST" action="{{ url_for('shop.buyout_item', item_id=item.id) }}"
+            onsubmit="return confirm('Перекупить «{{ item.name }}» у {{ owner_inv.player.display_name }}?')">
+        <div class="input-group mb-2">
+          <span class="input-group-text">🪙</span>
+          <input type="number" name="offer_price" class="form-control"
+                 min="{{ (owner_inv.price_paid + min_buyout_increment) | int }}"
+                 step="{{ min_buyout_increment | int }}"
+                 value="{{ (owner_inv.price_paid + min_buyout_increment) | int }}" required>
+        </div>
+        <button type="submit" class="btn btn-danger w-100">
+          <i class="bi bi-gem me-1"></i>Перекупить
+        </button>
+      </form>
+      {% elif validation and validation.ok %}
+      <form method="POST" action="{{ url_for('shop.purchase_item', item_id=item.id) }}"
+            onsubmit="return confirm('Купить «{{ item.name }}» за {{ item.price | int }} монет?')">
+        <button type="submit" class="btn btn-danger w-100">
+          <i class="bi bi-bag-check me-1"></i>Купить
+        </button>
+      </form>
+      {% else %}
+      <button class="btn btn-outline-secondary w-100" disabled>
+        {{ validation.message if validation else 'Недоступно' }}
+      </button>
+      {% endif %}
       </div>
     </div>
   </div>

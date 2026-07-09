@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import current_user
 
 from app import db
-from app.models import ShopItem, ShopCategory
+from app.models import ShopItem, ShopCategory, InventoryItem, Rarity
 from app.services import ShopService, PermissionService, Permission
 from app.services.shop_service import MIN_BUYOUT_INCREMENT
 from app.auth_decorators import requires_permission
@@ -11,6 +11,7 @@ shop_bp = Blueprint("shop", __name__)
 
 
 SORT_OPTIONS = {"rarity_desc", "rarity_asc"}
+EXCLUSIVE_RARITIES = (Rarity.MYTHIC, Rarity.ULTRA)
 
 
 @shop_bp.route("/")
@@ -35,6 +36,32 @@ def list_items():
         for item in items:
             affordability[item.id] = ShopService.validate_purchase(player, item).ok
 
+    # ── Hero-стата: не зависит от фильтра категории — это витрина
+    # магазина в целом, а не текущей выборки.
+    total_items = db.session.query(ShopItem).filter(ShopItem.is_active == True).count()
+    exclusive_count = (
+        db.session.query(ShopItem)
+        .filter(ShopItem.is_active == True, ShopItem.rarity.in_(EXCLUSIVE_RARITIES))
+        .count()
+    )
+    owned_count = (
+        db.session.query(InventoryItem).filter_by(player_id=player.id).count()
+        if player else 0
+    )
+
+    # Владельцы уникальных (Mythic/Ultra) лотов — один bulk-запрос на всю
+    # витрину, чтобы показать "занято/свободно" прямо в сетке, не заходя
+    # в карточку товара (та же информация, что уже есть на detail-странице).
+    exclusive_ids = [i.id for i in items if i.rarity in EXCLUSIVE_RARITIES]
+    owners = {}
+    if exclusive_ids:
+        owned_rows = (
+            db.session.query(InventoryItem)
+            .filter(InventoryItem.item_id.in_(exclusive_ids))
+            .all()
+        )
+        owners = {inv.item_id: inv for inv in owned_rows}
+
     return render_template(
         "shop/list.html",
         items=items,
@@ -43,6 +70,11 @@ def list_items():
         selected_sort=sort_param,
         affordability=affordability,
         player=player,
+        total_items=total_items,
+        exclusive_count=exclusive_count,
+        owned_count=owned_count,
+        owners=owners,
+        min_buyout_increment=MIN_BUYOUT_INCREMENT,
     )
 
 

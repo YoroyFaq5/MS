@@ -2,52 +2,168 @@
 {% from "_macros.html" import player_name %}
 {% block title %}{{ season.name }}{% endblock %}
 
+{% block head %}
+<style>
+/* ============================================================
+   Сезон — детальная страница, тот же язык, что /seasons, /ratings
+   ============================================================ */
+
+.season-detail-hero {
+  position: relative; overflow: hidden;
+  background: var(--ms-surface); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+  padding: clamp(1.25rem, 2.5vw, 2rem);
+  margin-bottom: 1.5rem;
+}
+.season-detail-hero__glow {
+  position: absolute; top: -140px; left: -60px; width: 340px; height: 340px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(199,165,82,.14), transparent 70%);
+  filter: blur(60px); pointer-events: none;
+}
+.season-detail-hero__row { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem; }
+.season-detail-hero__monogram {
+  flex-shrink: 0; width: 60px; height: 60px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(199,165,82,.3); border-radius: 50%;
+  font-size: 1.3rem; color: var(--ms-gold-light);
+  background: radial-gradient(circle, rgba(199,165,82,.08), transparent 75%);
+}
+.season-detail-hero__title {
+  font-family: 'Playfair Display', Georgia, serif; font-weight: 700;
+  font-size: clamp(1.4rem, 1vw + 1.2rem, 2rem);
+  background: linear-gradient(180deg, #F3E4B8 0%, #D4B06A 32%, #C7A552 58%, #9C7C3E 82%, #C7A552 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.season-detail-hero__dates { font-size: .78rem; color: var(--ms-muted); margin-top: .15rem; }
+.season-detail-hero__stats { display: flex; gap: .75rem; margin-left: auto; flex-wrap: wrap; }
+.season-detail-hero__stat { text-align: center; padding: .5rem 1rem; }
+.season-detail-hero__stat-value { font-size: 1.3rem; font-weight: 700; color: var(--ms-gold-light); font-variant-numeric: tabular-nums; }
+.season-detail-hero__stat-label { font-size: .66rem; color: var(--ms-muted); text-transform: uppercase; letter-spacing: .06em; }
+
+.season-status { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .6rem; border-radius: 99px; font-size: .7rem; font-weight: 600; white-space: nowrap; }
+.season-status--live    { background: rgba(199,165,82,.16); color: var(--ms-gold-light); }
+.season-status--done    { background: rgba(138,138,138,.1);  color: var(--ms-text-dim); }
+.season-status--tiebreak{ background: rgba(142,28,28,.16);   color: var(--ms-wine-light); }
+
+/* ── Победитель сезона ────────────────────────────────────────────── */
+.season-winner-banner {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 1.25rem;
+  padding: 1.25rem 1.5rem; margin-bottom: 1.5rem;
+  background: linear-gradient(180deg, rgba(199,165,82,.08), var(--ms-surface) 70%);
+  border: 1px solid rgba(199,165,82,.3);
+  border-radius: var(--ms-radius);
+}
+.season-winner-banner__avatar-ring {
+  flex-shrink: 0; width: 68px; height: 68px; border-radius: 50%; padding: 3px;
+  background: conic-gradient(from 0deg, var(--ms-gold-light), var(--ms-gold), #F3E4B8, var(--ms-gold-light));
+}
+.season-winner-banner__avatar {
+  width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ms-surface-raised); color: var(--ms-gold-light);
+  font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 1.5rem;
+}
+.season-winner-banner__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.season-winner-banner__label { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ms-muted); }
+.season-winner-banner__name { font-weight: 700; font-size: 1.15rem; }
+.season-winner-banner__score { margin-left: auto; text-align: right; }
+.season-winner-banner__score-value { font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 1.8rem; color: var(--ms-gold-light); }
+.season-winner-banner__score-label { font-size: .68rem; color: var(--ms-muted); }
+
+/* ── Ничья ────────────────────────────────────────────────────────── */
+.tiebreak-card {
+  min-width: 150px; text-align: center; padding: 1rem;
+  background: var(--ms-surface-raised); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+}
+.tiebreak-card__score { font-size: 1.2rem; font-weight: 700; color: var(--ms-gold-light); font-variant-numeric: tabular-nums; }
+
+/* ── Таблица рейтинга сезона — переиспользует .rank-table/.side-meter ── */
+.season-rating-avatar {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ms-gold); color: #0D0D0D; font-weight: 700; font-size: .78rem;
+}
+.season-rating-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.rank-row--winner td:first-child { box-shadow: inset 3px 0 0 var(--ms-gold-light); }
+.rank-row--tiebreak-top { background: rgba(142,28,28,.05); }
+
+/* ── Номинации ────────────────────────────────────────────────────── */
+.nomination-chip {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .35rem .7rem; border-radius: 99px;
+  background: rgba(199,165,82,.08); border: 1px solid rgba(199,165,82,.18);
+  font-size: .78rem; text-decoration: none; color: var(--ms-text);
+  transition: background .15s ease, border-color .15s ease;
+}
+.nomination-chip:hover { background: rgba(199,165,82,.14); border-color: rgba(199,165,82,.3); color: var(--ms-text); }
+.nomination-chip i { color: var(--ms-gold-light); }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex align-items-center gap-3 mb-4">
-  <a href="{{ url_for('seasons.index', year=season.year) }}" class="btn btn-outline-secondary btn-sm">← Сезоны {{ season.year }}</a>
-  <div class="flex-grow-1">
-    <h2 class="mb-0 fw-bold">📅 {{ season.name }}</h2>
-    <p class="text-muted small mb-0">
-      {{ season.starts_at.strftime('%d.%m.%Y') }} — {{ season.ends_at.strftime('%d.%m.%Y') }}
-    </p>
+<div class="mb-3">
+  <a href="{{ url_for('seasons.index', year=season.year) }}" class="text-muted small"><i class="bi bi-arrow-left me-1"></i>Сезоны {{ season.year }}</a>
+</div>
+
+<div class="season-detail-hero fade-in-up">
+  <div class="season-detail-hero__glow" aria-hidden="true"></div>
+  <div class="season-detail-hero__row">
+    <div class="season-detail-hero__monogram"><i class="bi bi-calendar3"></i></div>
+    <div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="season-detail-hero__title">{{ season.name }}</div>
+        {% if season.status.value == 'active' %}
+        <span class="season-status season-status--live"><i class="bi bi-circle-fill"></i>Активен</span>
+        {% elif season.status.value == 'finished' %}
+        <span class="season-status season-status--done"><i class="bi bi-check-circle-fill"></i>Завершён</span>
+        {% elif season.status.value == 'waiting_tiebreak' %}
+        <span class="season-status season-status--tiebreak"><i class="bi bi-exclamation-triangle-fill"></i>Ничья</span>
+        {% endif %}
+      </div>
+      <div class="season-detail-hero__dates">{{ season.starts_at.strftime('%d.%m.%Y') }} — {{ season.ends_at.strftime('%d.%m.%Y') }}</div>
+    </div>
+
+    <div class="season-detail-hero__stats">
+      <div class="season-detail-hero__stat">
+        <div class="season-detail-hero__stat-value">{{ season.games|length }}</div>
+        <div class="season-detail-hero__stat-label">Игр</div>
+      </div>
+      <div class="season-detail-hero__stat">
+        <div class="season-detail-hero__stat-value">{{ ratings|length }}</div>
+        <div class="season-detail-hero__stat-label">Участников</div>
+      </div>
+    </div>
   </div>
-  <span class="badge fs-6
-    {% if season.status.value == 'active' %}bg-success
-    {% elif season.status.value == 'waiting_tiebreak' %}bg-warning text-dark
-    {% else %}bg-secondary{% endif %}">
-    {% if season.status.value == 'active' %}🟢 Активен
-    {% elif season.status.value == 'finished' %}✅ Завершён
-    {% elif season.status.value == 'waiting_tiebreak' %}⚠️ Ничья
-    {% endif %}
-  </span>
 </div>
 
 <!-- Winner / tiebreak block -->
 {% if season.status.value == 'finished' and season.winner %}
-<div class="card mb-4 border-warning" style="background: rgba(251,191,36,.05)">
-  <div class="card-body d-flex align-items-center gap-4 py-3">
-    <div class="fs-2">🏆</div>
-    <div>
-      <div class="text-muted small mb-1">Победитель сезона</div>
-      <div class="fw-bold fs-5">{{ player_name(season.winner, equipped_bulk.get(season.winner.id, {})) }}</div>
+<div class="season-winner-banner fade-in-up">
+  <div class="season-winner-banner__avatar-ring">
+    <div class="season-winner-banner__avatar">
+      {% if avatars.get(season.winner_player_id) %}<img src="{{ avatars[season.winner_player_id] }}" alt="">{% else %}{{ season.winner.display_name[0]|upper }}{% endif %}
     </div>
-    <div class="ms-auto text-end">
-      <div class="text-muted small">Очки</div>
-      <div class="fw-bold fs-4 text-warning">{{ season.winner_score|round(2) }}</div>
-    </div>
-    {% if season.year_tournament_id %}
-    <a href="{{ url_for('tournaments.tournament_detail', tournament_id=season.year_tournament_id) }}"
-       class="btn btn-sm btn-outline-warning ms-2">
-      <i class="bi bi-trophy me-1"></i>Стол года
-    </a>
-    {% endif %}
   </div>
+  <div>
+    <div class="season-winner-banner__label"><i class="bi bi-trophy-fill me-1"></i>Победитель сезона</div>
+    <div class="season-winner-banner__name">{{ player_name(season.winner, equipped_bulk.get(season.winner.id, {})) }}</div>
+  </div>
+  <div class="season-winner-banner__score">
+    <div class="season-winner-banner__score-value">{{ season.winner_score|round(2) }}</div>
+    <div class="season-winner-banner__score-label">очков</div>
+  </div>
+  {% if season.year_tournament_id %}
+  <a href="{{ url_for('tournaments.tournament_detail', tournament_id=season.year_tournament_id) }}"
+     class="btn btn-sm btn-outline-warning ms-2">
+    <i class="bi bi-trophy me-1"></i>Стол года
+  </a>
+  {% endif %}
 </div>
 
 {% elif season.status.value == 'waiting_tiebreak' %}
-<div class="card mb-4 border-warning">
+<div class="card mb-4 border-warning fade-in-up">
   <div class="card-header bg-warning bg-opacity-10 fw-semibold text-warning">
-    ⚠️ Ничья — требуется выбор победителя
+    <i class="bi bi-exclamation-triangle me-1"></i>Ничья — требуется выбор победителя
   </div>
   <div class="card-body">
     <p class="text-muted small mb-3">
@@ -55,12 +171,11 @@
       Администратор должен выбрать победителя вручную.
     </p>
 
-    <!-- Tied players -->
     <div class="d-flex flex-wrap gap-2 mb-4">
       {% for r in tiebreak_candidates %}
-      <div class="card text-center p-3" style="min-width:140px">
+      <div class="tiebreak-card">
         <div class="fw-bold">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</div>
-        <div class="fs-5 text-warning fw-bold">{{ r.season_rating|round(2) }}</div>
+        <div class="tiebreak-card__score">{{ r.season_rating|round(2) }}</div>
         <div class="text-muted small">{{ r.games_played }} игр · {{ (r.win_rate * 100)|round(1) }}%</div>
       </div>
       {% endfor %}
@@ -102,11 +217,9 @@
   <div class="card-body">
     <div class="d-flex gap-2 flex-wrap">
       {% for pt in season_nominations %}
-      <a href="{{ url_for('profile.view_profile', player_id=pt.player_id) }}" class="text-decoration-none">
-        <span class="badge bg-body-secondary text-body border">
-          {% if pt.title.icon %}<i class="bi {{ pt.title.icon }} me-1"></i>{% endif %}
-          {{ pt.title.name }} — <strong class="ms-1">{{ player_name(pt.player, equipped_bulk.get(pt.player_id, {})) }}</strong>
-        </span>
+      <a href="{{ url_for('profile.view_profile', player_id=pt.player_id) }}" class="nomination-chip">
+        {% if pt.title.icon %}<i class="bi {{ pt.title.icon }}"></i>{% endif %}
+        {{ pt.title.name }} — <strong>{{ player_name(pt.player, equipped_bulk.get(pt.player_id, {})) }}</strong>
       </a>
       {% endfor %}
     </div>
@@ -119,19 +232,19 @@
 {% set max_wr = ratings|map(attribute='win_rate')|max if ratings else 0 %}
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
-    <div class="stat-card card text-center p-3">
+    <div class="stat-card card text-center p-3 fade-in-up" style="--d:0ms">
       <div class="stat-value">{{ season.games|length }}</div>
       <div class="stat-label">Игр сыграно</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="stat-card card text-center p-3">
+    <div class="stat-card card text-center p-3 fade-in-up" style="--d:40ms">
       <div class="stat-value">{{ ratings|length }}</div>
       <div class="stat-label">Участников</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="stat-card card text-center p-3">
+    <div class="stat-card card text-center p-3 fade-in-up" style="--d:80ms">
       <div class="stat-value text-success">
         {% if ratings %}{{ max_points }}{% else %}—{% endif %}
       </div>
@@ -139,7 +252,7 @@
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="stat-card card text-center p-3">
+    <div class="stat-card card text-center p-3 fade-in-up" style="--d:120ms">
       <div class="stat-value text-info">
         {% if ratings %}{{ (max_wr * 100)|round(1) }}%{% else %}—{% endif %}
       </div>
@@ -150,11 +263,11 @@
 
 <!-- Season leaderboard -->
 <div class="card mb-4">
-  <div class="card-header fw-semibold">🏅 Рейтинг сезона</div>
+  <div class="card-header fw-semibold"><i class="bi bi-award text-warning me-2"></i>Рейтинг сезона</div>
   <div class="card-body p-0">
     {% if ratings %}
     <div class="table-responsive">
-      <table class="table table-hover mb-0 align-middle">
+      <table class="table table-hover mb-0 align-middle rank-table">
         <thead>
           <tr>
             <th class="ps-4">#</th>
@@ -170,39 +283,40 @@
         </thead>
         <tbody>
           {% for r in ratings %}
-          <tr class="{% if season.winner_player_id == r.player_id %}winner-row{% endif %}
-                     {% if season.status.value == 'waiting_tiebreak' and loop.index == 1 %}tiebreak-row{% endif %}">
+          <tr class="rank-row
+                     {% if season.winner_player_id == r.player_id %}rank-row--winner{% elif r.rank <= 3 %}rank-row--top{{ r.rank }}{% endif %}
+                     {% if season.status.value == 'waiting_tiebreak' and loop.index == 1 %}rank-row--tiebreak-top{% endif %}">
             <td class="ps-4">
-              {% if season.winner_player_id == r.player_id %}🏆
-              {% elif r.rank == 1 and not season.winner_player_id %}🥇
-              {% elif r.rank == 2 %}🥈
-              {% elif r.rank == 3 %}🥉
-              {% else %}<span class="text-muted">{{ r.rank }}</span>{% endif %}
+              {% if season.winner_player_id == r.player_id %}<span class="rank-badge"><i class="bi bi-trophy-fill" style="color:var(--ms-gold-light)"></i></span>
+              {% else %}<span class="rank-badge">{{ r.rank }}</span>{% endif %}
             </td>
             <td>
-              <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}"
-                 class="text-decoration-none fw-semibold">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</a>
-            </td>
-            <td class="text-center text-muted">{{ r.games_played }}</td>
-            <td class="text-center text-muted">{{ r.games_won }}</td>
-            <td class="text-center">
-              <div class="d-flex align-items-center justify-content-center gap-2">
-                <div class="progress flex-grow-1" style="height:5px;max-width:50px">
-                  <div class="progress-bar bg-success" style="width:{{ (r.win_rate * 100)|round(1) }}%"></div>
-                </div>
-                <span class="text-muted small">{{ (r.win_rate * 100)|round(1) }}%</span>
+              <div class="d-flex align-items-center gap-2">
+                <span class="season-rating-avatar">
+                  {% if avatars.get(r.player_id) %}<img src="{{ avatars[r.player_id] }}" alt="">{% else %}{{ r.display_name[0]|upper }}{% endif %}
+                </span>
+                <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}"
+                   class="text-decoration-none fw-semibold">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</a>
               </div>
             </td>
-            <td class="text-center text-muted">{{ r.total_points }}</td>
-            <td class="text-center {% if r.gg_total > 0 %}text-warning{% elif r.gg_total < 0 %}text-danger{% else %}text-muted{% endif %}">
+            <td class="text-center text-muted tabular-nums">{{ r.games_played }}</td>
+            <td class="text-center text-muted tabular-nums">{{ r.games_won }}</td>
+            <td class="text-center">
+              <div class="side-meter justify-content-center">
+                <div class="side-meter__bar"><div class="side-meter__fill" style="width:{{ (r.win_rate * 100)|round(1) }}%"></div></div>
+                <span class="tabular-nums">{{ (r.win_rate * 100)|round(1) }}%</span>
+              </div>
+            </td>
+            <td class="text-center text-muted tabular-nums">{{ r.total_points }}</td>
+            <td class="text-center tabular-nums {% if r.gg_total > 0 %}elo-up{% elif r.gg_total < 0 %}elo-down{% else %}elo-flat{% endif %}">
               {% if r.gg_total != 0 %}{{ '+' if r.gg_total > 0 else '' }}{{ r.gg_total }}{% else %}—{% endif %}
             </td>
-            <td class="text-center">
-              <span class="{% if r.elo > 1000 %}text-success{% elif r.elo < 1000 %}text-danger{% else %}text-muted{% endif %} small fw-medium">
+            <td class="text-center tabular-nums">
+              <span class="{% if r.elo > 1000 %}elo-up{% elif r.elo < 1000 %}elo-down{% else %}elo-flat{% endif %} small fw-medium">
                 {{ r.elo|round|int }}
               </span>
             </td>
-            <td class="text-end pe-4 fw-bold text-success">{{ r.season_rating|round(2) }}</td>
+            <td class="text-end pe-4 fw-bold text-success tabular-nums">{{ r.season_rating|round(2) }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -221,7 +335,7 @@
 {% if current_user.is_authenticated and current_user.is_admin and season.status.value != 'finished' %}
 <div class="card mb-4">
   <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
-    <span>⭐ GG-бонусы сезона</span>
+    <span><i class="bi bi-stars text-warning me-2"></i>GG-бонусы сезона</span>
     <button class="btn btn-sm btn-outline-warning" type="button"
             data-bs-toggle="collapse" data-bs-target="#ggPanel">
       <i class="bi bi-plus-lg me-1"></i>Добавить
@@ -256,7 +370,6 @@
       </form>
     </div>
   </div>
-  <!-- Active GG entries -->
   {% if gg_entries %}
   <div class="card-body p-0">
     <table class="table table-hover mb-0 align-middle small">
@@ -274,7 +387,7 @@
         <tr class="{% if gg.revoked %}opacity-50{% endif %}">
           <td class="ps-3">{{ gg.player.display_name if gg.player else '?' }}</td>
           <td class="text-muted">{{ gg.reason }}</td>
-          <td class="text-center fw-semibold {% if gg.value >= 0 %}text-success{% else %}text-danger{% endif %}">
+          <td class="text-center fw-semibold tabular-nums {% if gg.value >= 0 %}elo-up{% else %}elo-down{% endif %}">
             {{ '+' if gg.value >= 0 else '' }}{{ gg.value }}
           </td>
           <td class="text-center text-muted">{{ gg.created_at.strftime('%d.%m.%Y') }}</td>
@@ -302,51 +415,35 @@
 <!-- Recent games -->
 {% if recent_games %}
 <div class="card">
-  <div class="card-header fw-semibold">🎮 Игры сезона</div>
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-hover mb-0 align-middle small">
-        <thead>
-          <tr>
-            <th class="ps-4">Игра</th>
-            <th>Дата</th>
-            <th class="text-center">Победитель</th>
-            <th class="text-end pe-4">Турнир</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for game in recent_games %}
-          <tr>
-            <td class="ps-4">
-              <a href="{{ url_for('games.game_detail', game_id=game.id) }}"
-                 class="text-decoration-none">#{{ game.id }}</a>
-            </td>
-            <td class="text-muted">{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</td>
-            <td class="text-center">
-              {% if game.win_side.value == 'mafia' %}<span class="badge bg-danger">🔫 Мафия</span>
-              {% elif game.win_side.value == 'city' %}<span class="badge bg-success">🏙 Город</span>
-              {% else %}<span class="badge bg-secondary">—</span>{% endif %}
-            </td>
-            <td class="text-end pe-4 text-muted">
-              {% if game.tournament %}
-              <a href="{{ url_for('tournaments.tournament_detail', tournament_id=game.tournament_id) }}"
-                 class="text-decoration-none small">{{ game.tournament.name }}</a>
-              {% else %}—{% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <div class="card-header fw-semibold"><i class="bi bi-controller text-warning me-2"></i>Игры сезона</div>
+  <div class="card-body">
+    <div class="game-feed">
+      {% for game in recent_games %}
+      <a href="{{ url_for('games.game_detail', game_id=game.id) }}"
+         class="game-event {% if game.win_side.value == 'city' %}game-event--city{% elif game.win_side.value == 'mafia' %}game-event--mafia{% endif %}">
+        <span class="game-event__side-icon">
+          {% if game.win_side.value == 'city' %}<i class="bi bi-shield-fill"></i>
+          {% elif game.win_side.value == 'mafia' %}<i class="bi bi-mask"></i>
+          {% else %}<i class="bi bi-dash-circle"></i>{% endif %}
+        </span>
+        <span class="game-event__main">
+          <span class="game-event__title">
+            Игра #{{ game.id }}
+            <span class="game-event__winner">
+              {% if game.win_side.value == 'city' %}— победил город
+              {% elif game.win_side.value == 'mafia' %}— победила мафия
+              {% else %}— ничья{% endif %}
+            </span>
+          </span>
+        </span>
+        <span class="game-event__meta">
+          {% if game.tournament %}<span class="text-muted small">{{ game.tournament.name }}</span>{% endif %}
+          <span class="game-event__date">{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</span>
+        </span>
+      </a>
+      {% endfor %}
     </div>
   </div>
 </div>
 {% endif %}
-
-{% block head %}
-<style>
-.winner-row { background: rgba(251,191,36,.06) !important; }
-.winner-row td:first-child { border-left: 3px solid #fbbf24; }
-.tiebreak-row { background: rgba(251,191,36,.04) !important; }
-</style>
-{% endblock %}
 {% endblock %}

@@ -2,27 +2,213 @@
 {% from "_macros.html" import shop_item_preview %}
 {% block title %}Магазин{% endblock %}
 
-{% block content %}
-{% set CATEGORY_LABELS = {'profile_customization': '🖼️ Кастомизация профиля', 'nickname': '✨ Никнейм', 'physical': '📦 Физические товары'} %}
-{% set RARITY_LABELS = {'common': 'Обычная', 'rare': 'Редкая', 'epic': 'Эпическая', 'legendary': 'Легендарная', 'mythic': 'Мифическая', 'ultra': 'Ультра'} %}
-{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark', 'mythic': 'bg-danger', 'ultra': 'bg-warning text-dark'} %}
+{% block head %}
+<style>
+/* ============================================================
+   Магазин — тот же премиальный язык, что на /games, /ratings, /seasons
+   ============================================================
+   Переиспользует --ms-* токены и hero-технику (свечение/частицы/
+   parallax/count-up). Карточки товаров остаются на общих .tournament-card
+   /.rarity-* из main.css (используются и в достижениях/титулах) —
+   не трогаем, только добавляем page-scoped обвязку .shop-card.
+   ============================================================ */
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h2 class="mb-0 fw-bold">🛒 Магазин</h2>
-    <p class="text-muted small mb-0">Тратьте монеты на кастомизацию профиля и клубный мерч</p>
+.shop-hero {
+  position: relative; overflow: hidden;
+  background: var(--ms-surface); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+  padding: clamp(1.5rem, 3vw, 2.5rem); margin-bottom: 1.5rem;
+  transition: transform .35s cubic-bezier(.2,.7,.3,1), box-shadow .35s ease, border-color .35s ease;
+}
+.shop-hero:hover { transform: translateY(-2px); border-color: rgba(199,165,82,.24); box-shadow: 0 20px 48px rgba(0,0,0,.4); }
+
+.shop-hero__bg { position: absolute; inset: 0; pointer-events: none; --mx: 0; --my: 0; }
+.shop-hero__lines {
+  position: absolute; inset: 0; opacity: .5;
+  background-image: repeating-linear-gradient(115deg, rgba(199,165,82,.05) 0px, rgba(199,165,82,.05) 1px, transparent 1px, transparent 64px);
+  -webkit-mask-image: linear-gradient(90deg, black, transparent 75%);
+  mask-image: linear-gradient(90deg, black, transparent 75%);
+}
+.shop-hero__glow {
+  position: absolute; width: 380px; height: 380px; border-radius: 50%; filter: blur(70px);
+  transition: transform .4s ease-out;
+  transform: translate3d(calc(var(--mx, 0) * 12px), calc(var(--my, 0) * 8px), 0);
+}
+.shop-hero__glow--1 { top: -160px; left: -60px; background: radial-gradient(circle, rgba(199,165,82,.16), transparent 70%); }
+.shop-hero__glow--2 { bottom: -180px; left: 220px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(212,176,106,.1), transparent 70%); transition-delay: .05s; }
+
+.shop-hero__particles { position: absolute; inset: 0; transform: translate3d(calc(var(--mx, 0) * 6px), calc(var(--my, 0) * 4px), 0); transition: transform .4s ease-out; }
+.shop-hero__particles span {
+  position: absolute; width: 3px; height: 3px; border-radius: 50%;
+  background: var(--ms-gold-light); opacity: 0; animation: shop-dust 7s ease-in-out infinite;
+}
+.shop-hero__particles span:nth-child(1) { top: 18%; left: 12%; animation-delay: 0s; }
+.shop-hero__particles span:nth-child(2) { top: 60%; left: 24%; animation-delay: 1.6s; }
+.shop-hero__particles span:nth-child(3) { top: 30%; left: 34%; animation-delay: 3.1s; }
+.shop-hero__particles span:nth-child(4) { top: 75%; left: 8%;  animation-delay: 4.4s; }
+.shop-hero__particles span:nth-child(5) { top: 45%; left: 42%; animation-delay: 5.6s; }
+@keyframes shop-dust {
+  0%   { opacity: 0; transform: translateY(6px); }
+  15%  { opacity: .5; }
+  50%  { opacity: .25; transform: translateY(-10px); }
+  85%  { opacity: 0; transform: translateY(-18px); }
+  100% { opacity: 0; }
+}
+
+.shop-hero__content { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 2rem 2.5rem; }
+.shop-hero__main { display: flex; align-items: center; gap: 1.25rem; }
+.shop-hero__monogram {
+  flex-shrink: 0; width: 76px; height: 76px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(199,165,82,.3); border-radius: 50%;
+  font-size: 1.6rem; color: var(--ms-gold-light);
+  background: radial-gradient(circle, rgba(199,165,82,.08), transparent 75%);
+}
+.shop-hero__count-wrap { display: flex; flex-direction: column; }
+.shop-hero__eyebrow { font-size: .68rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ms-muted); margin-bottom: .15rem; }
+.shop-hero__count {
+  font-family: 'Playfair Display', Georgia, serif; font-weight: 700;
+  font-size: clamp(2.75rem, 3.2vw + 1.5rem, 4.5rem); line-height: 1.2; white-space: nowrap;
+  background: linear-gradient(180deg, #F3E4B8 0%, #D4B06A 32%, #C7A552 58%, #9C7C3E 82%, #C7A552 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 10px rgba(0,0,0,.5));
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "lnum" 1;
+}
+.shop-hero__count-label { font-size: .82rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ms-text-dim); margin-top: .1rem; }
+.shop-hero__tagline { font-size: .78rem; color: var(--ms-muted); margin-top: .5rem; }
+
+.shop-hero__stats { display: flex; flex-wrap: wrap; gap: 1rem; margin-left: auto; }
+.shop-hero__stat {
+  display: flex; align-items: center; gap: 1rem;
+  min-width: 210px; max-width: 260px;
+  padding: 1.15rem 1.5rem;
+  background: var(--ms-surface-raised); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+}
+.shop-hero__stat-icon {
+  flex-shrink: 0; width: 52px; height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 1.3rem;
+  background: rgba(199,165,82,.16); color: var(--ms-gold-light);
+}
+.shop-hero__stat-body { min-width: 0; }
+.shop-hero__stat-value { font-size: 1.35rem; font-weight: 700; line-height: 1.2; color: var(--ms-gold-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shop-hero__stat-label { font-size: .82rem; color: var(--ms-text-dim); white-space: nowrap; margin-top: .1rem; }
+.shop-hero__stat-sub { font-size: .72rem; color: var(--ms-muted); margin-top: .1rem; }
+.shop-hero__stat-sub a { color: var(--ms-gold-light); }
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-hero, .shop-hero__glow, .shop-hero__particles { transition: none; }
+  .shop-hero__particles span { animation: none; opacity: 0; }
+}
+
+/* ── Toolbar: категории + сортировка ─────────────────────────────── */
+.shop-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1.5rem; }
+
+/* ── Сетка товаров ────────────────────────────────────────────────── */
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.1rem; }
+
+.shop-card {
+  display: block; text-decoration: none; color: inherit; height: 100%;
+  background: var(--ms-surface);
+  border-radius: var(--ms-radius);
+  padding: 1.25rem;
+  transition: transform .2s cubic-bezier(.2,.7,.3,1), box-shadow .2s ease;
+}
+.shop-card:hover { color: inherit; transform: translateY(-5px); box-shadow: 0 18px 38px rgba(0,0,0,.45); }
+
+.shop-card__preview {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 84px; margin-bottom: 1rem; padding: .75rem;
+  background: var(--ms-surface-raised); border-radius: var(--ms-radius);
+  overflow: hidden;
+}
+
+.shop-card__head { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; margin-bottom: .35rem; }
+.shop-card__name { font-weight: 700; font-size: 1rem; }
+.shop-card__meta { font-size: .72rem; color: var(--ms-muted); margin-bottom: .7rem; }
+.shop-card__desc { font-size: .8rem; color: var(--ms-text-dim); margin-bottom: .9rem; }
+
+.shop-card__owner {
+  display: flex; align-items: center; gap: .4rem;
+  font-size: .7rem; color: var(--ms-gold-light);
+  padding: .3rem .55rem; border-radius: 6px;
+  background: rgba(199,165,82,.08); border: 1px solid rgba(199,165,82,.18);
+  margin-bottom: .9rem;
+}
+.shop-card__owner--free { color: var(--ms-muted); background: rgba(138,138,138,.08); border-color: var(--ms-border); }
+
+.shop-card__footer { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.shop-card__price { display: inline-flex; align-items: center; gap: .35rem; font-weight: 700; color: var(--ms-gold-light); font-variant-numeric: tabular-nums; }
+
+.shop-avail { display: inline-flex; align-items: center; padding: .18rem .55rem; border-radius: 99px; font-size: .66rem; font-weight: 600; white-space: nowrap; }
+.shop-avail--yes { background: rgba(199,165,82,.14); color: var(--ms-gold-light); }
+.shop-avail--no  { background: rgba(138,138,138,.1);  color: var(--ms-muted); }
+
+/* Редкостные бейджи — цвета совпадают с .rarity-* лестницей в main.css,
+   просто как компактная пилюля вместо bootstrap .badge. */
+.rarity-pill { display: inline-flex; align-items: center; padding: .18rem .55rem; border-radius: 99px; font-size: .64rem; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
+.rarity-pill--common    { background: rgba(138,138,138,.12); color: var(--ms-muted); }
+.rarity-pill--rare      { background: rgba(184,184,184,.14); color: #B8B8B8; }
+.rarity-pill--epic      { background: rgba(142,28,28,.16);   color: var(--ms-wine-light); }
+.rarity-pill--legendary { background: rgba(199,165,82,.16);  color: var(--ms-gold-light); }
+.rarity-pill--mythic    { background: rgba(157,78,221,.16);  color: #c090ee; }
+.rarity-pill--ultra     { background: rgba(255,215,0,.16);   color: #ffd700; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set CATEGORY_LABELS = {'profile_customization': 'Кастомизация профиля', 'nickname': 'Никнейм', 'physical': 'Физические товары'} %}
+{% set CATEGORY_ICONS = {'profile_customization': 'bi-image', 'nickname': 'bi-stars', 'physical': 'bi-box-seam'} %}
+{% set RARITY_LABELS = {'common': 'Обычная', 'rare': 'Редкая', 'epic': 'Эпическая', 'legendary': 'Легендарная', 'mythic': 'Мифическая', 'ultra': 'Ультра'} %}
+
+<div class="shop-hero fade-in-up" id="shop-hero">
+  <div class="shop-hero__bg" aria-hidden="true">
+    <div class="shop-hero__lines"></div>
+    <div class="shop-hero__glow shop-hero__glow--1"></div>
+    <div class="shop-hero__glow shop-hero__glow--2"></div>
+    <div class="shop-hero__particles"><span></span><span></span><span></span><span></span><span></span></div>
   </div>
-  {% if player %}
-  <div class="stat-card card px-3 py-2">
-    <div class="d-flex align-items-center gap-2">
-      <i class="bi bi-coin text-warning fs-5"></i>
-      <span class="fw-bold fs-5">{{ (player.coins or 0) | int }}</span>
+
+  <div class="shop-hero__content">
+    <div class="shop-hero__main">
+      <div class="shop-hero__monogram fade-in-up" style="--d:60ms"><i class="bi bi-bag-heart-fill"></i></div>
+      <div class="shop-hero__count-wrap fade-in-up" style="--d:140ms">
+        {% if player %}
+        <div class="shop-hero__eyebrow">Ваш баланс</div>
+        <div class="shop-hero__count" data-count-to="{{ (player.coins or 0)|int }}">0</div>
+        <div class="shop-hero__count-label">монет</div>
+        {% else %}
+        <div class="shop-hero__eyebrow">Магазин клуба</div>
+        <div class="shop-hero__count" data-count-to="{{ total_items }}">0</div>
+        <div class="shop-hero__count-label">товаров в магазине</div>
+        {% endif %}
+        <div class="shop-hero__tagline">Магазин MafiaStyle</div>
+      </div>
+    </div>
+
+    <div class="shop-hero__stats">
+      {% if player %}
+      <a href="{{ url_for('inventory.list_inventory') }}" class="shop-hero__stat fade-in-up text-decoration-none" style="--d:220ms">
+        <div class="shop-hero__stat-icon"><i class="bi bi-backpack4-fill"></i></div>
+        <div class="shop-hero__stat-body">
+          <div class="shop-hero__stat-value">{{ owned_count }}</div>
+          <div class="shop-hero__stat-label">Куплено предметов</div>
+          <div class="shop-hero__stat-sub">Ваш инвентарь →</div>
+        </div>
+      </a>
+      {% endif %}
+      <div class="shop-hero__stat fade-in-up" style="--d:280ms">
+        <div class="shop-hero__stat-icon"><i class="bi bi-gem"></i></div>
+        <div class="shop-hero__stat-body">
+          <div class="shop-hero__stat-value">{{ exclusive_count }}</div>
+          <div class="shop-hero__stat-label">Эксклюзивных лотов</div>
+          <div class="shop-hero__stat-sub">Mythic / Ultra — по одному на клуб</div>
+        </div>
+      </div>
     </div>
   </div>
-  {% endif %}
 </div>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+<div class="shop-toolbar">
   <ul class="nav nav-pills gap-2 mb-0">
     <li class="nav-item">
       <a class="nav-link {% if not selected_category %}active{% endif %}" href="{{ url_for('shop.list_items', sort=selected_sort) }}">Все</a>
@@ -30,7 +216,9 @@
     {% for cat in categories %}
     <li class="nav-item">
       <a class="nav-link {% if selected_category == cat %}active{% endif %}"
-         href="{{ url_for('shop.list_items', category=cat.value, sort=selected_sort) }}">{{ CATEGORY_LABELS.get(cat.value, cat.value) }}</a>
+         href="{{ url_for('shop.list_items', category=cat.value, sort=selected_sort) }}">
+        <i class="bi {{ CATEGORY_ICONS.get(cat.value, 'bi-tag') }} me-1"></i>{{ CATEGORY_LABELS.get(cat.value, cat.value) }}
+      </a>
     </li>
     {% endfor %}
   </ul>
@@ -48,39 +236,44 @@
 </div>
 
 {% if items %}
-<div class="row g-3">
+<div class="shop-grid">
   {% for item in items %}
-  <div class="col-md-6 col-xl-4">
-    <a href="{{ url_for('shop.item_detail', item_id=item.id) }}" class="text-decoration-none text-reset">
-      <div class="card tournament-card h-100 rarity-{{ item.rarity.value }}">
-        <div class="card-body p-4">
-          <div class="d-flex align-items-center justify-content-center mb-3 py-2" style="min-height:64px;background:var(--ms-surface-raised);border-radius:var(--ms-radius);overflow:hidden;">
-            {{ shop_item_preview(item) }}
-          </div>
-          <div class="d-flex justify-content-between align-items-start mb-2">
-            <h5 class="fw-semibold mb-0">{{ item.name }}</h5>
-            <span class="badge {{ RARITY_BADGE.get(item.rarity.value, 'bg-secondary') }}">
-              {{ RARITY_LABELS.get(item.rarity.value, item.rarity.value) }}
-            </span>
-          </div>
-          <div class="text-muted small mb-3">{{ CATEGORY_LABELS.get(item.category.value, item.category.value) }} · {{ item.subcategory }}</div>
-          {% if item.description %}
-          <p class="text-muted small mb-3">{{ item.description }}</p>
-          {% endif %}
-          <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-bold text-warning"><i class="bi bi-coin me-1"></i>{{ item.price | int }}</span>
-            {% if player %}
-              {% if affordability.get(item.id) %}
-              <span class="badge bg-success-subtle text-success border border-success-subtle">Доступно</span>
-              {% else %}
-              <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Недоступно</span>
-              {% endif %}
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </a>
-  </div>
+  {% set is_exclusive = item.rarity.value in ('mythic', 'ultra') %}
+  {% set owner_inv = owners.get(item.id) if is_exclusive else none %}
+  <a href="{{ url_for('shop.item_detail', item_id=item.id) }}"
+     class="shop-card tournament-card rarity-{{ item.rarity.value }}{% if loop.index0 < 12 %} fade-in-up{% endif %}"
+     {% if loop.index0 < 12 %}style="--d:{{ (loop.index0 % 12) * 30 }}ms"{% endif %}>
+    <div class="shop-card__preview">{{ shop_item_preview(item) }}</div>
+
+    <div class="shop-card__head">
+      <div class="shop-card__name">{{ item.name }}</div>
+      <span class="rarity-pill rarity-pill--{{ item.rarity.value }}">{{ RARITY_LABELS.get(item.rarity.value, item.rarity.value) }}</span>
+    </div>
+    <div class="shop-card__meta">{{ CATEGORY_LABELS.get(item.category.value, item.category.value) }} · {{ item.subcategory }}</div>
+
+    {% if item.description %}
+    <div class="shop-card__desc">{{ item.description }}</div>
+    {% endif %}
+
+    {% if is_exclusive %}
+      {% if owner_inv %}
+      <div class="shop-card__owner"><i class="bi bi-person-fill"></i>Владелец: {{ owner_inv.player.display_name }} · куплен за {{ owner_inv.price_paid|int }}</div>
+      {% else %}
+      <div class="shop-card__owner shop-card__owner--free"><i class="bi bi-unlock"></i>Свободно — доступно к покупке</div>
+      {% endif %}
+    {% endif %}
+
+    <div class="shop-card__footer">
+      <span class="shop-card__price"><i class="bi bi-coin"></i>{{ (owner_inv.price_paid + min_buyout_increment)|int if owner_inv else item.price|int }}</span>
+      {% if player %}
+        {% if affordability.get(item.id) %}
+        <span class="shop-avail shop-avail--yes">Доступно</span>
+        {% else %}
+        <span class="shop-avail shop-avail--no">Недоступно</span>
+        {% endif %}
+      {% endif %}
+    </div>
+  </a>
   {% endfor %}
 </div>
 {% else %}
@@ -91,4 +284,52 @@
   </div>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const hero = document.getElementById('shop-hero');
+  if (!hero) return;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const countEl = hero.querySelector('[data-count-to]');
+  if (countEl) {
+    const target = parseInt(countEl.dataset.countTo, 10) || 0;
+    if (reduceMotion || target === 0) {
+      countEl.textContent = String(target);
+    } else {
+      const duration = 1200;
+      const start = performance.now();
+      const ease = t => 1 - Math.pow(1 - t, 3);
+      const tick = now => {
+        const p = Math.min(1, (now - start) / duration);
+        countEl.textContent = String(Math.round(ease(p) * target));
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+  }
+
+  if (!reduceMotion && window.matchMedia('(hover: hover)').matches) {
+    const bg = hero.querySelector('.shop-hero__bg');
+    let raf = null;
+    hero.addEventListener('mousemove', (e) => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const r = hero.getBoundingClientRect();
+        const mx = ((e.clientX - r.left) / r.width - 0.5) * 2;
+        const my = ((e.clientY - r.top) / r.height - 0.5) * 2;
+        bg.style.setProperty('--mx', mx.toFixed(3));
+        bg.style.setProperty('--my', my.toFixed(3));
+        raf = null;
+      });
+    });
+    hero.addEventListener('mouseleave', () => {
+      bg.style.setProperty('--mx', 0);
+      bg.style.setProperty('--my', 0);
+    });
+  }
+})();
+</script>
 {% endblock %}
