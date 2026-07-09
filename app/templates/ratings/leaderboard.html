@@ -119,6 +119,27 @@
 .lb-hero__stat-label { font-size: .82rem; color: var(--ms-text-dim); white-space: nowrap; margin-top: .1rem; }
 .lb-hero__stat-sub { font-size: .72rem; color: var(--ms-muted); margin-top: .1rem; }
 
+/* Кликабельный вариант — переход на рейтинг текущего сезона */
+a.lb-hero__stat {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+a.lb-hero__stat:hover {
+  background: rgba(199,165,82,.1);
+  border-color: rgba(199,165,82,.3);
+  transform: translateY(-2px);
+}
+.lb-hero__stat-arrow {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--ms-muted);
+  font-size: .95rem;
+  transition: transform .15s ease, color .15s ease;
+}
+a.lb-hero__stat:hover .lb-hero__stat-arrow { transform: translateX(3px); color: var(--ms-gold-light); }
+
 @media (prefers-reduced-motion: reduce) {
   .lb-hero, .lb-hero__glow, .lb-hero__particles { transition: none; }
   .lb-hero__particles span { animation: none; opacity: 0; }
@@ -367,6 +388,17 @@
           <div class="lb-hero__stat-sub">по {{ ratings|length }} игрокам</div>
         </div>
       </div>
+      {% if current_season %}
+      <a href="{{ url_for('seasons.detail', season_id=current_season.id) }}" class="lb-hero__stat fade-in-up" style="--d:340ms">
+        <div class="lb-hero__stat-icon"><i class="bi bi-calendar3"></i></div>
+        <div class="lb-hero__stat-body">
+          <div class="lb-hero__stat-value">{{ current_season.name }}</div>
+          <div class="lb-hero__stat-label">Рейтинг сезона</div>
+          <div class="lb-hero__stat-sub">Текущий период →</div>
+        </div>
+        <i class="bi bi-arrow-right lb-hero__stat-arrow"></i>
+      </a>
+      {% endif %}
     </div>
     {% endif %}
   </div>

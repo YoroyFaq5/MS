@@ -2,24 +2,284 @@
 {% from "_macros.html" import player_name %}
 {% block title %}Сезоны {{ year }}{% endblock %}
 
+{% block head %}
+<style>
+/* ============================================================
+   Сезоны — тот же премиальный язык, что уже на /games и /ratings
+   ============================================================
+   Переиспользует --ms-* токены, hero-технику (свечение/частицы/
+   parallax/count-up) и .rank-table/.rank-row/.rank-badge/.side-meter
+   из main.css. Новый язык не вводится, только развивается.
+   ============================================================ */
+
+.season-hero {
+  position: relative;
+  overflow: hidden;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  margin-bottom: 1.5rem;
+  transition: transform .35s cubic-bezier(.2,.7,.3,1), box-shadow .35s ease, border-color .35s ease;
+}
+.season-hero:hover {
+  transform: translateY(-2px);
+  border-color: rgba(199,165,82,.24);
+  box-shadow: 0 20px 48px rgba(0,0,0,.4);
+}
+
+.season-hero__bg { position: absolute; inset: 0; pointer-events: none; --mx: 0; --my: 0; }
+.season-hero__lines {
+  position: absolute; inset: 0; opacity: .5;
+  background-image: repeating-linear-gradient(115deg, rgba(199,165,82,.05) 0px, rgba(199,165,82,.05) 1px, transparent 1px, transparent 64px);
+  -webkit-mask-image: linear-gradient(90deg, black, transparent 75%);
+  mask-image: linear-gradient(90deg, black, transparent 75%);
+}
+.season-hero__glow {
+  position: absolute; width: 380px; height: 380px; border-radius: 50%;
+  filter: blur(70px);
+  transition: transform .4s ease-out;
+  transform: translate3d(calc(var(--mx, 0) * 12px), calc(var(--my, 0) * 8px), 0);
+}
+.season-hero__glow--1 { top: -160px; left: -60px; background: radial-gradient(circle, rgba(199,165,82,.16), transparent 70%); }
+.season-hero__glow--2 { bottom: -180px; left: 220px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(212,176,106,.1), transparent 70%); transition-delay: .05s; }
+
+.season-hero__particles { position: absolute; inset: 0; transform: translate3d(calc(var(--mx, 0) * 6px), calc(var(--my, 0) * 4px), 0); transition: transform .4s ease-out; }
+.season-hero__particles span {
+  position: absolute; width: 3px; height: 3px; border-radius: 50%;
+  background: var(--ms-gold-light); opacity: 0;
+  animation: season-dust 7s ease-in-out infinite;
+}
+.season-hero__particles span:nth-child(1) { top: 18%; left: 12%; animation-delay: 0s; }
+.season-hero__particles span:nth-child(2) { top: 60%; left: 24%; animation-delay: 1.6s; }
+.season-hero__particles span:nth-child(3) { top: 30%; left: 34%; animation-delay: 3.1s; }
+.season-hero__particles span:nth-child(4) { top: 75%; left: 8%;  animation-delay: 4.4s; }
+.season-hero__particles span:nth-child(5) { top: 45%; left: 42%; animation-delay: 5.6s; }
+@keyframes season-dust {
+  0%   { opacity: 0; transform: translateY(6px); }
+  15%  { opacity: .5; }
+  50%  { opacity: .25; transform: translateY(-10px); }
+  85%  { opacity: 0; transform: translateY(-18px); }
+  100% { opacity: 0; }
+}
+
+.season-hero__content { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 2rem 2.5rem; }
+.season-hero__main { display: flex; align-items: center; gap: 1.25rem; }
+
+.season-hero__monogram {
+  flex-shrink: 0; width: 76px; height: 76px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(199,165,82,.3); border-radius: 50%;
+  font-size: 1.6rem; color: var(--ms-gold-light);
+  background: radial-gradient(circle, rgba(199,165,82,.08), transparent 75%);
+}
+
+.season-hero__count-wrap { display: flex; flex-direction: column; }
+.season-hero__eyebrow {
+  font-size: .68rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ms-muted); margin-bottom: .15rem;
+}
+.season-hero__count {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(2.75rem, 3.2vw + 1.5rem, 4.5rem);
+  line-height: 1.2;
+  white-space: nowrap;
+  background: linear-gradient(180deg, #F3E4B8 0%, #D4B06A 32%, #C7A552 58%, #9C7C3E 82%, #C7A552 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 10px rgba(0,0,0,.5));
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+.season-hero__count-label {
+  font-size: .82rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ms-text-dim); margin-top: .1rem;
+}
+.season-hero__tagline { font-size: .78rem; color: var(--ms-muted); margin-top: .5rem; }
+
+.season-hero__stats { display: flex; flex-wrap: wrap; gap: 1rem; margin-left: auto; }
+.season-hero__stat {
+  display: flex; align-items: center; gap: 1rem;
+  min-width: 220px; max-width: 280px;
+  padding: 1.15rem 1.5rem;
+  background: var(--ms-surface-raised);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+}
+.season-hero__stat-icon {
+  flex-shrink: 0; width: 52px; height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 1.3rem;
+  background: rgba(199,165,82,.16); color: var(--ms-gold-light);
+}
+.season-hero__stat-body { min-width: 0; }
+.season-hero__stat-value {
+  font-size: 1.35rem; font-weight: 700; line-height: 1.2; color: var(--ms-gold-light);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.season-hero__stat-label { font-size: .82rem; color: var(--ms-text-dim); white-space: nowrap; margin-top: .1rem; }
+.season-hero__stat-sub { font-size: .72rem; color: var(--ms-muted); margin-top: .1rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .season-hero, .season-hero__glow, .season-hero__particles { transition: none; }
+  .season-hero__particles span { animation: none; opacity: 0; }
+}
+
+/* ── Toolbar: год + admin-действия ───────────────────────────────── */
+.season-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: .75rem; margin-bottom: 1.5rem;
+}
+
+/* ── Карточки сезонов ─────────────────────────────────────────────── */
+.season-card {
+  position: relative;
+  height: 100%;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  padding: 1.25rem;
+  transition: transform .2s cubic-bezier(.2,.7,.3,1), box-shadow .2s ease, border-color .2s ease;
+}
+.season-card:hover { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(0,0,0,.4); border-color: rgba(199,165,82,.22); }
+.season-card--current {
+  border-color: rgba(199,165,82,.35);
+  background: linear-gradient(180deg, rgba(199,165,82,.06), var(--ms-surface) 60%);
+}
+.season-card--tiebreak { border-color: rgba(142,28,28,.4); }
+
+.season-card__head { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; margin-bottom: .9rem; }
+.season-card__name { font-weight: 700; font-size: .98rem; }
+.season-card__dates { font-size: .72rem; color: var(--ms-muted); margin-top: .1rem; }
+
+.season-status {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .18rem .55rem; border-radius: 99px;
+  font-size: .66rem; font-weight: 600; letter-spacing: .02em; white-space: nowrap;
+}
+.season-status--live    { background: rgba(199,165,82,.16); color: var(--ms-gold-light); }
+.season-status--pending { background: rgba(138,138,138,.12); color: var(--ms-muted); }
+.season-status--done    { background: rgba(138,138,138,.1);  color: var(--ms-text-dim); }
+.season-status--tiebreak{ background: rgba(142,28,28,.16);   color: var(--ms-wine-light); }
+.season-status--live i { animation: season-pulse 1.6s ease-in-out infinite; }
+@keyframes season-pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+.season-card__progress { height: 3px; border-radius: 99px; background: var(--ms-border); overflow: hidden; margin-bottom: .9rem; }
+.season-card__progress-fill { height: 100%; background: var(--ms-gold-light); }
+
+.season-card__winner {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .55rem .7rem;
+  background: rgba(199,165,82,.06);
+  border: 1px solid rgba(199,165,82,.18);
+  border-radius: 8px;
+  margin-bottom: .85rem;
+}
+.season-card__winner-avatar {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ms-gold); color: #0D0D0D; font-weight: 700; font-size: .85rem;
+}
+.season-card__winner-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.season-card__winner-name { font-weight: 600; font-size: .85rem; color: var(--ms-gold-light); }
+.season-card__winner-score { font-size: .68rem; color: var(--ms-muted); }
+
+.season-card__note { font-size: .78rem; color: var(--ms-muted); margin-bottom: .85rem; }
+.season-card__games { font-size: .74rem; color: var(--ms-muted); margin-bottom: .9rem; display: flex; align-items: center; gap: .35rem; }
+
+.season-card__cta {
+  display: flex; align-items: center; justify-content: center; gap: .4rem;
+  width: 100%; padding: .5rem; border-radius: 8px;
+  background: var(--ms-surface-raised);
+  border: 1px solid var(--ms-border);
+  color: var(--ms-text-dim);
+  font-size: .82rem; font-weight: 600;
+  text-decoration: none;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.season-card__cta:hover { background: rgba(199,165,82,.12); color: var(--ms-gold-light); border-color: rgba(199,165,82,.3); }
+
+/* ── Годовая таблица — переиспользует .rank-table/.side-meter ───────── */
+.season-avatar {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ms-gold); color: #0D0D0D; font-weight: 700; font-size: .78rem;
+}
+.season-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.rank-row:hover .season-avatar { box-shadow: 0 0 0 2px rgba(199,165,82,.35); }
+.rank-row--top1 .season-avatar { box-shadow: 0 0 0 2px var(--ms-gold-light); }
+.rank-row--top2 .season-avatar { box-shadow: 0 0 0 2px #B8B8B8; }
+.rank-row--top3 .season-avatar { box-shadow: 0 0 0 2px #B08D57; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-  <div>
-    <h2 class="mb-0 fw-bold">📅 Сезоны</h2>
-    <p class="text-muted small mb-0">Двухмесячные рейтинговые периоды</p>
+<div class="season-hero fade-in-up" id="season-hero">
+  <div class="season-hero__bg" aria-hidden="true">
+    <div class="season-hero__lines"></div>
+    <div class="season-hero__glow season-hero__glow--1"></div>
+    <div class="season-hero__glow season-hero__glow--2"></div>
+    <div class="season-hero__particles">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
   </div>
 
-  <div class="d-flex gap-2 align-items-center flex-wrap">
-    <!-- Year selector -->
-    <div class="btn-group btn-group-sm">
-      {% for y in available_years %}
-      <a href="{{ url_for('seasons.index', year=y) }}"
-         class="btn {{ 'btn-danger' if y == year else 'btn-outline-secondary' }}">{{ y }}</a>
-      {% endfor %}
+  <div class="season-hero__content">
+    <div class="season-hero__main">
+      <div class="season-hero__monogram fade-in-up" style="--d:60ms"><i class="bi bi-calendar3"></i></div>
+      <div class="season-hero__count-wrap fade-in-up" style="--d:140ms">
+        {% if current_season %}
+        <div class="season-hero__eyebrow">{{ current_season.name }}</div>
+        {% if days_remaining == 0 %}
+        <div class="season-hero__count" style="font-size:clamp(1.75rem, 2vw + 1rem, 2.75rem)">Последний день</div>
+        {% else %}
+        <div class="season-hero__count" data-count-to="{{ days_remaining }}">0</div>
+        <div class="season-hero__count-label">дней до конца сезона</div>
+        {% endif %}
+        <div class="season-hero__tagline">Текущий рейтинговый период клуба</div>
+        {% else %}
+        <div class="season-hero__eyebrow">Сезоны клуба</div>
+        <div class="season-hero__count" style="font-size:clamp(1.75rem, 2vw + 1rem, 2.75rem)">{{ year }}</div>
+        <div class="season-hero__tagline">Двухмесячные рейтинговые периоды</div>
+        {% endif %}
+      </div>
     </div>
 
-    <!-- Admin controls -->
-    {% if current_user.is_authenticated and current_user.is_admin %}
+    {% if current_season %}
+    <div class="season-hero__stats">
+      {% if current_season_leader %}
+      <div class="season-hero__stat fade-in-up" style="--d:220ms">
+        <div class="season-hero__stat-icon"><i class="bi bi-award-fill"></i></div>
+        <div class="season-hero__stat-body">
+          <div class="season-hero__stat-value">{{ current_season_leader.display_name }}</div>
+          <div class="season-hero__stat-label">Лидер сезона</div>
+          <div class="season-hero__stat-sub">{{ current_season_leader.season_rating|round(2) }} очков</div>
+        </div>
+      </div>
+      {% endif %}
+      <div class="season-hero__stat fade-in-up" style="--d:280ms">
+        <div class="season-hero__stat-icon"><i class="bi bi-controller"></i></div>
+        <div class="season-hero__stat-body">
+          <div class="season-hero__stat-value">{{ current_season_games_count }}</div>
+          <div class="season-hero__stat-label">Игр в сезоне</div>
+          <div class="season-hero__stat-sub">{{ current_season.name }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="season-toolbar">
+  <div class="btn-group btn-group-sm">
+    {% for y in available_years %}
+    <a href="{{ url_for('seasons.index', year=y) }}"
+       class="btn {{ 'btn-danger' if y == year else 'btn-outline-secondary' }}">{{ y }}</a>
+    {% endfor %}
+  </div>
+
+  {% if current_user.is_authenticated and current_user.is_admin %}
+  <div class="d-flex gap-2 flex-wrap">
     <form method="POST" action="{{ url_for('seasons.close_expired') }}">
       <button class="btn btn-sm btn-outline-warning"
               onclick="return confirm('Закрыть все завершившиеся сезоны?')">
@@ -33,69 +293,63 @@
         <i class="bi bi-trophy me-1"></i>Стол года {{ year }}
       </button>
     </form>
-    {% endif %}
   </div>
+  {% endif %}
 </div>
 
 <!-- 6 season cards -->
 <div class="row g-3 mb-5">
   {% for season in seasons %}
   <div class="col-md-6 col-xl-4">
-    <div class="card h-100 season-card
-      {% if current_season and current_season.id == season.id %}season-card--current{% endif %}
-      {% if season.status.value == 'waiting_tiebreak' %}season-card--tiebreak{% endif %}">
+    {% set is_current = current_season and current_season.id == season.id %}
+    <div class="season-card fade-in-up
+      {% if is_current %}season-card--current{% endif %}
+      {% if season.status.value == 'waiting_tiebreak' %}season-card--tiebreak{% endif %}"
+      style="--d:{{ (loop.index0 % 6) * 40 }}ms">
 
-      <div class="card-body p-4">
-        <div class="d-flex justify-content-between align-items-start mb-3">
-          <div>
-            <div class="fw-bold fs-6">{{ season.name }}</div>
-            <div class="text-muted small">
-              {{ season.starts_at.strftime('%d.%m') }} — {{ season.ends_at.strftime('%d.%m.%Y') }}
-            </div>
-          </div>
-          {% if season.status.value == 'active' %}
-            {% if current_season and current_season.id == season.id %}
-              <span class="badge bg-success">🟢 Идёт</span>
-            {% else %}
-              <span class="badge bg-secondary">⏳ Ожидает</span>
-            {% endif %}
-          {% elif season.status.value == 'finished' %}
-            <span class="badge bg-body-secondary text-muted border">✅ Завершён</span>
-          {% elif season.status.value == 'waiting_tiebreak' %}
-            <span class="badge bg-warning text-dark">⚠️ Ничья!</span>
+      <div class="season-card__head">
+        <div>
+          <div class="season-card__name">{{ season.name }}</div>
+          <div class="season-card__dates">{{ season.starts_at.strftime('%d.%m') }} — {{ season.ends_at.strftime('%d.%m.%Y') }}</div>
+        </div>
+        {% if season.status.value == 'active' %}
+          {% if is_current %}
+          <span class="season-status season-status--live"><i class="bi bi-circle-fill"></i>Идёт</span>
+          {% else %}
+          <span class="season-status season-status--pending"><i class="bi bi-hourglass-split"></i>Ожидает</span>
           {% endif %}
-        </div>
-
-        <!-- Winner block -->
-        {% if season.winner %}
-        <div class="winner-block d-flex align-items-center gap-2 mb-3">
-          <span class="fs-4">🏆</span>
-          <div>
-            <div class="fw-semibold text-warning">{{ player_name(season.winner, equipped_bulk.get(season.winner.id, {})) }}</div>
-            <div class="text-muted small">{{ season.winner_score|round(2) }} очков</div>
-          </div>
-        </div>
+        {% elif season.status.value == 'finished' %}
+          <span class="season-status season-status--done"><i class="bi bi-check-circle-fill"></i>Завершён</span>
         {% elif season.status.value == 'waiting_tiebreak' %}
-        <div class="alert alert-warning py-2 small mb-3">
-          <i class="bi bi-exclamation-triangle me-1"></i>
-          Ничья — требуется выбор победителя
-        </div>
-        {% elif current_season and current_season.id == season.id %}
-        <div class="text-muted small mb-3">Сезон в процессе</div>
-        {% else %}
-        <div class="text-muted small mb-3">—</div>
+          <span class="season-status season-status--tiebreak"><i class="bi bi-exclamation-triangle-fill"></i>Ничья</span>
         {% endif %}
-
-        <!-- Games count -->
-        <div class="text-muted small mb-3">
-          <i class="bi bi-controller me-1"></i>{{ season.games|length }} игр
-        </div>
-
-        <a href="{{ url_for('seasons.detail', season_id=season.id) }}"
-           class="btn btn-sm btn-outline-secondary w-100">
-          Рейтинг сезона →
-        </a>
       </div>
+
+      <div class="season-card__progress"><div class="season-card__progress-fill" style="width:{{ season_progress.get(season.id, 0) }}%"></div></div>
+
+      {% if season.winner %}
+      <div class="season-card__winner">
+        <span class="season-card__winner-avatar">
+          {% if avatars.get(season.winner_player_id) %}<img src="{{ avatars[season.winner_player_id] }}" alt="">{% else %}🏆{% endif %}
+        </span>
+        <div>
+          <div class="season-card__winner-name">{{ player_name(season.winner, equipped_bulk.get(season.winner.id, {})) }}</div>
+          <div class="season-card__winner-score">{{ season.winner_score|round(2) }} очков</div>
+        </div>
+      </div>
+      {% elif season.status.value == 'waiting_tiebreak' %}
+      <div class="season-card__note"><i class="bi bi-exclamation-triangle me-1"></i>Ничья — требуется выбор победителя</div>
+      {% elif is_current %}
+      <div class="season-card__note">Сезон в процессе</div>
+      {% else %}
+      <div class="season-card__note">—</div>
+      {% endif %}
+
+      <div class="season-card__games"><i class="bi bi-controller"></i>{{ season.games|length }} игр</div>
+
+      <a href="{{ url_for('seasons.detail', season_id=season.id) }}" class="season-card__cta">
+        Рейтинг сезона<i class="bi bi-arrow-right"></i>
+      </a>
     </div>
   </div>
   {% endfor %}
@@ -110,7 +364,7 @@
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0 align-middle">
+      <table class="table table-hover mb-0 align-middle rank-table">
         <thead>
           <tr>
             <th class="ps-4">#</th>
@@ -125,34 +379,32 @@
         </thead>
         <tbody>
           {% for r in year_ratings %}
-          <tr>
-            <td class="ps-4">
-              {% if r.rank == 1 %}🥇
-              {% elif r.rank == 2 %}🥈
-              {% elif r.rank == 3 %}🥉
-              {% else %}<span class="text-muted">{{ r.rank }}</span>{% endif %}
-            </td>
+          <tr class="rank-row {% if r.rank <= 3 %}rank-row--top{{ r.rank }}{% endif %}">
+            <td class="ps-4"><span class="rank-badge">{{ r.rank }}</span></td>
             <td>
-              <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}"
-                 class="text-decoration-none fw-semibold">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</a>
-            </td>
-            <td class="text-center text-muted">{{ r.games_played }}</td>
-            <td class="text-center text-muted">{{ r.games_won }}</td>
-            <td class="text-center">
-              <div class="d-flex align-items-center justify-content-center gap-2">
-                <div class="progress flex-grow-1" style="height:5px;max-width:50px">
-                  <div class="progress-bar bg-success" style="width:{{ r.win_rate }}%"></div>
-                </div>
-                <span class="text-muted small">{{ r.win_rate }}%</span>
+              <div class="d-flex align-items-center gap-2">
+                <span class="season-avatar">
+                  {% if avatars.get(r.player_id) %}<img src="{{ avatars[r.player_id] }}" alt="">{% else %}{{ r.display_name[0]|upper }}{% endif %}
+                </span>
+                <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}"
+                   class="text-decoration-none fw-semibold">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</a>
               </div>
             </td>
-            <td class="text-center text-muted">{{ r.avg_score|round(2) }}</td>
+            <td class="text-center text-muted tabular-nums">{{ r.games_played }}</td>
+            <td class="text-center text-muted tabular-nums">{{ r.games_won }}</td>
             <td class="text-center">
-              <span class="{% if r.elo > 1000 %}text-success{% elif r.elo < 1000 %}text-danger{% else %}text-muted{% endif %} small fw-medium">
+              <div class="side-meter justify-content-center">
+                <div class="side-meter__bar"><div class="side-meter__fill" style="width:{{ r.win_rate }}%"></div></div>
+                <span class="tabular-nums">{{ r.win_rate }}%</span>
+              </div>
+            </td>
+            <td class="text-center text-muted tabular-nums">{{ r.avg_score|round(2) }}</td>
+            <td class="text-center">
+              <span class="{% if r.elo > 1000 %}text-success{% elif r.elo < 1000 %}text-danger{% else %}text-muted{% endif %} small fw-medium tabular-nums">
                 {{ r.elo|round|int }}
               </span>
             </td>
-            <td class="text-end pe-4 fw-bold text-success">{{ r.total_score|round(2) }}</td>
+            <td class="text-end pe-4 fw-bold text-success tabular-nums">{{ r.total_score|round(2) }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -167,22 +419,52 @@
   </div>
 </div>
 {% endif %}
-
-{% block head %}
-<style>
-.season-card {
-  border: 1px solid var(--ms-border);
-  transition: transform .15s, box-shadow .15s;
-}
-.season-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.4); }
-.season-card--current { border-color: rgba(212,176,106,.5) !important; }
-.season-card--tiebreak { border-color: rgba(123,15,15,.5) !important; }
-.winner-block {
-  background: rgba(212,176,106,.08);
-  border: 1px solid rgba(212,176,106,.25);
-  border-radius: 8px;
-  padding: 8px 12px;
-}
-</style>
 {% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const hero = document.getElementById('season-hero');
+  if (!hero) return;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const countEl = hero.querySelector('[data-count-to]');
+  if (countEl) {
+    const target = parseInt(countEl.dataset.countTo, 10) || 0;
+    if (reduceMotion || target === 0) {
+      countEl.textContent = String(target);
+    } else {
+      const duration = 1200;
+      const start = performance.now();
+      const ease = t => 1 - Math.pow(1 - t, 3);
+      const tick = now => {
+        const p = Math.min(1, (now - start) / duration);
+        countEl.textContent = String(Math.round(ease(p) * target));
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+  }
+
+  if (!reduceMotion && window.matchMedia('(hover: hover)').matches) {
+    const bg = hero.querySelector('.season-hero__bg');
+    let raf = null;
+    hero.addEventListener('mousemove', (e) => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const r = hero.getBoundingClientRect();
+        const mx = ((e.clientX - r.left) / r.width - 0.5) * 2;
+        const my = ((e.clientY - r.top) / r.height - 0.5) * 2;
+        bg.style.setProperty('--mx', mx.toFixed(3));
+        bg.style.setProperty('--my', my.toFixed(3));
+        raf = null;
+      });
+    });
+    hero.addEventListener('mouseleave', () => {
+      bg.style.setProperty('--mx', 0);
+      bg.style.setProperty('--my', 0);
+    });
+  }
+})();
+</script>
 {% endblock %}

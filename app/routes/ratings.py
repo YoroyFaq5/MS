@@ -5,6 +5,7 @@ from app import db
 from app.models import Player
 from app.services import RatingService, TitleService
 from app.services.shop_service import ShopService
+from app.services.season_service import SeasonService
 
 ratings_bp = Blueprint("ratings", __name__)
 
@@ -34,10 +35,13 @@ def leaderboard():
         old_rank = rank_30d_ago.get(r.player_id)
         r.rank_movement = (old_rank - r.rank) if old_rank is not None else None
 
+    current_season = SeasonService.get_current_season()
+
     return render_template(
         "ratings/leaderboard.html", ratings=ratings,
         equipped_titles=equipped_titles, equipped_bulk=equipped_bulk,
         avatars=avatars, avg_win_rate=avg_win_rate,
+        current_season=current_season,
     )
 
 

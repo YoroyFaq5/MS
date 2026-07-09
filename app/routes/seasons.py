@@ -4,6 +4,7 @@ Seasons Blueprint
 Read-only views for players + admin actions (tiebreak, year tournament).
 Zero business logic here — all delegated to SeasonService / RatingService.
 """
+import math
 from datetime import datetime, timezone
 from flask import (
     Blueprint, render_template, request, redirect,
@@ -12,13 +13,20 @@ from flask import (
 from flask_login import current_user
 
 from app import db
-from app.models import Season, SeasonStatus
+from app.models import Season, SeasonStatus, Player
 from app.services.season_service import SeasonService
 from app.services.rating_service import RatingService
 from app.services.shop_service import ShopService
 from app.auth_decorators import admin_required
 
 seasons_bp = Blueprint("seasons", __name__)
+
+
+def _naive(dt):
+    """DateTime(timezone=True) columns round-trip tz-naive from MySQL —
+    strip tzinfo from both sides before comparing/subtracting (see the
+    same helper name/pattern in routes/main.py and routes/profile.py)."""
+    return dt.replace(tzinfo=None) if dt and dt.tzinfo else dt
 
 
 # ── Current season / year overview ───────────────────────────────────────────
@@ -45,11 +53,60 @@ def index():
     # Year rating
     year_ratings = RatingService.get_year_rating(year)
 
-    # Персонализация ников — один bulk-запрос на все имена этой страницы
-    # (year_ratings + победители сезонов года).
+    # ── Hero-блок: текущий сезон крупным планом ────────────────────────
+    # Дней до конца (ceil — "осталось меньше суток" всё равно читается
+    # как "1 день"), лидер сезона (полная формула, как на /seasons/<id>),
+    # игр в сезоне — всё вычисляется здесь один раз, без новых тяжёлых
+    # запросов (compute_season_ratings — только для ОДНОГО сезона).
+    days_remaining = None
+    current_season_leader = None
+    current_season_games_count = 0
+    if current_season:
+        now_naive = _naive(datetime.now(timezone.utc))
+        ends_naive = _naive(current_season.ends_at)
+        seconds_left = (ends_naive - now_naive).total_seconds()
+        days_remaining = max(0, math.ceil(seconds_left / 86400)) if seconds_left > 0 else 0
+
+        from app.services.season_rating_engine import SeasonRatingEngine
+        from app.models import Game
+        cs_ratings = SeasonRatingEngine.compute_season_ratings(current_season.id)
+        current_season_leader = cs_ratings[0] if cs_ratings else None
+        current_season_games_count = (
+            db.session.query(Game)
+            .filter(Game.season_id == current_season.id, Game.is_finished == True)
+            .count()
+        )
+
+    # Прогресс сезона (% времени прошло) — только для реально текущего
+    # сезона; для остальных в списке года — по статусу (завершён = 100%,
+    # ещё не начался = 0%), без лишней датовой арифметики.
+    season_progress = {}
+    for s in seasons:
+        if s.status == SeasonStatus.FINISHED:
+            season_progress[s.id] = 100
+        elif current_season and s.id == current_season.id:
+            starts_naive = _naive(s.starts_at)
+            ends_naive = _naive(s.ends_at)
+            now_naive = _naive(datetime.now(timezone.utc))
+            total = (ends_naive - starts_naive).total_seconds()
+            elapsed = (now_naive - starts_naive).total_seconds()
+            season_progress[s.id] = max(0, min(100, round(elapsed / total * 100))) if total > 0 else 0
+        else:
+            season_progress[s.id] = 0
+
+    # Персонализация ников + аватарки — один bulk-запрос на все имена
+    # этой страницы (year_ratings + победители сезонов года + лидер
+    # текущего сезона).
     player_ids = {r.player_id for r in year_ratings}
     player_ids.update(s.winner_player_id for s in seasons if s.winner_player_id)
+    if current_season_leader:
+        player_ids.add(current_season_leader.player_id)
     equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+    avatars = dict(
+        db.session.query(Player.id, Player.avatar_url)
+        .filter(Player.id.in_(player_ids))
+        .all()
+    ) if player_ids else {}
 
     return render_template(
         "seasons/index.html",
@@ -59,6 +116,11 @@ def index():
         available_years=available_years,
         year_ratings=year_ratings,
         equipped_bulk=equipped_bulk,
+        avatars=avatars,
+        days_remaining=days_remaining,
+        current_season_leader=current_season_leader,
+        current_season_games_count=current_season_games_count,
+        season_progress=season_progress,
     )
 
 
