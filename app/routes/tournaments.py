@@ -382,6 +382,15 @@ def leaderboard(tournament_id: int):
     equipped_titles = TitleService.get_equipped_titles_bulk(player_ids)
     equipped_bulk = ShopService.get_equipped_bulk(player_ids)
 
+    # Побед по роли / ПУ / Ci / ЛХ — прикрепляется к уже посчитанным
+    # PlayerRating прямо здесь (не часть самого DTO), плюс суперлативы
+    # турнира (MVP + лучший по каждой роли).
+    role_breakdown = RatingService.get_role_breakdown(tournament_id=tournament_id)
+    from app.services.rating_service import RoleTournamentStats
+    for r in player_ratings:
+        r.role_stats = role_breakdown.get(r.player_id) or RoleTournamentStats()
+    superlatives = RatingService.pick_role_superlatives(player_ratings, role_breakdown)
+
     return render_template(
         "tournaments/leaderboard.html",
         tournament=t,
@@ -390,6 +399,7 @@ def leaderboard(tournament_id: int):
         final_ids=final_ids,
         equipped_titles=equipped_titles,
         equipped_bulk=equipped_bulk,
+        superlatives=superlatives,
     )
 
 

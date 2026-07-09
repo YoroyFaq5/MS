@@ -96,12 +96,69 @@
 </div>
 {% endif %}
 
+<!-- Superlatives: MVP + лучшие по ролям -->
+{% if superlatives.mvp or superlatives.don or superlatives.sheriff or superlatives.civilian or superlatives.mafia %}
+<h5 class="fw-semibold mb-3">⭐ Лучшие турнира</h5>
+<div class="row g-3 mb-5">
+  {% if superlatives.mvp %}
+  <div class="col-6 col-md-4 col-lg">
+    <div class="stat-card card text-center p-3 h-100">
+      <div class="stat-icon">⭐</div>
+      <div class="text-muted small">MVP</div>
+      <div class="fw-bold">{{ player_name(superlatives.mvp, equipped_bulk.get(superlatives.mvp.player_id, {})) }}</div>
+      <div class="text-warning small">{{ superlatives.mvp.superlative_value|round(2) }} бонус.</div>
+    </div>
+  </div>
+  {% endif %}
+  {% if superlatives.don %}
+  <div class="col-6 col-md-4 col-lg">
+    <div class="stat-card card text-center p-3 h-100">
+      <div class="stat-icon">👑</div>
+      <div class="text-muted small">Лучший Дон</div>
+      <div class="fw-bold">{{ player_name(superlatives.don, equipped_bulk.get(superlatives.don.player_id, {})) }}</div>
+      <div class="text-warning small">{{ superlatives.don.superlative_value|round(2) }} очков</div>
+    </div>
+  </div>
+  {% endif %}
+  {% if superlatives.sheriff %}
+  <div class="col-6 col-md-4 col-lg">
+    <div class="stat-card card text-center p-3 h-100">
+      <div class="stat-icon">🔍</div>
+      <div class="text-muted small">Лучший Шериф</div>
+      <div class="fw-bold">{{ player_name(superlatives.sheriff, equipped_bulk.get(superlatives.sheriff.player_id, {})) }}</div>
+      <div class="text-warning small">{{ superlatives.sheriff.superlative_value|round(2) }} очков</div>
+    </div>
+  </div>
+  {% endif %}
+  {% if superlatives.civilian %}
+  <div class="col-6 col-md-4 col-lg">
+    <div class="stat-card card text-center p-3 h-100">
+      <div class="stat-icon">🔴</div>
+      <div class="text-muted small">Лучший Красный</div>
+      <div class="fw-bold">{{ player_name(superlatives.civilian, equipped_bulk.get(superlatives.civilian.player_id, {})) }}</div>
+      <div class="text-warning small">{{ superlatives.civilian.superlative_value|round(2) }} очков</div>
+    </div>
+  </div>
+  {% endif %}
+  {% if superlatives.mafia %}
+  <div class="col-6 col-md-4 col-lg">
+    <div class="stat-card card text-center p-3 h-100">
+      <div class="stat-icon">⚫</div>
+      <div class="text-muted small">Лучший Чёрный</div>
+      <div class="fw-bold">{{ player_name(superlatives.mafia, equipped_bulk.get(superlatives.mafia.player_id, {})) }}</div>
+      <div class="text-warning small">{{ superlatives.mafia.superlative_value|round(2) }} очков</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
 <!-- Full table -->
 <div class="card">
   <div class="card-body p-0">
     {% if player_ratings %}
     <div class="table-responsive">
-      <table class="table table-hover mb-0 align-middle">
+      <table class="table table-hover mb-0 align-middle" id="tournamentRatingTable">
         <thead>
           <tr>
             <th class="ps-4">#</th>
@@ -111,6 +168,11 @@
             <th class="text-center">Винрейт</th>
             <th class="text-center">Ср. очки</th>
             <th class="text-center">ELO</th>
+            <th class="text-center" title="Побед в роли Шериф">Поб. Ш</th>
+            <th class="text-center" title="Побед в роли Дон">Поб. Д</th>
+            <th class="text-center" title="Раз был ПУ (первым убитым)">Убийств</th>
+            <th class="text-center" title="Компенсационные баллы ФСМ">Ci</th>
+            <th class="text-center" title="Бонус за успешный ПУ-звонок">ЛХ</th>
             <th class="text-end pe-4">Очки</th>
           </tr>
         </thead>
@@ -152,6 +214,11 @@
                 {{ r.elo|round|int }}
               </span>
             </td>
+            <td class="text-center text-muted">{{ r.role_stats.wins_sheriff }}</td>
+            <td class="text-center text-muted">{{ r.role_stats.wins_don }}</td>
+            <td class="text-center text-muted">{{ r.role_stats.pu_count }}</td>
+            <td class="text-center text-muted">{{ r.role_stats.ci_total|round(2) }}</td>
+            <td class="text-center text-muted">{{ r.role_stats.lh_total|round(2) }}</td>
             <td class="text-end pe-4 fw-bold text-success">{{ r.total_score|round(2) }}</td>
           </tr>
           {% endfor %}
@@ -171,6 +238,12 @@
 <style>
 .finalist-row { background: rgba(251,191,36,.04) !important; }
 .finalist-row td:first-child { border-left: 3px solid #fbbf24; }
+
+@media (max-width: 991.98px) {
+  #tournamentRatingTable th:nth-child(8), #tournamentRatingTable td:nth-child(8),
+  #tournamentRatingTable th:nth-child(9), #tournamentRatingTable td:nth-child(9),
+  #tournamentRatingTable th:nth-child(12), #tournamentRatingTable td:nth-child(12) { display: none; }
+}
 </style>
 {% endblock %}
 {% endblock %}

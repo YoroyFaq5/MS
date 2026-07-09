@@ -127,6 +127,29 @@ class TeamRating:
         }
 
 
+@dataclass
+class RoleTournamentStats:
+    """
+    Per-role win/score breakdown + ПУ/Ci/ЛХ totals, scoped to one
+    tournament or one stage (series) — see RatingService.get_role_breakdown.
+    Attached onto the matching PlayerRating by the caller (as
+    `.role_stats`), not merged into the PlayerRating dataclass itself, so
+    every existing PlayerRating caller/to_dict() stays untouched.
+    """
+    wins_sheriff: int = 0
+    wins_don: int = 0
+    wins_mafia: int = 0     # обычная мафия (не Дон) — "лучший чёрный"
+    wins_civilian: int = 0  # мирный без роли шерифа — "лучший красный"
+    score_sheriff: float = 0.0
+    score_don: float = 0.0
+    score_mafia: float = 0.0
+    score_civilian: float = 0.0
+    pu_count: int = 0        # раз был ПУ ("убийств")
+    ci_total: float = 0.0    # компенсационные баллы ФСМ (Ci)
+    lh_total: float = 0.0    # бонус за успешный ПУ-звонок ("ЛХ")
+    bonus_total: float = 0.0  # bonus_score, любая роль — критерий MVP
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -360,6 +383,100 @@ class RatingService:
                 continue
             ratings.append(_slots_to_player_rating(player, slots))
         return _rank(ratings)
+
+    # ── Role/ПУ/Ci breakdown + superlatives ─────────────────────────────────
+
+    @staticmethod
+    def get_role_breakdown(
+        tournament_id: Optional[int] = None, stage_id: Optional[int] = None
+    ) -> dict[int, RoleTournamentStats]:
+        """
+        Per-role win counts + per-role total_score sums + ПУ count +
+        Ci/ЛХ/bonus totals, scoped to one tournament or one stage — a
+        single bulk query (unlike get_tournament_rating/get_stage_rating's
+        one-query-per-player loop), same is_finished-only filter (no
+        is_ranked filter) so numbers line up with those methods' columns.
+        """
+        query = (
+            db.session.query(GameSlot)
+            .join(Game)
+            .options(contains_eager(GameSlot.game))
+            .filter(Game.is_finished == True)
+        )
+        if tournament_id is not None:
+            query = query.filter(Game.tournament_id == tournament_id)
+        if stage_id is not None:
+            query = query.filter(Game.stage_id == stage_id)
+        slots = query.all()
+
+        breakdown: dict[int, RoleTournamentStats] = {}
+        for slot in slots:
+            stats = breakdown.setdefault(slot.player_id, RoleTournamentStats())
+            won = (
+                (slot.is_mafia_side and slot.game.win_side == WinSide.MAFIA)
+                or (slot.is_city_side and slot.game.win_side == WinSide.CITY)
+            )
+            score = slot.total_score
+            if slot.role == Role.SHERIFF:
+                stats.score_sheriff += score
+                if won:
+                    stats.wins_sheriff += 1
+            elif slot.role == Role.DON:
+                stats.score_don += score
+                if won:
+                    stats.wins_don += 1
+            elif slot.role == Role.MAFIA:
+                stats.score_mafia += score
+                if won:
+                    stats.wins_mafia += 1
+            else:  # CIVILIAN
+                stats.score_civilian += score
+                if won:
+                    stats.wins_civilian += 1
+
+            if slot.is_pu:
+                stats.pu_count += 1
+            stats.ci_total += slot.compensation_score
+            stats.lh_total += slot.pu_bonus
+            stats.bonus_total += slot.bonus_score
+
+        return breakdown
+
+    @staticmethod
+    def pick_role_superlatives(
+        ratings: List[PlayerRating], role_stats: dict[int, RoleTournamentStats]
+    ) -> dict[str, Optional[PlayerRating]]:
+        """
+        MVP (наибольшая сумма bonus_score, любая роль) + "лучший" по каждой
+        из 4 ролей (наибольшая сумма total_score именно в этой роли).
+        Побеждает только при значении > 0 — если никто не набрал бонусов/
+        очков в роли, соответствующий титул остаётся пустым (None), а не
+        достаётся случайному игроку с нулём.
+
+        Победившему PlayerRating выставляется `.superlative_value` — то
+        самое число, по которому он победил (шаблон не лезет обратно в
+        role_stats).
+        """
+        def pick(attr: str) -> Optional[PlayerRating]:
+            best, best_val = None, 0.0
+            for r in ratings:
+                stats = role_stats.get(r.player_id)
+                if not stats:
+                    continue
+                val = getattr(stats, attr)
+                if val > best_val:
+                    best_val, best = val, r
+            if best is not None:
+                best.superlative_value = best_val
+            return best
+
+        return {
+            "mvp": pick("bonus_total"),
+            "don": pick("score_don"),
+            "sheriff": pick("score_sheriff"),
+            "civilian": pick("score_civilian"),
+            "mafia": pick("score_mafia"),
+        }
 
     # ── Team rating ──────────────────────────────────────────────────────────
 

@@ -11,7 +11,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 
 from app import db
 from app.models import Player, TournamentSeries
-from app.services import SeriesTournamentService, TournamentService
+from app.services import SeriesTournamentService, TournamentService, RatingService
+from app.services.rating_service import RoleTournamentStats
 from app.services.shop_service import ShopService
 from app.auth_decorators import admin_required
 
@@ -126,6 +127,16 @@ def series_detail(series_tournament_id: int, series_id: int):
         [r.player_id for r in leaderboard] + [p.id for p in tournament_players]
     )
 
+    # Побед по роли / ПУ / Ci / ЛХ — та же логика, что на общем рейтинге
+    # турнира (tournaments.leaderboard), только scoped на stage этой
+    # конкретной серии/вечера, + суперлативы серии.
+    role_breakdown = (
+        RatingService.get_role_breakdown(stage_id=series.stage_id) if series.stage_id else {}
+    )
+    for r in leaderboard:
+        r.role_stats = role_breakdown.get(r.player_id) or RoleTournamentStats()
+    superlatives = RatingService.pick_role_superlatives(leaderboard, role_breakdown)
+
     return render_template(
         "series_tournaments/series_detail.html",
         series_tournament=st,
@@ -135,6 +146,7 @@ def series_detail(series_tournament_id: int, series_id: int):
         games=games,
         tournament_players=tournament_players,
         equipped_bulk=equipped_bulk,
+        superlatives=superlatives,
     )
 
 
