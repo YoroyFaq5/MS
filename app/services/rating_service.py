@@ -140,10 +140,10 @@ class RoleTournamentStats:
     wins_don: int = 0
     wins_mafia: int = 0     # обычная мафия (не Дон) — "лучший чёрный"
     wins_civilian: int = 0  # мирный без роли шерифа — "лучший красный"
-    score_sheriff: float = 0.0
-    score_don: float = 0.0
-    score_mafia: float = 0.0
-    score_civilian: float = 0.0
+    bonus_sheriff: float = 0.0  # bonus_score в роли — критерий "лучший шериф"
+    bonus_don: float = 0.0      # bonus_score в роли — критерий "лучший дон"
+    bonus_mafia: float = 0.0    # bonus_score в роли — критерий "лучший чёрный"
+    bonus_civilian: float = 0.0  # bonus_score в роли — критерий "лучший красный"
     pu_count: int = 0        # раз был ПУ ("убийств")
     ci_total: float = 0.0    # компенсационные баллы ФСМ (Ci)
     lh_total: float = 0.0    # бонус за успешный ПУ-звонок ("ЛХ")
@@ -424,21 +424,20 @@ class RatingService:
                 (slot.is_mafia_side and slot.game.win_side == WinSide.MAFIA)
                 or (slot.is_city_side and slot.game.win_side == WinSide.CITY)
             )
-            score = slot.total_score
             if slot.role == Role.SHERIFF:
-                stats.score_sheriff += score
+                stats.bonus_sheriff += slot.bonus_score
                 if won:
                     stats.wins_sheriff += 1
             elif slot.role == Role.DON:
-                stats.score_don += score
+                stats.bonus_don += slot.bonus_score
                 if won:
                     stats.wins_don += 1
             elif slot.role == Role.MAFIA:
-                stats.score_mafia += score
+                stats.bonus_mafia += slot.bonus_score
                 if won:
                     stats.wins_mafia += 1
             else:  # CIVILIAN
-                stats.score_civilian += score
+                stats.bonus_civilian += slot.bonus_score
                 if won:
                     stats.wins_civilian += 1
 
@@ -456,9 +455,10 @@ class RatingService:
     ) -> dict[str, Optional["RoleSuperlative"]]:
         """
         MVP (наибольшая сумма bonus_score, любая роль) + "лучший" по каждой
-        из 4 ролей (наибольшая сумма total_score именно в этой роли).
-        Побеждает только при значении > 0 — если никто не набрал бонусов/
-        очков в роли, соответствующий титул остаётся пустым (None), а не
+        из 4 ролей (наибольшая сумма bonus_score именно в этой роли — тот
+        же критерий, что и у MVP, просто в разрезе одной роли, а не всех
+        сразу). Побеждает только при значении > 0 — если никто не набрал
+        бонусов в роли, соответствующий титул остаётся пустым (None), а не
         достаётся случайному игроку с нулём.
 
         Возвращает RoleSuperlative(rating, value), а не PlayerRating с
@@ -480,10 +480,10 @@ class RatingService:
 
         return {
             "mvp": pick("bonus_total"),
-            "don": pick("score_don"),
-            "sheriff": pick("score_sheriff"),
-            "civilian": pick("score_civilian"),
-            "mafia": pick("score_mafia"),
+            "don": pick("bonus_don"),
+            "sheriff": pick("bonus_sheriff"),
+            "civilian": pick("bonus_civilian"),
+            "mafia": pick("bonus_mafia"),
         }
 
     # ── Team rating ──────────────────────────────────────────────────────────
