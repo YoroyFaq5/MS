@@ -40,6 +40,14 @@
   --bs-secondary-color: var(--ms-muted);
   --bs-tertiary-bg: var(--ms-surface-raised);
 
+  /* Bootstrap's <a> reboot rule reads --bs-link-color-rgb (not the hex
+     var) for its color — both must be set. Left at Bootstrap's default
+     blue until now, which is why any plain link without an explicit
+     .text-* class (e.g. a player name with no cosmetic nickname color
+     equipped) rendered blue instead of the theme's ivory/gold. */
+  --bs-link-color: var(--ms-text);              --bs-link-color-rgb: 243,233,210;
+  --bs-link-hover-color: var(--ms-gold-light);   --bs-link-hover-color-rgb: 212,176,106;
+
   --bs-primary: var(--ms-gold);          --bs-primary-rgb: 199,165,82;
   --bs-danger:  var(--ms-wine);          --bs-danger-rgb: 123,15,15;
   --bs-warning: var(--ms-gold-light);    --bs-warning-rgb: 212,176,106;
