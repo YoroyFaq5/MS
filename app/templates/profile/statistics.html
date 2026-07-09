@@ -4,15 +4,66 @@
 
 {% set ROLE_LABELS = {'civilian': '👤 Мирный', 'mafia': '🔫 Мафия', 'don': '🎩 Дон', 'sheriff': '🔍 Шериф'} %}
 
+{% block head %}
+<style>
+/* ============================================================
+   Статистика игрока — премиальная шапка + карточки с count-up
+   ============================================================
+   Тот же язык, что на /games, /ratings, /seasons и т.д.: --ms-* токены,
+   .fade-in-up стаггер, тонкое золотое свечение. Хедер компактнее
+   полноразмерных hero — это подстраница профиля, не landing.
+   ============================================================ */
+
+.pstats-hero {
+  position: relative; overflow: hidden;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem 2rem;
+  background: var(--ms-surface); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+  padding: 1.5rem 1.75rem; margin-bottom: 1.5rem;
+}
+.pstats-hero__glow {
+  position: absolute; top: -140px; left: -60px; width: 320px; height: 320px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(199,165,82,.14), transparent 70%);
+  filter: blur(60px); pointer-events: none;
+}
+.pstats-hero__identity { position: relative; z-index: 1; display: flex; align-items: center; gap: 1.1rem; }
+.pstats-hero__avatar { width: 72px; height: 72px; font-size: 1.7rem; flex-shrink: 0; }
+.pstats-hero__eyebrow { font-size: .66rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ms-muted); }
+.pstats-hero__name { font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 1.35rem; line-height: 1.2; margin-top: .1rem; }
+.pstats-hero__elo { display: flex; align-items: baseline; gap: .4rem; margin-top: .3rem; }
+.pstats-hero__elo-label { font-size: .66rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ms-muted); }
+.pstats-hero__elo-value { font-weight: 700; color: var(--ms-gold-light); font-variant-numeric: tabular-nums; }
+
+.pstats-hero__stats { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 1.4rem 2rem; margin-left: auto; }
+.pstats-hero__stat { text-align: center; min-width: 64px; }
+.pstats-hero__stat-value { font-size: 1.5rem; font-weight: 700; color: var(--ms-text); font-variant-numeric: tabular-nums; line-height: 1; }
+.pstats-hero__stat-label { font-size: .66rem; color: var(--ms-muted); text-transform: uppercase; letter-spacing: .04em; margin-top: .35rem; }
+.pstats-hero__compare { position: relative; z-index: 1; }
+
+@media (max-width: 575.98px) {
+  .pstats-hero__stats { margin-left: 0; width: 100%; justify-content: space-between; gap: 1rem; }
+  .pstats-hero__compare { width: 100%; }
+}
+
+/* ── Карточки статистики — иконка + count-up ─────────────────────────── */
+.pstat-card { position: relative; overflow: hidden; }
+.pstat-card__icon {
+  width: 34px; height: 34px; margin: 0 auto .5rem;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: .95rem;
+  background: rgba(138,138,138,.12); color: var(--ms-muted);
+}
+.pstat-card__icon--gold { background: rgba(199,165,82,.16); color: var(--ms-gold-light); }
+.pstat-card__icon--wine { background: rgba(142,28,28,.16); color: var(--ms-wine-light); }
+
+/* ── Радар ролей ──────────────────────────────────────────────────────── */
+.role-radar-container { position: relative; height: 300px; }
+#roleMetricToggle .btn.active { background: var(--ms-gold); border-color: var(--ms-gold); color: #0D0D0D; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h2 class="mb-0 fw-bold">📊 Статистика — {{ player_name(player, equipped_bulk.get(player_id, {})) }}</h2>
-    <a href="{{ url_for('profile.view_profile', player_id=player_id) }}" class="text-muted small">← К профилю</a>
-  </div>
-  <a href="{{ url_for('profile.compare', a=player_id) }}" class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-arrow-left-right me-1"></i>Сравнить с игроком
-  </a>
+<div class="mb-3">
+  <a href="{{ url_for('profile.view_profile', player_id=player_id) }}" class="text-muted small"><i class="bi bi-arrow-left me-1"></i>К профилю</a>
 </div>
 
 {% if not stats or stats.total_games == 0 %}
@@ -24,72 +75,132 @@
 </div>
 {% else %}
 
-<div class="row g-3 mb-4">
+{% set frame = equipped_bulk.get(player_id, {}).get('profile_customization:frame') %}
+<div class="pstats-hero fade-in-up">
+  <div class="pstats-hero__glow" aria-hidden="true"></div>
+  <div class="pstats-hero__identity">
+    <div class="avatar-circle pstats-hero__avatar {% if frame %}profile-frame{% if frame.item.data.theme or frame.item.data.effect == 'rainbow' %} fx-frame-themed fx-frame-theme-{{ frame.item.data.theme or 'rainbow' }}{% elif frame.item.data.effect == 'glow' %} fx-frame-glow{% endif %}{% endif %}"
+         {% if frame and frame.item.data.color and not frame.item.data.theme and frame.item.data.effect != 'rainbow' %}style="border-color:{{ frame.item.data.color }};--fx-color:{{ frame.item.data.color }}"{% endif %}>
+      {% if player.avatar_url %}
+      <img src="{{ player.avatar_url }}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
+      {% else %}
+      {{ player.display_name[0]|upper }}
+      {% endif %}
+    </div>
+    <div>
+      <div class="pstats-hero__eyebrow">Профиль игрока</div>
+      <div class="pstats-hero__name">{{ player_name(player, equipped_bulk.get(player_id, {})) }}</div>
+      <div class="pstats-hero__elo">
+        <span class="pstats-hero__elo-label">ELO</span>
+        <span class="pstats-hero__elo-value">{{ player.elo|round|int }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="pstats-hero__stats">
+    <div class="pstats-hero__stat">
+      <div class="pstats-hero__stat-value">{{ stats.total_games }}</div>
+      <div class="pstats-hero__stat-label">Игр сыграно</div>
+    </div>
+    <div class="pstats-hero__stat">
+      <div class="pstats-hero__stat-value" style="color:var(--ms-gold-light)">{{ stats.total_wins }}</div>
+      <div class="pstats-hero__stat-label">Побед</div>
+    </div>
+    <div class="pstats-hero__stat">
+      <div class="pstats-hero__stat-value" style="color:var(--ms-gold-light)">{{ stats.win_rate }}%</div>
+      <div class="pstats-hero__stat-label">Винрейт</div>
+    </div>
+    <div class="pstats-hero__stat">
+      <div class="pstats-hero__stat-value">{{ stats.avg_score|round(2) }}</div>
+      <div class="pstats-hero__stat-label">Ср. очки</div>
+    </div>
+  </div>
+
+  <a href="{{ url_for('profile.compare', a=player_id) }}" class="btn btn-outline-secondary btn-sm pstats-hero__compare">
+    <i class="bi bi-arrow-left-right me-1"></i>Сравнить с игроком
+  </a>
+</div>
+
+<div class="pstats-grid row g-3 mb-4">
   <div class="col-6 col-lg-3">
-    <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value">{{ stats.avg_score|round(2) }}</div>
+    <div class="stat-card pstat-card card p-3 text-center h-100 fade-in-up" style="--d:0ms">
+      <div class="pstat-card__icon"><i class="bi bi-graph-up-arrow"></i></div>
+      <div class="stat-value" data-count-to="{{ stats.avg_score }}" data-decimals="2">0</div>
       <div class="stat-label">Ср. баллы за игру</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value text-success">{{ stats.best_score|round(2) }}</div>
+    <div class="stat-card pstat-card card p-3 text-center h-100 fade-in-up" style="--d:40ms">
+      <div class="pstat-card__icon pstat-card__icon--gold"><i class="bi bi-arrow-up-circle-fill"></i></div>
+      <div class="stat-value text-success" data-count-to="{{ stats.best_score }}" data-decimals="2">0</div>
       <div class="stat-label">Лучший результат</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value text-danger">{{ stats.worst_score|round(2) }}</div>
+    <div class="stat-card pstat-card card p-3 text-center h-100 fade-in-up" style="--d:80ms">
+      <div class="pstat-card__icon pstat-card__icon--wine"><i class="bi bi-arrow-down-circle-fill"></i></div>
+      <div class="stat-value text-danger" data-count-to="{{ stats.worst_score }}" data-decimals="2">0</div>
       <div class="stat-label">Худший результат</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value {% if stats.current_streak_signed > 0 %}text-success{% elif stats.current_streak_signed < 0 %}text-danger{% endif %}">
-        {{ stats.current_streak_signed }}
-      </div>
+    <div class="stat-card pstat-card card p-3 text-center h-100 fade-in-up" style="--d:120ms">
+      <div class="pstat-card__icon {% if stats.current_streak_signed > 0 %}pstat-card__icon--gold{% elif stats.current_streak_signed < 0 %}pstat-card__icon--wine{% endif %}"><i class="bi bi-lightning-charge-fill"></i></div>
+      <div class="stat-value {% if stats.current_streak_signed > 0 %}text-success{% elif stats.current_streak_signed < 0 %}text-danger{% endif %}"
+           data-count-to="{{ stats.current_streak_signed }}" data-decimals="0">0</div>
       <div class="stat-label">Текущая серия</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value text-success">{{ stats.longest_streak }}</div>
+    <div class="stat-card pstat-card card p-3 text-center h-100 fade-in-up" style="--d:160ms">
+      <div class="pstat-card__icon pstat-card__icon--gold"><i class="bi bi-trophy-fill"></i></div>
+      <div class="stat-value text-success" data-count-to="{{ stats.longest_streak }}" data-decimals="0">0</div>
       <div class="stat-label">Лучшая серия побед</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value text-danger">{{ stats.longest_loss_streak }}</div>
+    <div class="stat-card pstat-card card p-3 text-center h-100 fade-in-up" style="--d:200ms">
+      <div class="pstat-card__icon pstat-card__icon--wine"><i class="bi bi-emoji-frown-fill"></i></div>
+      <div class="stat-value text-danger" data-count-to="{{ stats.longest_loss_streak }}" data-decimals="0">0</div>
       <div class="stat-label">Худшая серия поражений</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value">{{ stats.tournament_count }}</div>
+    <div class="stat-card pstat-card card p-3 text-center h-100 fade-in-up" style="--d:240ms">
+      <div class="pstat-card__icon"><i class="bi bi-flag-fill"></i></div>
+      <div class="stat-value" data-count-to="{{ stats.tournament_count }}" data-decimals="0">0</div>
       <div class="stat-label">Турниров</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value">{{ stats.season_wins }}</div>
+    <div class="stat-card pstat-card card p-3 text-center h-100 fade-in-up" style="--d:280ms">
+      <div class="pstat-card__icon pstat-card__icon--gold"><i class="bi bi-calendar-check-fill"></i></div>
+      <div class="stat-value" data-count-to="{{ stats.season_wins }}" data-decimals="0">0</div>
       <div class="stat-label">Побед в сезонах</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value text-danger">{{ stats.pu_count }}</div>
+    <div class="stat-card pstat-card card p-3 text-center h-100 fade-in-up" style="--d:320ms">
+      <div class="pstat-card__icon pstat-card__icon--wine"><i class="bi bi-skull"></i></div>
+      <div class="stat-value text-danger" data-count-to="{{ stats.pu_count }}" data-decimals="0">0</div>
       <div class="stat-label">Раз был ПУ</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value text-danger">{{ stats.pu_sheriff_count }}</div>
+    <div class="stat-card pstat-card card p-3 text-center h-100 fade-in-up" style="--d:360ms">
+      <div class="pstat-card__icon pstat-card__icon--wine"><i class="bi bi-search"></i></div>
+      <div class="stat-value text-danger" data-count-to="{{ stats.pu_sheriff_count }}" data-decimals="0">0</div>
       <div class="stat-label">ПУ в роли Шерифа</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card card p-3 text-center h-100">
-      <div class="stat-value">{{ (stats.pu_accuracy|round(1) ~ '%') if stats.pu_accuracy is not none else '—' }}</div>
+    <div class="stat-card pstat-card card p-3 text-center h-100 fade-in-up" style="--d:400ms">
+      <div class="pstat-card__icon"><i class="bi bi-bullseye"></i></div>
+      {% if stats.pu_accuracy is not none %}
+      <div class="stat-value" data-count-to="{{ stats.pu_accuracy }}" data-decimals="1" data-suffix="%">0</div>
+      {% else %}
+      <div class="stat-value text-muted">—</div>
+      {% endif %}
       <div class="stat-label">Точность ЛХ</div>
     </div>
   </div>
@@ -99,7 +210,15 @@
   <!-- Role analytics -->
   <div class="col-lg-6">
     <div class="card h-100">
-      <div class="card-header fw-semibold">🎭 Игровая аналитика по ролям</div>
+      <div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span>🎭 Игровая аналитика по ролям</span>
+        {% if role_stats and role_stats.role_breakdown %}
+        <div class="btn-group btn-group-sm" role="group" id="roleMetricToggle">
+          <button type="button" class="btn btn-outline-secondary active" data-metric="winrate">Винрейт (%)</button>
+          <button type="button" class="btn btn-outline-secondary" data-metric="avg_score">Средние очки</button>
+        </div>
+        {% endif %}
+      </div>
       <div class="card-body">
         {% if role_stats %}
         <div class="d-flex flex-wrap gap-2 mb-3">
@@ -119,26 +238,12 @@
           </span>
           {% endif %}
         </div>
-        <div class="table-responsive">
-        <table class="table table-sm mb-0">
-          <thead><tr><th>Роль</th><th class="text-end">Игр</th><th class="text-end">Побед</th><th class="text-end">WR</th></tr></thead>
-          <tbody>
-          {% for r in role_stats.role_breakdown %}
-            <tr>
-              <td>{{ ROLE_LABELS.get(r.role, r.role) }}</td>
-              <td class="text-end">{{ r.games }}</td>
-              <td class="text-end">{{ r.wins }}</td>
-              <td class="text-end">
-                <div class="progress" style="height:6px;width:60px;display:inline-block;vertical-align:middle;margin-right:6px;">
-                  <div class="progress-bar bg-info" style="width:{{ r.win_rate }}%"></div>
-                </div>
-                {{ r.win_rate }}%
-              </td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
-        </div>
+        {% if role_stats.role_breakdown %}
+        <div class="role-radar-container"><canvas id="chartRoleRadar"></canvas></div>
+        <div class="role-radar-hint text-muted small mt-2">Чем больше площадь — тем стабильнее игра по всем ролям.</div>
+        {% else %}
+        <div class="text-center text-muted py-4 small">Пока нет сыгранных ролей</div>
+        {% endif %}
         {% endif %}
       </div>
     </div>
@@ -417,16 +522,10 @@
       <div class="card-body"><div class="chart-container"><canvas id="chartStreaks"></canvas></div></div>
     </div>
   </div>
-  <div class="col-lg-6">
-    <div class="card h-100">
+  <div class="col-12">
+    <div class="card">
       <div class="card-header fw-semibold"><i class="bi bi-palette2 me-2"></i>История ролей (последние игры)</div>
       <div class="card-body"><div class="chart-container"><canvas id="chartRoles"></canvas></div></div>
-    </div>
-  </div>
-  <div class="col-lg-6">
-    <div class="card h-100">
-      <div class="card-header fw-semibold"><i class="bi bi-bar-chart-steps me-2"></i>Эффективность по ролям</div>
-      <div class="card-body"><div class="chart-container"><canvas id="chartRolePerf"></canvas></div></div>
     </div>
   </div>
   <div class="col-12">
@@ -527,18 +626,64 @@ new Chart(document.getElementById('chartStreaks'), {
   });
 }
 
-// Role performance
-new Chart(document.getElementById('chartRolePerf'), {
-  type: 'bar',
-  data: {
-    labels: CHART_DATA.role_performance.labels,
-    datasets: [
-      {label: 'WR %', data: CHART_DATA.role_performance.winrate, backgroundColor: GOLD},
-      {label: 'Ср. баллы', data: CHART_DATA.role_performance.avg_score, backgroundColor: SILVER},
-    ],
-  },
-  options: {...RESPONSIVE_BASE, scales: {y: {beginAtZero: true}}},
-});
+// Role radar — один луч на роль, переключатель метрики (винрейт/очки)
+// вместо двух сгруппированных столбцов, как раньше.
+{
+  const el = document.getElementById('chartRoleRadar');
+  const perf = CHART_DATA.role_performance;
+  if (el && perf.labels.length) {
+    const ROLE_LABEL_COLOR = {'Мирный': SILVER, 'Шериф': GOLD, 'Мафия': WINE, 'Дон': '#8A6A3A'};
+    const pointColors = perf.labels.map(l => ROLE_LABEL_COLOR[l] || GOLD);
+
+    const roleRadar = new Chart(el, {
+      type: 'radar',
+      data: {
+        labels: perf.labels,
+        datasets: [{
+          label: 'Винрейт (%)',
+          data: perf.winrate,
+          borderColor: GOLD,
+          backgroundColor: GOLD_DIM,
+          pointBackgroundColor: pointColors,
+          pointBorderColor: '#0D0D0D',
+          pointRadius: 4,
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        ...RESPONSIVE_BASE,
+        plugins: {legend: {display: false}},
+        animation: {duration: 700, easing: 'easeOutCubic'},
+        scales: {
+          r: {
+            beginAtZero: true,
+            suggestedMax: 100,
+            grid: {color: GRID_COLOR},
+            angleLines: {color: GRID_COLOR},
+            pointLabels: {color: TEXT_COLOR, font: {size: 12}},
+            ticks: {display: false, backdropColor: 'transparent'},
+          },
+        },
+      },
+    });
+
+    const toggle = document.getElementById('roleMetricToggle');
+    if (toggle) {
+      toggle.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-metric]');
+        if (!btn) return;
+        toggle.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const metric = btn.dataset.metric;
+        const isWinrate = metric === 'winrate';
+        roleRadar.data.datasets[0].data = perf[metric];
+        roleRadar.data.datasets[0].label = isWinrate ? 'Винрейт (%)' : 'Средние очки';
+        roleRadar.options.scales.r.suggestedMax = isWinrate ? 100 : undefined;
+        roleRadar.update();
+      });
+    }
+  }
+}
 
 // Economy
 if (CHART_DATA.economy.labels.length) {
@@ -563,6 +708,36 @@ if (CHART_DATA.economy.labels.length) {
   document.getElementById('chartEconomy').replaceWith(Object.assign(document.createElement('div'), {
     className: 'text-center text-muted py-4 small', textContent: 'Нет истории операций с монетами',
   }));
+}
+
+// Count-up для карточек статистики (pstats-hero + pstat-card) — читает
+// data-count-to/data-decimals/data-suffix, ничего не анимирует под
+// prefers-reduced-motion (значения уже отрендерены сервером в HTML —
+// JS в этом случае просто оставляет их как есть, count-up только визуальный).
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  document.querySelectorAll('[data-count-to]').forEach(el => {
+    const target = parseFloat(el.dataset.countTo);
+    if (Number.isNaN(target)) return;
+    const decimals = parseInt(el.dataset.decimals || '0', 10);
+    const suffix = el.dataset.suffix || '';
+    const duration = 900;
+    const start = performance.now();
+    const ease = t => 1 - Math.pow(1 - t, 3);
+    const tick = now => {
+      const p = Math.min(1, (now - start) / duration);
+      el.textContent = (target * ease(p)).toFixed(decimals) + suffix;
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+} else {
+  document.querySelectorAll('[data-count-to]').forEach(el => {
+    const target = parseFloat(el.dataset.countTo);
+    if (Number.isNaN(target)) return;
+    const decimals = parseInt(el.dataset.decimals || '0', 10);
+    const suffix = el.dataset.suffix || '';
+    el.textContent = target.toFixed(decimals) + suffix;
+  });
 }
 </script>
 {% endif %}
