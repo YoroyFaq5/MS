@@ -4,21 +4,41 @@ Tournaments Blueprint
 All view logic delegates to TournamentService / RatingService.
 Zero business logic here — only HTTP layer.
 """
+from datetime import datetime, timezone
+
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, flash, abort, jsonify
 )
+from sqlalchemy import func
+
 from app import db
 from app.models import (
     Tournament, TournamentStage, TournamentParticipant,
     Team, TeamPlayer, Game, GameSlot, Player, Role,
-    TournamentType, StageType, SeriesTournament,
+    TournamentType, StageType, SeriesTournament, SeasonStatus,
 )
 from app.services import TournamentService, RatingService
 from app.services.shop_service import ShopService
+from app.services.season_service import SeasonService
 from app.auth_decorators import admin_required
 
 tournaments_bp = Blueprint("tournaments", __name__)
+
+
+def _ru_plural(n: int, one: str, few: str, many: str) -> str:
+    """Russian plural: 1 турнир / 2 турнира / 5 турниров / 21 турнир…
+    (same helper as routes/main.py — kept file-local rather than shared,
+    consistent with this codebase's small per-file utility convention)."""
+    n_abs = abs(n) % 100
+    n1 = n_abs % 10
+    if 10 < n_abs < 20:
+        return many
+    if 1 < n1 < 5:
+        return few
+    if n1 == 1:
+        return one
+    return many
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -62,10 +82,46 @@ def list_tournaments():
         st.tournament_id: st.id
         for st in db.session.query(SeriesTournament).all()
     }
+
+    # ── Hero-стата — дешёвые агрегатные запросы (COUNT), а не Python-цикл
+    # по уже загруженным relationship-коллекциям каждого турнира.
+    active_count = sum(1 for t in tournaments if t.status == "active")
+    active_label = _ru_plural(active_count, "активный турнир", "активных турнира", "активных турниров")
+
+    total_participants = (
+        db.session.query(func.count(func.distinct(TournamentParticipant.player_id))).scalar() or 0
+    )
+    total_games = (
+        db.session.query(func.count(Game.id))
+        .filter(Game.tournament_id.isnot(None), Game.is_finished == True)
+        .scalar() or 0
+    )
+    total_stages = db.session.query(func.count(TournamentStage.id)).scalar() or 0
+
+    current_year = datetime.now(timezone.utc).year
+    seasons_this_year = SeasonService.get_seasons_for_year(current_year)
+    finished_seasons_count = sum(1 for s in seasons_this_year if s.status == SeasonStatus.FINISHED)
+
+    # Единственный "избранный" турнир сверху страницы — активный, если
+    # есть, иначе самый свежий из ожидающих. Нечего выделять отдельно,
+    # если турнир уже завершён (архив ниже, в обычной сетке).
+    featured = next((t for t in tournaments if t.status == "active"), None)
+    if not featured:
+        featured = next((t for t in tournaments if t.status == "pending"), None)
+
     return render_template(
         "tournaments/list.html",
         tournaments=tournaments,
         series_tournament_ids=series_tournament_ids,
+        active_count=active_count,
+        active_label=active_label,
+        total_participants=total_participants,
+        total_games=total_games,
+        total_stages=total_stages,
+        finished_seasons_count=finished_seasons_count,
+        finished_seasons_label=_ru_plural(finished_seasons_count, "завершённый сезон", "завершённых сезона", "завершённых сезонов"),
+        current_year=current_year,
+        featured=featured,
     )
 
 

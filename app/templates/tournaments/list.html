@@ -1,107 +1,414 @@
 {% extends "base.html" %}
 {% block title %}Турниры{% endblock %}
 
+{% block head %}
+<style>
+/* ============================================================
+   Турниры — центр турнирной экосистемы клуба
+   ============================================================
+   Тот же премиальный язык, что на /games, /ratings, /seasons, /shop,
+   /players, /inventory: hero со свечением/частицами/parallax/count-up,
+   переиспользование --ms-* токенов и .rarity-pill-подобных пилюль.
+   Реальных статусов турнира три (pending/active/finished — см.
+   Tournament.status в модели), "отменён" в данных не существует —
+   выдумывать четвёртое состояние не стали.
+   ============================================================ */
+
+.tourney-hero {
+  position: relative; overflow: hidden;
+  background: var(--ms-surface); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+  padding: clamp(1.5rem, 3vw, 2.5rem); margin-bottom: 1.5rem;
+  transition: transform .35s cubic-bezier(.2,.7,.3,1), box-shadow .35s ease, border-color .35s ease;
+}
+.tourney-hero:hover { transform: translateY(-2px); border-color: rgba(199,165,82,.24); box-shadow: 0 20px 48px rgba(0,0,0,.4); }
+
+.tourney-hero__bg { position: absolute; inset: 0; pointer-events: none; overflow: hidden; --mx: 0; --my: 0; }
+.tourney-hero__lines {
+  position: absolute; inset: 0; opacity: .5;
+  background-image: repeating-linear-gradient(115deg, rgba(199,165,82,.05) 0px, rgba(199,165,82,.05) 1px, transparent 1px, transparent 64px);
+  -webkit-mask-image: linear-gradient(90deg, black, transparent 75%);
+  mask-image: linear-gradient(90deg, black, transparent 75%);
+}
+.tourney-hero__glow {
+  position: absolute; width: 380px; height: 380px; border-radius: 50%; filter: blur(70px);
+  transition: transform .4s ease-out;
+  transform: translate3d(calc(var(--mx, 0) * 12px), calc(var(--my, 0) * 8px), 0);
+}
+.tourney-hero__glow--1 { top: -160px; left: -60px; background: radial-gradient(circle, rgba(199,165,82,.16), transparent 70%); }
+.tourney-hero__glow--2 { bottom: -180px; left: 220px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(212,176,106,.1), transparent 70%); transition-delay: .05s; }
+
+/* Едва заметный силуэт кубка справа — декоративный якорь атмосферы,
+   не иллюстрация: один приглушённый bootstrap-icon огромного кегля. */
+.tourney-hero__watermark {
+  position: absolute; right: -30px; top: 50%; transform: translateY(-50%);
+  font-size: 13rem; color: rgba(199,165,82,.05);
+  pointer-events: none; line-height: 1;
+}
+
+.tourney-hero__particles { position: absolute; inset: 0; transform: translate3d(calc(var(--mx, 0) * 6px), calc(var(--my, 0) * 4px), 0); transition: transform .4s ease-out; }
+.tourney-hero__particles span {
+  position: absolute; width: 3px; height: 3px; border-radius: 50%;
+  background: var(--ms-gold-light); opacity: 0; animation: tourney-dust 7s ease-in-out infinite;
+}
+.tourney-hero__particles span:nth-child(1) { top: 18%; left: 12%; animation-delay: 0s; }
+.tourney-hero__particles span:nth-child(2) { top: 60%; left: 24%; animation-delay: 1.6s; }
+.tourney-hero__particles span:nth-child(3) { top: 30%; left: 34%; animation-delay: 3.1s; }
+.tourney-hero__particles span:nth-child(4) { top: 75%; left: 8%;  animation-delay: 4.4s; }
+.tourney-hero__particles span:nth-child(5) { top: 45%; left: 42%; animation-delay: 5.6s; }
+@keyframes tourney-dust {
+  0%   { opacity: 0; transform: translateY(6px); }
+  15%  { opacity: .5; }
+  50%  { opacity: .25; transform: translateY(-10px); }
+  85%  { opacity: 0; transform: translateY(-18px); }
+  100% { opacity: 0; }
+}
+
+.tourney-hero__content { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 2rem 2.5rem; }
+.tourney-hero__main { display: flex; align-items: center; gap: 1.25rem; }
+.tourney-hero__monogram {
+  flex-shrink: 0; width: 76px; height: 76px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(199,165,82,.3); border-radius: 50%;
+  font-size: 1.6rem; color: var(--ms-gold-light);
+  background: radial-gradient(circle, rgba(199,165,82,.08), transparent 75%);
+}
+.tourney-hero__count-wrap { display: flex; flex-direction: column; }
+.tourney-hero__eyebrow { font-size: .68rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ms-muted); margin-bottom: .15rem; }
+.tourney-hero__count {
+  font-family: 'Playfair Display', Georgia, serif; font-weight: 700;
+  font-size: clamp(2.75rem, 3.2vw + 1.5rem, 4.5rem); line-height: 1.2; white-space: nowrap;
+  background: linear-gradient(180deg, #F3E4B8 0%, #D4B06A 32%, #C7A552 58%, #9C7C3E 82%, #C7A552 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 10px rgba(0,0,0,.5));
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "lnum" 1;
+}
+.tourney-hero__count-label { font-size: .82rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ms-text-dim); margin-top: .1rem; }
+.tourney-hero__tagline { font-size: .78rem; color: var(--ms-muted); margin-top: .5rem; }
+
+.tourney-hero__stats { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 1.75rem 2rem; margin-left: auto; }
+.tourney-hero__stat { display: flex; flex-direction: column; gap: .2rem; padding-left: 1.5rem; border-left: 1px solid var(--ms-border); }
+.tourney-hero__stat:first-child { padding-left: 0; border-left: none; }
+.tourney-hero__stat-icon { color: var(--ms-gold-light); font-size: 1.1rem; margin-bottom: .1rem; }
+.tourney-hero__stat-value { font-size: 1.7rem; font-weight: 700; color: var(--ms-text); font-variant-numeric: tabular-nums; line-height: 1; }
+.tourney-hero__stat-label { font-size: .66rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ms-gold-light); margin-top: .3rem; }
+.tourney-hero__stat-sub { font-size: .7rem; color: var(--ms-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tourney-hero, .tourney-hero__glow, .tourney-hero__particles { transition: none; }
+  .tourney-hero__particles span { animation: none; opacity: 0; }
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────── */
+.tourney-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .6rem; margin-bottom: 1.25rem; }
+
+/* ── Статусная система — три полноценных состояния, не просто цвет ─── */
+.tourney-status {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .3rem .75rem; border-radius: 99px;
+  font-size: .72rem; font-weight: 700; white-space: nowrap;
+}
+.tourney-status--pending { background: rgba(138,138,138,.12); color: var(--ms-muted); border: 1px solid var(--ms-border); }
+.tourney-status--active  { background: rgba(199,165,82,.16); color: var(--ms-gold-light); border: 1px solid rgba(199,165,82,.3); }
+.tourney-status--finished{ background: rgba(138,138,138,.08); color: var(--ms-text-dim); border: 1px solid var(--ms-border); }
+.tourney-status--active .tourney-status__dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--ms-gold-light);
+  animation: tourney-live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes tourney-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+.tourney-ribbon {
+  position: absolute; top: 14px; left: -1px; z-index: 2;
+  padding: .25rem .8rem .25rem .6rem;
+  background: var(--ms-surface-raised); border: 1px solid var(--ms-border); border-left: none;
+  border-radius: 0 6px 6px 0;
+  font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ms-gold-light);
+}
+
+/* ── Тип/формат-пилюли ───────────────────────────────────────────── */
+.tourney-pill {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .18rem .6rem; border-radius: 99px;
+  font-size: .68rem; font-weight: 600; white-space: nowrap;
+  background: rgba(138,138,138,.1); color: var(--ms-text-dim); border: 1px solid var(--ms-border);
+}
+.tourney-pill--accent { background: rgba(199,165,82,.12); color: var(--ms-gold-light); border-color: rgba(199,165,82,.25); }
+
+/* ── Карточка турнира — премиальная афиша, не плоский div ───────────── */
+.tourney-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.25rem; }
+
+.tourney-card {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+  background: var(--ms-surface); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+  padding: 1.5rem;
+  transition: transform .25s cubic-bezier(.2,.7,.3,1), box-shadow .25s ease, border-color .25s ease;
+}
+.tourney-card::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(199,165,82,.4), transparent);
+  opacity: 0; transition: opacity .25s ease;
+}
+.tourney-card:hover { transform: translateY(-6px); box-shadow: 0 20px 44px rgba(0,0,0,.45); border-color: rgba(199,165,82,.26); }
+.tourney-card:hover::before { opacity: 1; }
+.tourney-card--active { border-color: rgba(199,165,82,.3); background: linear-gradient(180deg, rgba(199,165,82,.05), var(--ms-surface) 60%); }
+.tourney-card--active:hover { box-shadow: 0 22px 48px rgba(0,0,0,.5), 0 0 46px rgba(199,165,82,.1); }
+.tourney-card--finished { opacity: .82; }
+
+.tourney-card__crest {
+  flex-shrink: 0; width: 52px; height: 52px; margin-bottom: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 1.35rem;
+  background: radial-gradient(circle, rgba(199,165,82,.14), transparent 75%);
+  border: 1px solid rgba(199,165,82,.28); color: var(--ms-gold-light);
+}
+
+.tourney-card__head { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; margin-bottom: .6rem; }
+.tourney-card__name { font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 1.25rem; line-height: 1.25; }
+.tourney-card__badges { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .9rem; }
+
+.tourney-card__desc { font-size: .82rem; color: var(--ms-text-dim); margin-bottom: 1rem; flex-grow: 1; }
+
+.tourney-card__meta { display: flex; flex-wrap: wrap; gap: .4rem 1rem; font-size: .72rem; color: var(--ms-muted); margin-bottom: 1.1rem; }
+.tourney-card__meta i { color: var(--ms-gold-light); margin-right: .25rem; }
+
+.tourney-card__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-bottom: 1.1rem; }
+.tourney-card__stat {
+  text-align: center; padding: .65rem .4rem;
+  background: var(--ms-surface-raised); border: 1px solid var(--ms-border); border-radius: 8px;
+}
+.tourney-card__stat i { color: var(--ms-gold-light); font-size: .85rem; display: block; margin-bottom: .25rem; }
+.tourney-card__stat-value { font-weight: 700; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.tourney-card__stat-label { font-size: .6rem; color: var(--ms-muted); text-transform: uppercase; letter-spacing: .04em; margin-top: .1rem; }
+
+.tourney-card__actions { display: flex; gap: .5rem; margin-top: auto; }
+
+.tourney-cta {
+  flex-grow: 1; text-align: center;
+  padding: .55rem 1rem; border-radius: 8px;
+  background: linear-gradient(180deg, #E3C687, var(--ms-gold) 60%, var(--ms-gold-dark));
+  color: #1A1305; font-weight: 700; font-size: .85rem;
+  text-decoration: none; border: none;
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.tourney-cta:hover { color: #1A1305; transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 8px 20px rgba(199,165,82,.25); }
+.tourney-cta--outline {
+  flex-grow: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; padding: .55rem; border-radius: 8px;
+  background: var(--ms-surface-raised); border: 1px solid var(--ms-border); color: var(--ms-text-dim);
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.tourney-cta--outline:hover { background: rgba(199,165,82,.12); border-color: rgba(199,165,82,.3); color: var(--ms-gold-light); }
+
+.tourney-card__footer { font-size: .68rem; color: var(--ms-muted); margin-top: .9rem; padding-top: .8rem; border-top: 1px solid var(--ms-border); }
+
+/* ── Featured card — тот же язык, но крупнее и шире ──────────────────── */
+.tourney-featured {
+  position: relative; overflow: hidden;
+  display: flex; gap: 1.75rem;
+  background: linear-gradient(180deg, rgba(199,165,82,.06), var(--ms-surface) 55%);
+  border: 1px solid rgba(199,165,82,.3); border-radius: var(--ms-radius);
+  padding: 1.75rem; margin-bottom: 1.75rem;
+  transition: transform .25s cubic-bezier(.2,.7,.3,1), box-shadow .25s ease;
+}
+.tourney-featured:hover { transform: translateY(-4px); box-shadow: 0 24px 54px rgba(0,0,0,.5), 0 0 50px rgba(199,165,82,.1); }
+.tourney-featured__crest {
+  flex-shrink: 0; width: 88px; height: 96px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.1rem; color: var(--ms-gold-light);
+  background: linear-gradient(160deg, rgba(199,165,82,.16), rgba(199,165,82,.03));
+  border: 1px solid rgba(199,165,82,.3);
+  clip-path: polygon(0 0, 100% 0, 100% 78%, 50% 100%, 0 78%);
+}
+.tourney-featured__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tourney-featured__side { flex-shrink: 0; width: 200px; display: flex; flex-direction: column; align-items: flex-end; gap: .5rem; text-align: right; }
+.tourney-featured__side-label { font-size: .62rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ms-muted); }
+.tourney-featured__side-value { font-weight: 700; }
+
+@media (max-width: 767.98px) {
+  .tourney-featured { flex-direction: column; }
+  .tourney-featured__side { width: 100%; align-items: flex-start; text-align: left; flex-direction: row; justify-content: space-between; }
+  .tourney-hero__watermark { display: none; }
+  .tourney-hero__stats { gap: 1.25rem; }
+  .tourney-hero__stat { padding-left: 1rem; }
+}
+
+.tourney-closing {
+  text-align: center; color: var(--ms-muted); font-size: .82rem;
+  padding: 2rem 1rem .5rem; display: flex; align-items: center; justify-content: center; gap: .5rem;
+}
+.tourney-closing i { color: var(--ms-gold-light); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tourney-card, .tourney-featured { transition: none; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h2 class="mb-0 fw-bold">🏆 Турниры</h2>
-    <p class="text-muted small mb-0">{{ tournaments|length }} турниров</p>
+{% set TYPE_LABELS = {'individual': 'Индивидуальный', 'team': 'Командный'} %}
+
+<div class="tourney-hero fade-in-up" id="tourney-hero">
+  <div class="tourney-hero__bg" aria-hidden="true">
+    <div class="tourney-hero__lines"></div>
+    <div class="tourney-hero__glow tourney-hero__glow--1"></div>
+    <div class="tourney-hero__glow tourney-hero__glow--2"></div>
+    <i class="bi bi-trophy-fill tourney-hero__watermark"></i>
+    <div class="tourney-hero__particles"><span></span><span></span><span></span><span></span><span></span></div>
   </div>
-  <div class="d-flex gap-2">
-    <a href="{{ url_for('series_tournaments.list_series_tournaments') }}" class="btn btn-outline-secondary">
-      <i class="bi bi-collection-play me-1"></i>Серийные турниры
-    </a>
-    {% if current_user.is_authenticated and current_user.is_admin %}
-    <a href="{{ url_for('tournaments.new_tournament') }}" class="btn btn-danger">
-      <i class="bi bi-plus-lg me-1"></i>Создать турнир
-    </a>
-    {% endif %}
+
+  <div class="tourney-hero__content">
+    <div class="tourney-hero__main">
+      <div class="tourney-hero__monogram fade-in-up" style="--d:60ms"><i class="bi bi-trophy-fill"></i></div>
+      <div class="tourney-hero__count-wrap fade-in-up" style="--d:140ms">
+        <div class="tourney-hero__eyebrow">Сезон {{ current_year }}</div>
+        <div class="tourney-hero__count" data-count-to="{{ active_count }}">0</div>
+        <div class="tourney-hero__count-label">{{ active_label }}</div>
+        <div class="tourney-hero__tagline">Центр соревнований MafiaStyle</div>
+      </div>
+    </div>
+
+    <div class="tourney-hero__stats fade-in-up" style="--d:220ms">
+      <div class="tourney-hero__stat">
+        <i class="bi bi-people-fill tourney-hero__stat-icon"></i>
+        <div class="tourney-hero__stat-value">{{ total_participants }}</div>
+        <div class="tourney-hero__stat-label">Участников</div>
+        <div class="tourney-hero__stat-sub">Игроков в турнирах</div>
+      </div>
+      <div class="tourney-hero__stat">
+        <i class="bi bi-controller tourney-hero__stat-icon"></i>
+        <div class="tourney-hero__stat-value">{{ total_games }}</div>
+        <div class="tourney-hero__stat-label">Сыграно игр</div>
+        <div class="tourney-hero__stat-sub">Во всех турнирах</div>
+      </div>
+      <div class="tourney-hero__stat">
+        <i class="bi bi-diagram-3-fill tourney-hero__stat-icon"></i>
+        <div class="tourney-hero__stat-value">{{ total_stages }}</div>
+        <div class="tourney-hero__stat-label">Этапов</div>
+        <div class="tourney-hero__stat-sub">Пройдено всего</div>
+      </div>
+      <div class="tourney-hero__stat">
+        <i class="bi bi-calendar-check-fill tourney-hero__stat-icon"></i>
+        <div class="tourney-hero__stat-value">{{ finished_seasons_count }}</div>
+        <div class="tourney-hero__stat-label">{{ finished_seasons_label }}</div>
+        <div class="tourney-hero__stat-sub">История продолжается</div>
+      </div>
+    </div>
   </div>
 </div>
 
+<div class="tourney-toolbar">
+  <a href="{{ url_for('series_tournaments.list_series_tournaments') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-collection-play me-1"></i>Серийные турниры
+  </a>
+  {% if current_user.is_authenticated and current_user.is_admin %}
+  <a href="{{ url_for('tournaments.new_tournament') }}" class="btn btn-danger">
+    <i class="bi bi-plus-lg me-1"></i>Создать турнир
+  </a>
+  {% endif %}
+</div>
+
 {% if tournaments %}
-<div class="row g-3">
-  {% for t in tournaments %}
-  <div class="col-md-6 col-xl-4">
-    <div class="card h-100 tournament-card">
-      <div class="card-body p-4">
-        <div class="d-flex justify-content-between align-items-start mb-3">
-          <div>
-            <h5 class="fw-bold mb-1">{{ t.name }}</h5>
-            <div class="d-flex gap-2 flex-wrap">
-              {% if t.type.value == 'individual' %}
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">👤 Индивидуальный</span>
-              {% else %}
-                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">👥 Командный</span>
-              {% endif %}
-              {% if t.is_ranked %}
-                <span class="badge bg-success-subtle text-success border border-success-subtle">📈 Рейтинговый</span>
-              {% else %}
-                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">🏖 Нерейтинговый</span>
-              {% endif %}
-              {% if t.has_stages %}
-                <span class="badge bg-info-subtle text-info border border-info-subtle">📋 Этапы</span>
-              {% endif %}
-              {% if series_tournament_ids.get(t.id) %}
-                <span class="badge bg-info-subtle text-info border border-info-subtle">🔗 Серийный</span>
-              {% endif %}
-            </div>
-          </div>
-          <span class="badge fs-6
-            {% if t.status == 'active' %}bg-success
-            {% elif t.status == 'finished' %}bg-secondary
-            {% else %}bg-warning text-dark{% endif %}">
-            {% if t.status == 'active' %}🟢 Активен
-            {% elif t.status == 'finished' %}✅ Завершён
-            {% else %}⏳ Ожидает{% endif %}
-          </span>
-        </div>
+  {% macro status_pill(t) %}
+    {% if t.status == 'active' %}
+    <span class="tourney-status tourney-status--active"><span class="tourney-status__dot"></span>Активен</span>
+    {% elif t.status == 'finished' %}
+    <span class="tourney-status tourney-status--finished"><i class="bi bi-check-circle-fill"></i>Завершён</span>
+    {% else %}
+    <span class="tourney-status tourney-status--pending"><i class="bi bi-hourglass-split"></i>Ожидает</span>
+    {% endif %}
+  {% endmacro %}
 
-        {% if t.description %}
-        <p class="text-muted small mb-3">{{ t.description }}</p>
-        {% endif %}
-
-        <div class="row g-2 mb-3 text-center">
-          <div class="col-4">
-            <div class="bg-body-secondary rounded py-2">
-              <div class="fw-bold">{{ t.participants|length }}</div>
-              <div class="text-muted" style="font-size:.7rem">УЧАСТНИКОВ</div>
-            </div>
+  {% if featured %}
+  {% set t = featured %}
+  <a href="{{ url_for('tournaments.tournament_detail', tournament_id=t.id) }}" class="tourney-featured fade-in-up text-decoration-none text-reset" style="--d:0ms">
+    {% if t.status == 'pending' %}<span class="tourney-ribbon">Скоро</span>{% endif %}
+    <div class="tourney-featured__crest">
+      <i class="bi {{ 'bi-people-fill' if t.type.value == 'team' else 'bi-person-badge-fill' }}"></i>
+    </div>
+    <div class="tourney-featured__body">
+      <div class="tourney-card__head">
+        <div>
+          <div class="tourney-card__name">{{ t.name }}</div>
+          <div class="tourney-card__badges mt-2">
+            <span class="tourney-pill"><i class="bi bi-person"></i>{{ TYPE_LABELS.get(t.type.value, t.type.value) }}</span>
+            <span class="tourney-pill {% if t.is_ranked %}tourney-pill--accent{% endif %}">{% if t.is_ranked %}Рейтинговый{% else %}Нерейтинговый{% endif %}</span>
+            {% if t.has_stages %}<span class="tourney-pill">Этапы</span>{% endif %}
+            {% if series_tournament_ids.get(t.id) %}<span class="tourney-pill tourney-pill--accent"><i class="bi bi-link-45deg"></i>Серийный</span>{% endif %}
           </div>
-          <div class="col-4">
-            <div class="bg-body-secondary rounded py-2">
-              <div class="fw-bold">{{ t.games|selectattr('is_finished')|list|length }}</div>
-              <div class="text-muted" style="font-size:.7rem">ИГР</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="bg-body-secondary rounded py-2">
-              <div class="fw-bold">{{ t.stages|length }}</div>
-              <div class="text-muted" style="font-size:.7rem">ЭТАПОВ</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="d-flex gap-2">
-          <a href="{{ url_for('tournaments.tournament_detail', tournament_id=t.id) }}"
-             class="btn btn-sm btn-outline-secondary flex-grow-1">Открыть</a>
-          <a href="{{ url_for('tournaments.leaderboard', tournament_id=t.id) }}"
-             class="btn btn-sm btn-outline-warning">🏆</a>
-          {% if t.has_stages %}
-          <a href="{{ url_for('tournaments.stages', tournament_id=t.id) }}"
-             class="btn btn-sm btn-outline-info">📋</a>
-          {% endif %}
         </div>
       </div>
-      <div class="card-footer text-muted small">
-        Создан {{ t.created_at.strftime('%d.%m.%Y') }}
+
+      {% if t.description %}<p class="tourney-card__desc">{{ t.description }}</p>{% endif %}
+
+      <div class="tourney-card__stats" style="max-width:420px;">
+        <div class="tourney-card__stat"><i class="bi bi-people-fill"></i><div class="tourney-card__stat-value">{{ t.participants|length }}</div><div class="tourney-card__stat-label">Участника</div></div>
+        <div class="tourney-card__stat"><i class="bi bi-controller"></i><div class="tourney-card__stat-value">{{ t.games|selectattr('is_finished')|list|length }}</div><div class="tourney-card__stat-label">Игр</div></div>
+        <div class="tourney-card__stat"><i class="bi bi-diagram-3-fill"></i><div class="tourney-card__stat-value">{{ t.stages|length }}</div><div class="tourney-card__stat-label">Этапов</div></div>
+      </div>
+    </div>
+
+    <div class="tourney-featured__side">
+      {{ status_pill(t) }}
+      {% if t.started_at %}
+      <div><div class="tourney-featured__side-label">Начало</div><div class="tourney-featured__side-value">{{ t.started_at.strftime('%d.%m.%Y %H:%M') }}</div></div>
+      {% else %}
+      <div><div class="tourney-featured__side-label">Создан</div><div class="tourney-featured__side-value">{{ t.created_at.strftime('%d.%m.%Y') }}</div></div>
+      {% endif %}
+      <span class="tourney-cta" style="margin-top:auto;">Открыть турнир<i class="bi bi-arrow-right ms-1"></i></span>
+    </div>
+  </a>
+  {% endif %}
+
+  <div class="tourney-grid">
+    {% for t in tournaments %}
+    {% if t.id != (featured.id if featured else none) %}
+    <div class="tourney-card tourney-card--{{ t.status }}{% if loop.index0 < 9 %} fade-in-up{% endif %}"
+         {% if loop.index0 < 9 %}style="--d:{{ (loop.index0 % 9) * 45 }}ms"{% endif %}>
+      {% if t.status == 'pending' %}<span class="tourney-ribbon">Скоро</span>{% endif %}
+
+      <div class="tourney-card__head">
+        <div class="tourney-card__crest"><i class="bi {{ 'bi-people-fill' if t.type.value == 'team' else 'bi-person-badge-fill' }}"></i></div>
+        {{ status_pill(t) }}
+      </div>
+
+      <div class="tourney-card__name mb-2">{{ t.name }}</div>
+      <div class="tourney-card__badges">
+        <span class="tourney-pill"><i class="bi bi-person"></i>{{ TYPE_LABELS.get(t.type.value, t.type.value) }}</span>
+        <span class="tourney-pill {% if t.is_ranked %}tourney-pill--accent{% endif %}">{% if t.is_ranked %}Рейтинговый{% else %}Нерейтинговый{% endif %}</span>
+        {% if t.has_stages %}<span class="tourney-pill">Этапы</span>{% endif %}
+        {% if series_tournament_ids.get(t.id) %}<span class="tourney-pill tourney-pill--accent"><i class="bi bi-link-45deg"></i>Серийный</span>{% endif %}
+      </div>
+
+      {% if t.description %}<p class="tourney-card__desc">{{ t.description }}</p>{% else %}<div class="flex-grow-1"></div>{% endif %}
+
+      <div class="tourney-card__stats">
+        <div class="tourney-card__stat"><i class="bi bi-people-fill"></i><div class="tourney-card__stat-value">{{ t.participants|length }}</div><div class="tourney-card__stat-label">Участн.</div></div>
+        <div class="tourney-card__stat"><i class="bi bi-controller"></i><div class="tourney-card__stat-value">{{ t.games|selectattr('is_finished')|list|length }}</div><div class="tourney-card__stat-label">Игр</div></div>
+        <div class="tourney-card__stat"><i class="bi bi-diagram-3-fill"></i><div class="tourney-card__stat-value">{{ t.stages|length }}</div><div class="tourney-card__stat-label">Этапов</div></div>
+      </div>
+
+      <div class="tourney-card__actions">
+        <a href="{{ url_for('tournaments.tournament_detail', tournament_id=t.id) }}" class="tourney-cta">Открыть турнир</a>
+        <a href="{{ url_for('tournaments.leaderboard', tournament_id=t.id) }}" class="tourney-cta--outline" title="Рейтинг турнира"><i class="bi bi-trophy"></i></a>
+        {% if t.has_stages %}
+        <a href="{{ url_for('tournaments.stages', tournament_id=t.id) }}" class="tourney-cta--outline" title="Этапы"><i class="bi bi-diagram-3"></i></a>
+        {% endif %}
+      </div>
+
+      <div class="tourney-card__footer">
+        <i class="bi bi-calendar3"></i>Создан {{ t.created_at.strftime('%d.%m.%Y') }}
         {% if t.started_at %} · Старт {{ t.started_at.strftime('%d.%m.%Y') }}{% endif %}
         {% if t.finished_at %} · Финиш {{ t.finished_at.strftime('%d.%m.%Y') }}{% endif %}
       </div>
     </div>
+    {% endif %}
+    {% endfor %}
   </div>
-  {% endfor %}
-</div>
+
+  <div class="tourney-closing">
+    <i class="bi bi-trophy-fill"></i>Турниры — это история побед, которая пишется каждым из нас.
+  </div>
 {% else %}
 <div class="text-center text-muted py-5">
   <i class="bi bi-trophy fs-1 d-block mb-3 opacity-25"></i>
@@ -113,4 +420,52 @@
   {% endif %}
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const hero = document.getElementById('tourney-hero');
+  if (!hero) return;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const countEl = hero.querySelector('[data-count-to]');
+  if (countEl) {
+    const target = parseInt(countEl.dataset.countTo, 10) || 0;
+    if (reduceMotion || target === 0) {
+      countEl.textContent = String(target);
+    } else {
+      const duration = 1200;
+      const start = performance.now();
+      const ease = t => 1 - Math.pow(1 - t, 3);
+      const tick = now => {
+        const p = Math.min(1, (now - start) / duration);
+        countEl.textContent = String(Math.round(ease(p) * target));
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+  }
+
+  if (!reduceMotion && window.matchMedia('(hover: hover)').matches) {
+    const bg = hero.querySelector('.tourney-hero__bg');
+    let raf = null;
+    hero.addEventListener('mousemove', (e) => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const r = hero.getBoundingClientRect();
+        const mx = ((e.clientX - r.left) / r.width - 0.5) * 2;
+        const my = ((e.clientY - r.top) / r.height - 0.5) * 2;
+        bg.style.setProperty('--mx', mx.toFixed(3));
+        bg.style.setProperty('--my', my.toFixed(3));
+        raf = null;
+      });
+    });
+    hero.addEventListener('mouseleave', () => {
+      bg.style.setProperty('--mx', 0);
+      bg.style.setProperty('--my', 0);
+    });
+  }
+})();
+</script>
 {% endblock %}
