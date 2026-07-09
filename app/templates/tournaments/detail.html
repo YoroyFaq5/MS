@@ -276,6 +276,11 @@
         <a href="{{ url_for('tournaments.leaderboard', tournament_id=tournament.id) }}"
            class="btn btn-sm btn-outline-secondary">Все →</a>
       </div>
+      {% if tournament.status != 'finished' %}
+      <div class="px-3 pt-2 text-muted small">
+        <i class="bi bi-hourglass-split me-1"></i>Турнир ещё не завершён — места и очки предварительные, могут измениться до конца.
+      </div>
+      {% endif %}
       <div class="card-body p-0">
         {% if player_ratings %}
         <div class="table-responsive">

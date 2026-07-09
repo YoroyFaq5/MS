@@ -15,6 +15,13 @@
   {% endif %}
 </div>
 
+{% if tournament.status != 'finished' %}
+<div class="alert alert-secondary d-flex align-items-center gap-2 py-2 mb-4">
+  <i class="bi bi-hourglass-split"></i>
+  Турнир ещё не завершён — места и очки предварительные, могут измениться до конца.
+</div>
+{% endif %}
+
 {% if team_ratings %}
 <!-- TEAM rating (command tournament) -->
 <h5 class="fw-semibold mb-3">🤝 Командный зачёт</h5>
