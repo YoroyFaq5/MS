@@ -150,6 +150,14 @@ class RoleTournamentStats:
     bonus_total: float = 0.0  # bonus_score, любая роль — критерий MVP
 
 
+@dataclass
+class RoleSuperlative:
+    """One tournament/series "best of" slot — the winning PlayerRating +
+    the value they won it with. See RatingService.pick_role_superlatives."""
+    rating: PlayerRating
+    value: float
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -445,7 +453,7 @@ class RatingService:
     @staticmethod
     def pick_role_superlatives(
         ratings: List[PlayerRating], role_stats: dict[int, RoleTournamentStats]
-    ) -> dict[str, Optional[PlayerRating]]:
+    ) -> dict[str, Optional["RoleSuperlative"]]:
         """
         MVP (наибольшая сумма bonus_score, любая роль) + "лучший" по каждой
         из 4 ролей (наибольшая сумма total_score именно в этой роли).
@@ -453,11 +461,13 @@ class RatingService:
         очков в роли, соответствующий титул остаётся пустым (None), а не
         достаётся случайному игроку с нулём.
 
-        Победившему PlayerRating выставляется `.superlative_value` — то
-        самое число, по которому он победил (шаблон не лезет обратно в
-        role_stats).
+        Возвращает RoleSuperlative(rating, value), а не PlayerRating с
+        приклеенным `.superlative_value` — один и тот же игрок вполне может
+        выиграть сразу две номинации (например, MVP и «Лучший Красный»), и
+        если писать значение прямо в PlayerRating, второе присваивание
+        затирает первое (оба поля указывают на один и тот же объект).
         """
-        def pick(attr: str) -> Optional[PlayerRating]:
+        def pick(attr: str) -> Optional["RoleSuperlative"]:
             best, best_val = None, 0.0
             for r in ratings:
                 stats = role_stats.get(r.player_id)
@@ -466,9 +476,7 @@ class RatingService:
                 val = getattr(stats, attr)
                 if val > best_val:
                     best_val, best = val, r
-            if best is not None:
-                best.superlative_value = best_val
-            return best
+            return RoleSuperlative(rating=best, value=best_val) if best is not None else None
 
         return {
             "mvp": pick("bonus_total"),
