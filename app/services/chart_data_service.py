@@ -12,6 +12,7 @@ ChartDataService
 """
 from __future__ import annotations
 
+from collections import Counter
 from typing import Dict, List
 
 from app import db
@@ -23,6 +24,25 @@ ROLE_LABELS: Dict[str, str] = {
     "mafia": "Мафия",
     "don": "Дон",
 }
+ROLE_ORDER = ["civilian", "sheriff", "mafia", "don"]
+
+
+def _mini_sparkline_points(results: List[bool], width: int = 200, height: int = 30, pad: float = 4) -> str:
+    """SVG <polyline points="..."> for a win/loss form sparkline — same
+    server-side string-math approach as the homepage's form sparkline
+    (see routes/main.py::_sparkline_points), just kept local here since
+    it's the only place in this service that needs it."""
+    n = len(results)
+    if n == 0:
+        return ""
+    if n == 1:
+        y = height / 2
+        return f"{pad:.1f},{y:.1f} {width - pad:.1f},{y:.1f}"
+    x_step = (width - 2 * pad) / (n - 1)
+    return " ".join(
+        f"{pad + i * x_step:.1f},{(pad if won else height - pad):.1f}"
+        for i, won in enumerate(results)
+    )
 
 
 class ChartDataService:
@@ -74,8 +94,44 @@ class ChartDataService:
                 "role_label": ROLE_LABELS.get(slot.role.value, slot.role.value),
                 "won": won,
                 "game_id": game.id,
+                # Для тултипа таймлайна ролей (профиль → статистика).
+                "is_eliminated": slot.is_eliminated,
+                "quality_score": slot.quality_score,  # -1..+1, субъективная оценка ведущего; None если не выставлялась
+                "total_score": round(slot.total_score, 2),
             })
-        return {"games": entries}
+
+        # Текущая серия побед подряд — считаем с конца хронологического списка.
+        win_streak = 0
+        for e in reversed(entries):
+            if not e["won"]:
+                break
+            win_streak += 1
+
+        judged = [e["quality_score"] for e in entries if e["quality_score"] is not None]
+        avg_quality_score = round(sum(judged) / len(judged), 2) if judged else None
+
+        # Сводка по ролям — за то же окно (последние N игр), не за карьеру
+        # целиком (это отдельная метрика — см. ProfileService.get_role_statistics,
+        # который скоуплен на все игры).
+        role_counts = Counter(e["role"] for e in entries)
+        role_summary = [
+            {
+                "role": role,
+                "label": ROLE_LABELS.get(role, role),
+                "count": role_counts[role],
+                "pct": round(role_counts[role] / len(entries) * 100) if entries else 0,
+            }
+            for role in ROLE_ORDER
+            if role_counts.get(role)
+        ]
+
+        return {
+            "games": entries,
+            "win_streak": win_streak,
+            "avg_quality_score": avg_quality_score,
+            "role_summary": role_summary,
+            "sparkline_points": _mini_sparkline_points([e["won"] for e in entries]),
+        }
 
     # ── Win/loss streak timeline ─────────────────────────────────────────────
 

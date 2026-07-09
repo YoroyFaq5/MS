@@ -3,6 +3,27 @@
 {% block title %}Статистика — {{ player.display_name }}{% endblock %}
 
 {% set ROLE_LABELS = {'civilian': '👤 Мирный', 'mafia': '🔫 Мафия', 'don': '🎩 Дон', 'sheriff': '🔍 Шериф'} %}
+{% set ROLE_ICON = {'civilian': 'bi-people-fill', 'sheriff': 'bi-search', 'mafia': 'bi-mask', 'don': 'bi-gem'} %}
+{% set ROLE_ORDER_LIST = ['civilian', 'sheriff', 'mafia', 'don'] %}
+
+{% macro role_popover(g, loop_index) -%}
+<template class="role-popover-tpl" data-index="{{ loop_index }}">
+  <div class="role-popover">
+    <div class="role-popover__title">Игра №{{ g.game_id }}<span class="role-popover__date">{{ g.date }}</span></div>
+    <ul class="role-popover__list">
+      <li><i class="bi bi-person-badge"></i>Роль: <strong>{{ g.role_label }}</strong></li>
+      <li><i class="bi bi-trophy"></i>Результат: <strong class="{{ 'role-popover__win' if g.won else 'role-popover__loss' }}">{{ 'Победа' if g.won else 'Поражение' }}</strong></li>
+      <li><i class="bi bi-people"></i>Игроков: 10</li>
+      <li><i class="bi {{ 'bi-emoji-dizzy-fill' if g.is_eliminated else 'bi-shield-check' }}"></i>Статус: <strong>{{ 'Выбыл по ходу игры' if g.is_eliminated else 'Дожил до конца' }}</strong></li>
+      {% if g.quality_score is not none %}
+      <li><i class="bi bi-star"></i>Оценка ведущего: <strong>{{ '%+.1f'|format(g.quality_score) }}</strong></li>
+      {% endif %}
+      <li><i class="bi bi-coin"></i>Очки: <strong>{{ '%+.2f'|format(g.total_score) }}</strong></li>
+    </ul>
+    <a href="{{ url_for('games.game_detail', game_id=g.game_id) }}" class="role-popover__link">Смотреть игру <i class="bi bi-arrow-right"></i></a>
+  </div>
+</template>
+{%- endmacro %}
 
 {% block head %}
 <style>
@@ -58,6 +79,154 @@
 /* ── Радар ролей ──────────────────────────────────────────────────────── */
 .role-radar-container { position: relative; height: 300px; }
 #roleMetricToggle .btn.active { background: var(--ms-gold); border-color: var(--ms-gold); color: #0D0D0D; }
+
+/* ============================================================
+   История ролей — таймлайн последних игр
+   ============================================================
+   Роль-цвета переиспользуют ту же палитру, что уже задана для ролей
+   в играх (games/list.html .match-role--*): мирный = приглушённый
+   текст/золото, шериф = --flavor-defense (синий, зарезервирован
+   именно под шерифа во всём проекте), мафия/дон = вино/вино-тёмный.
+   ============================================================ */
+
+.role-history-streak { font-size: .78rem; }
+
+.role-summary-strip {
+  display: flex; flex-wrap: wrap; gap: .5rem;
+  margin-bottom: 1.5rem;
+}
+.role-summary-item {
+  flex: 1 1 120px;
+  display: flex; align-items: center; gap: .65rem;
+  padding: .7rem .9rem;
+  background: var(--ms-surface-raised); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+}
+.role-summary-icon {
+  flex-shrink: 0; width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 1rem;
+  background: rgba(138,138,138,.12); color: var(--ms-muted);
+}
+.role-summary-icon--civilian { background: rgba(199,165,82,.16); color: var(--ms-gold-light); }
+.role-summary-icon--sheriff  { background: rgba(91,141,201,.16); color: var(--flavor-defense, #5B8DC9); }
+.role-summary-icon--mafia    { background: rgba(142,28,28,.16);  color: var(--ms-wine-light); }
+.role-summary-icon--don      { background: rgba(123,15,15,.2);   color: var(--ms-wine); }
+.role-summary-body { min-width: 0; }
+.role-summary-value { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: .35rem; }
+.role-summary-pct { font-size: .68rem; font-weight: 600; color: var(--ms-muted); }
+.role-summary-label { font-size: .68rem; color: var(--ms-muted); white-space: nowrap; }
+
+/* ── Таймлайн ─────────────────────────────────────────────────────────── */
+.role-timeline-wrap {
+  position: relative;
+  display: flex; align-items: center; gap: .75rem;
+  padding: 1rem 0;
+}
+.role-timeline-endpoint {
+  flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; gap: .2rem;
+  font-size: .62rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ms-muted);
+}
+.role-timeline-endpoint i { font-size: .9rem; color: var(--ms-gold-light); }
+
+.role-timeline {
+  position: relative; z-index: 1;
+  flex: 1; display: flex; align-items: flex-start; gap: 2.25rem;
+  overflow-x: auto; overflow-y: visible;
+  padding: 2.75rem .5rem 0;
+  scrollbar-width: thin;
+}
+.role-timeline-line { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.role-timeline-line polyline { fill: none; stroke: rgba(199,165,82,.35); stroke-width: 1.5; stroke-dasharray: 3 4; stroke-linecap: round; }
+
+.role-timeline-node {
+  flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; gap: .4rem;
+  width: 64px;
+}
+.role-timeline-node:nth-child(even) { transform: translateY(-14px); }
+.role-timeline-node:nth-child(odd)  { transform: translateY(14px); }
+
+.role-timeline-badge {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.05rem; cursor: pointer;
+  background: var(--ms-surface-raised);
+  border: 2px solid var(--ms-border);
+  color: var(--ms-text-dim);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.role-timeline-badge:hover { transform: translateY(-2px) scale(1.06); }
+.role-timeline-badge--civilian { color: var(--ms-gold-light); border-color: rgba(199,165,82,.35); }
+.role-timeline-badge--sheriff  { color: var(--flavor-defense, #5B8DC9); border-color: rgba(91,141,201,.4); }
+.role-timeline-badge--mafia    { color: var(--ms-wine-light); border-color: rgba(142,28,28,.4); }
+.role-timeline-badge--don      { color: var(--ms-wine); border-color: rgba(123,15,15,.5); }
+.role-timeline-badge--win  { box-shadow: 0 0 0 3px rgba(199,165,82,.22); }
+.role-timeline-badge--loss { box-shadow: 0 0 0 3px rgba(142,28,28,.18); }
+
+.role-timeline-date { font-size: .64rem; color: var(--ms-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.role-timeline-result { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+
+/* ── Попап деталей игры ──────────────────────────────────────────────── */
+.popover {
+  --bs-popover-max-width: 260px;
+  --bs-popover-bg: var(--ms-surface-raised);
+  --bs-popover-border-color: var(--ms-border);
+  --bs-popover-header-bg: var(--ms-surface-raised);
+  --bs-popover-header-color: var(--ms-text);
+  --bs-popover-body-color: var(--ms-text-dim);
+  --bs-popover-arrow-color: var(--ms-surface-raised);
+  border-radius: var(--ms-radius);
+}
+.role-popover__title { font-weight: 700; color: var(--ms-text); margin-bottom: .5rem; display: flex; justify-content: space-between; gap: .5rem; }
+.role-popover__date { font-weight: 400; color: var(--ms-muted); font-size: .78rem; }
+.role-popover__list { list-style: none; padding: 0; margin: 0 0 .6rem; display: flex; flex-direction: column; gap: .3rem; font-size: .8rem; }
+.role-popover__list i { color: var(--ms-gold-light); margin-right: .4rem; width: 14px; display: inline-block; text-align: center; }
+.role-popover__win { color: var(--ms-gold-light); }
+.role-popover__loss { color: var(--ms-wine-light); }
+.role-popover__link { font-size: .8rem; font-weight: 600; color: var(--ms-gold-light); text-decoration: none; }
+.role-popover__link:hover { color: var(--ms-gold); }
+
+/* ── Легенда / последние результаты / средняя оценка ─────────────────── */
+.role-legend, .role-results-card, .role-avgscore-card {
+  height: 100%;
+  background: var(--ms-surface-raised); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+  padding: .9rem 1rem;
+}
+.role-legend__title, .role-results-card__title, .role-avgscore-card__title {
+  font-size: .68rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ms-muted); margin-bottom: .6rem;
+}
+.role-legend__item { display: flex; align-items: center; gap: .5rem; font-size: .82rem; margin-bottom: .4rem; }
+.role-legend__item:last-child { margin-bottom: 0; }
+.role-legend__icon {
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: .7rem;
+}
+
+.role-results-chips { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .6rem; }
+.role-results-chip {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .62rem; font-weight: 700;
+}
+.role-results-chip--win  { background: rgba(199,165,82,.16); color: var(--ms-gold-light); }
+.role-results-chip--loss { background: rgba(142,28,28,.16); color: var(--ms-wine-light); }
+.role-results-sparkline { display: block; width: 100%; height: 26px; }
+.role-results-sparkline polyline { fill: none; stroke: var(--ms-gold-light); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+.role-avgscore-card { text-align: center; }
+.role-avgscore-card__value { font-size: 1.6rem; font-weight: 700; color: var(--ms-gold-light); font-variant-numeric: tabular-nums; }
+.role-avgscore-card__value i { font-size: 1rem; margin-right: .4rem; }
+.role-avgscore-card__sub { font-size: .68rem; color: var(--ms-muted); margin-top: .2rem; }
+
+@media (max-width: 767.98px) {
+  .role-timeline-endpoint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .role-timeline-badge { transition: none; }
+}
 </style>
 {% endblock %}
 
@@ -181,7 +350,7 @@
   </div>
   <div class="col-6 col-lg-3">
     <div class="stat-card pstat-card card p-3 text-center h-100 fade-in-up" style="--d:320ms">
-      <div class="pstat-card__icon pstat-card__icon--wine"><i class="bi bi-skull"></i></div>
+      <div class="pstat-card__icon pstat-card__icon--wine"><i class="bi bi-emoji-dizzy-fill"></i></div>
       <div class="stat-value text-danger" data-count-to="{{ stats.pu_count }}" data-decimals="0">0</div>
       <div class="stat-label">Раз был ПУ</div>
     </div>
@@ -523,9 +692,100 @@
     </div>
   </div>
   <div class="col-12">
-    <div class="card">
-      <div class="card-header fw-semibold"><i class="bi bi-palette2 me-2"></i>История ролей (последние игры)</div>
-      <div class="card-body"><div class="chart-container"><canvas id="chartRoles"></canvas></div></div>
+    <div class="card role-history-card">
+      <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="fw-semibold"><i class="bi bi-clock-history me-2"></i>История ролей <span class="text-muted small fw-normal">(последние игры)</span></span>
+        {% if chart_data.roles.win_streak and chart_data.roles.win_streak > 0 %}
+        <span class="streak-chip streak-chip--win role-history-streak"><i class="bi bi-fire me-1"></i>Побед подряд: {{ chart_data.roles.win_streak }}</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% set rt_games = chart_data.roles.games %}
+        {% if rt_games %}
+
+        <div class="role-summary-strip">
+          {% for r in chart_data.roles.role_summary %}
+          <div class="role-summary-item">
+            <span class="role-summary-icon role-summary-icon--{{ r.role }}"><i class="bi {{ ROLE_ICON.get(r.role, 'bi-person-fill') }}"></i></span>
+            <div class="role-summary-body">
+              <div class="role-summary-value">{{ r.count }}<span class="role-summary-pct">{{ r.pct }}%</span></div>
+              <div class="role-summary-label">{{ r.label }}</div>
+            </div>
+          </div>
+          {% endfor %}
+          <div class="role-summary-item role-summary-item--total">
+            <span class="role-summary-icon"><i class="bi bi-collection"></i></span>
+            <div class="role-summary-body">
+              <div class="role-summary-value">{{ rt_games|length }}</div>
+              <div class="role-summary-label">Всего игр</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="role-timeline-wrap">
+          <svg class="role-timeline-line" id="roleTimelineLine" aria-hidden="true"></svg>
+          <div class="role-timeline-endpoint role-timeline-endpoint--start"><i class="bi bi-arrow-right"></i>START</div>
+          <div class="role-timeline" id="roleTimeline">
+            {% for g in rt_games %}
+            <div class="role-timeline-node">
+              <button type="button"
+                      class="role-timeline-badge role-timeline-badge--{{ g.role }} {{ 'role-timeline-badge--win' if g.won else 'role-timeline-badge--loss' }}"
+                      data-timeline-badge data-index="{{ loop.index0 }}" aria-label="Игра №{{ g.game_id }}, {{ g.role_label }}">
+                <i class="bi {{ ROLE_ICON.get(g.role, 'bi-person-fill') }}"></i>
+              </button>
+              {{ role_popover(g, loop.index0) }}
+              <div class="role-timeline-date">{{ g.date }}</div>
+              <div class="role-timeline-result {{ 'text-success' if g.won else 'text-danger' }}">{{ 'Победа' if g.won else 'Поражение' }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="role-timeline-endpoint role-timeline-endpoint--finish">FINISH<i class="bi bi-arrow-up-right"></i></div>
+        </div>
+
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <div class="role-legend">
+              <div class="role-legend__title">Легенда ролей</div>
+              {% for role in ROLE_ORDER_LIST %}
+              <div class="role-legend__item">
+                <span class="role-legend__icon role-summary-icon--{{ role }}"><i class="bi {{ ROLE_ICON.get(role) }}"></i></span>
+                {{ {'civilian': 'Мирный', 'sheriff': 'Шериф', 'mafia': 'Мафия', 'don': 'Дон'}[role] }}
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="col-md-5">
+            <div class="role-results-card">
+              <div class="role-results-card__title">Последние результаты</div>
+              <div class="role-results-chips">
+                {% for g in rt_games[-10:] %}
+                <span class="role-results-chip {{ 'role-results-chip--win' if g.won else 'role-results-chip--loss' }}">{{ 'W' if g.won else 'L' }}</span>
+                {% endfor %}
+              </div>
+              {% if chart_data.roles.sparkline_points %}
+              <svg class="role-results-sparkline" viewBox="0 0 200 30" preserveAspectRatio="none">
+                <polyline points="{{ chart_data.roles.sparkline_points }}"></polyline>
+              </svg>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="role-avgscore-card">
+              <div class="role-avgscore-card__title">Средняя оценка</div>
+              {% if chart_data.roles.avg_quality_score is not none %}
+              <div class="role-avgscore-card__value"><i class="bi bi-star-fill"></i>{{ '%+.2f'|format(chart_data.roles.avg_quality_score) }}</div>
+              {% else %}
+              <div class="role-avgscore-card__value text-muted">—</div>
+              {% endif %}
+              <div class="role-avgscore-card__sub">За последние {{ rt_games|length }} игр</div>
+            </div>
+          </div>
+        </div>
+
+        {% else %}
+        <div class="text-center text-muted py-4 small">Нет сыгранных игр для истории</div>
+        {% endif %}
+      </div>
     </div>
   </div>
   <div class="col-12">
@@ -563,8 +823,6 @@ Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
 // фиксированную высоту вместо canvas[height]).
 const RESPONSIVE_BASE = { responsive: true, maintainAspectRatio: false };
 
-const ROLE_COLORS = {civilian: SILVER, sheriff: GOLD, mafia: WINE, don: '#5A4A2E'};
-
 // ELO
 if (CHART_DATA.elo.labels.length) {
   new Chart(document.getElementById('chartElo'), {
@@ -598,32 +856,52 @@ new Chart(document.getElementById('chartStreaks'), {
   options: {...RESPONSIVE_BASE, plugins: {legend: {display: false}}},
 });
 
-// Role timeline — bar per game, colored by role, bordered by win/loss
+// Role history timeline — попапы деталей игры (из <template> рядом с
+// каждым жетоном, а не data-bs-content: содержимое достаточно
+// сложное — списки, ссылка — и вручную экранировать HTML внутри
+// атрибута только чтобы избежать этого не стоит) + соединительная
+// SVG-линия между жетонами (считается по факту их положения, а не
+// приблизительно CSS-волной — переживает любую ширину/перенос).
 {
-  const games = CHART_DATA.roles.games;
-  new Chart(document.getElementById('chartRoles'), {
-    type: 'bar',
-    data: {
-      labels: games.map(g => g.date),
-      datasets: [{
-        label: 'Роль', data: games.map(() => 1),
-        backgroundColor: games.map(g => ROLE_COLORS[g.role] || SILVER),
-        borderColor: games.map(g => g.won ? GOLD : WINE),
-        borderWidth: 3,
-      }],
-    },
-    options: {
-      ...RESPONSIVE_BASE,
-      plugins: {
-        legend: {display: false},
-        tooltip: {callbacks: {label: (ctx) => {
-          const g = games[ctx.dataIndex];
-          return `${g.role_label} — ${g.won ? 'победа' : 'поражение'}`;
-        }}},
-      },
-      scales: {y: {display: false}},
-    },
-  });
+  const timeline = document.getElementById('roleTimeline');
+  if (timeline) {
+    document.querySelectorAll('[data-timeline-badge]').forEach(btn => {
+      const tpl = document.querySelector(`.role-popover-tpl[data-index="${btn.dataset.index}"]`);
+      if (!tpl || typeof bootstrap === 'undefined') return;
+      new bootstrap.Popover(btn, {
+        html: true,
+        trigger: 'focus',
+        placement: 'top',
+        content: tpl.innerHTML,
+      });
+    });
+
+    const drawTimelineLine = () => {
+      const svg = document.getElementById('roleTimelineLine');
+      const wrap = svg && svg.closest('.role-timeline-wrap');
+      if (!svg || !wrap) return;
+      const wrapRect = wrap.getBoundingClientRect();
+      svg.setAttribute('width', wrapRect.width);
+      svg.setAttribute('height', wrapRect.height);
+      const badges = timeline.querySelectorAll('.role-timeline-badge');
+      const points = Array.from(badges).map(b => {
+        const r = b.getBoundingClientRect();
+        const x = r.left - wrapRect.left + r.width / 2;
+        const y = r.top - wrapRect.top + r.height / 2;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' ');
+      svg.innerHTML = points
+        ? `<polyline points="${points}"></polyline>`
+        : '';
+    };
+
+    drawTimelineLine();
+    window.addEventListener('resize', drawTimelineLine);
+    // Скролл ленты сдвигает жетоны относительно wrap — линия должна
+    // пересчитываться, иначе "уедет" от жетонов при горизонтальной
+    // прокрутке на узких экранах.
+    timeline.addEventListener('scroll', drawTimelineLine, {passive: true});
+  }
 }
 
 // Role radar — один луч на роль, переключатель метрики (винрейт/очки)
