@@ -4,83 +4,203 @@
 
 {% block head %}
 <style>
-.games-grid {
+/* ============================================================
+   Games list — "match card" redesign
+   ============================================================
+   Reuses the site's existing --ms-* palette and established
+   conventions (rank-row inset accent for MVP, --flavor-defense for
+   the sheriff's "cool" accent, .fade-in-up entrance) rather than
+   inventing a parallel design language. No new colors beyond what
+   already exists elsewhere in main.css.
+   ============================================================ */
+
+.matches-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
 }
 
-.game-box {
+.match-card {
   background: var(--ms-surface);
   border: 1px solid var(--ms-border);
   border-radius: var(--ms-radius);
-  padding: 12px 12px 10px;
+  overflow: hidden;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.match-card:hover, .match-card:focus-within {
+  transform: translateY(-3px);
+  border-color: rgba(199,165,82,.28);
+  box-shadow: 0 16px 36px rgba(0,0,0,.45), 0 0 0 1px rgba(199,165,82,.1);
 }
 
-.game-header {
+/* ── Match header ─────────────────────────────────────────────── */
+.match-card__header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 4px;
+  justify-content: space-between;
+  padding: .85rem 1rem;
+  border-bottom: 1px solid var(--ms-border);
+  background: linear-gradient(135deg, rgba(199,165,82,.05), transparent 60%);
+}
+.match-card__header--mafia {
+  background: linear-gradient(135deg, rgba(142,28,28,.12), transparent 65%);
+}
+.match-card__header--city {
+  background: linear-gradient(135deg, rgba(199,165,82,.1), transparent 65%);
 }
 
-.game-meta-small {
-  font-size: 11px;
+.match-card__result { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+
+.match-card__side-icon {
+  flex-shrink: 0;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-size: 1rem;
+  background: rgba(138,138,138,.12);
   color: var(--ms-muted);
-  margin-bottom: 8px;
+}
+.match-card__header--city  .match-card__side-icon { background: rgba(199,165,82,.16); color: var(--ms-gold-light); }
+.match-card__header--mafia .match-card__side-icon { background: rgba(142,28,28,.18); color: var(--ms-wine-light); }
+
+.match-card__result-text {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.games-grid table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.games-grid th {
-  padding: 5px;
-  background: var(--ms-surface-raised);
+.match-card__id {
+  flex-shrink: 0;
+  font-size: .72rem;
   font-weight: 600;
+  color: var(--ms-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.match-card__subheader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem .65rem;
+  padding: .6rem 1rem;
+  font-size: .72rem;
+  color: var(--ms-muted);
+  border-bottom: 1px solid var(--ms-border);
+}
+.match-card__subheader i { margin-right: .3rem; opacity: .85; }
+
+.match-card__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: .12rem .5rem;
+  border-radius: 99px;
+  background: rgba(199,165,82,.1);
+  color: var(--ms-gold-light);
+  font-weight: 500;
+}
+.match-card__chip--muted { background: rgba(138,138,138,.1); color: var(--ms-muted); }
+
+/* ── Summary strip ────────────────────────────────────────────── */
+.match-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: .5rem;
+  padding: .75rem 1rem;
+  background: var(--ms-surface-raised);
+  border-bottom: 1px solid var(--ms-border);
+}
+.match-summary__item { display: flex; flex-direction: column; gap: .05rem; min-width: 0; }
+.match-summary__label {
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+}
+.match-summary__label i { color: var(--ms-gold-light); font-size: .68rem; }
+.match-summary__value {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--ms-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.match-summary__sub {
+  font-size: .68rem;
+  color: var(--ms-gold-light);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Player table ─────────────────────────────────────────────── */
+.match-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+.match-table th {
+  padding: .45rem .75rem;
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
   color: var(--ms-muted);
   text-align: left;
+  border-bottom: 1px solid var(--ms-border);
 }
+.match-table td {
+  padding: .4rem .75rem;
+  border-top: 1px solid rgba(199,165,82,.06);
+  color: var(--ms-text-dim);
+  vertical-align: middle;
+}
+.match-table tbody tr { transition: background .15s ease; }
+.match-table tbody tr:hover { background: rgba(199,165,82,.045); }
+.match-table tbody tr:hover td { color: var(--ms-text); }
 
-.games-grid td {
-  padding: 5px;
+.match-table__player { display: flex; align-items: center; gap: .3rem; color: var(--ms-text); font-weight: 500; }
+.match-table__pu-mark { cursor: help; opacity: .9; }
+.match-table__mvp-star { color: var(--ms-gold-light); font-size: .72rem; filter: drop-shadow(0 0 4px var(--ms-gold-glow)); }
+
+/* MVP row — same inset-accent language as the homepage leaderboard's top-3 */
+.match-table__row--mvp { background: rgba(199,165,82,.05); }
+.match-table__row--mvp td:first-child { box-shadow: inset 3px 0 0 var(--ms-gold-light); padding-left: .6rem; }
+
+/* PU (Первый Убиенный) row */
+.match-table__row--pu td:first-child { box-shadow: inset 2px 0 0 var(--ms-border); }
+
+/* Role color system — a signal, not decoration: neutral / cool / two
+   shades of red for the mafia side (Дон slightly deeper than Мафия). */
+.match-role { font-weight: 600; }
+.match-role--civilian { color: var(--ms-text-dim); font-weight: 500; }
+.match-role--sheriff   { color: var(--flavor-defense, #5B8DC9); }
+.match-role--mafia     { color: var(--ms-wine-light); }
+.match-role--don       { color: var(--ms-wine); }
+
+.match-elo-up   { color: var(--ms-gold-light); }
+.match-elo-down { color: var(--ms-wine-light); }
+.match-elo-flat { color: var(--ms-muted); }
+
+.match-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .4rem;
+  padding: .6rem 1rem;
   border-top: 1px solid var(--ms-border);
-  color: var(--ms-text);
 }
 
-.role-civilian { color: #B0B0B0; }
-.role-sheriff  { color: var(--ms-gold-light); }
-.role-don      { color: #8A7247; }
-.role-mafia    { color: var(--ms-wine-light); }
-
-/* PU — Первый Убиенный */
-.pu-row {
-  background: linear-gradient(90deg, var(--ms-gold-glow), transparent 70%);
-}
-.pu-row td:first-child {
-  position: relative;
-  padding-left: 14px;
-}
-.pu-row td:first-child::before {
-  content: "";
-  position: absolute;
-  left: 4px; top: 0;
-  width: 3px; height: 100%;
-  background: var(--ms-gold-light);
-  border-radius: 2px;
-}
-.pu-mark {
-  margin-right: 4px;
-  cursor: help;
+@media (prefers-reduced-motion: reduce) {
+  .match-card { transition: none; }
 }
 
-.game-actions {
-  margin-top: 6px;
-  text-align: right;
+@media (max-width: 480px) {
+  .matches-grid { gap: 14px; }
+  .match-card__header, .match-card__subheader, .match-summary, .match-table td, .match-table th, .match-card__actions {
+    padding-left: .7rem; padding-right: .7rem;
+  }
 }
 </style>
 {% endblock %}
@@ -99,8 +219,8 @@
 </div>
 
 {% if pending_games %}
-<div class="card mb-4">
-  <div class="card-header fw-semibold">⏳ В процессе ({{ pending_games|length }})</div>
+<div class="card panel mb-4">
+  <div class="card-header panel-header fw-semibold">⏳ В процессе ({{ pending_games|length }})</div>
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-hover mb-0 align-middle">
@@ -145,48 +265,110 @@
 {% endif %}
 
 {% if finished_games %}
-<div class="games-grid">
+<div class="matches-grid">
   {% for game in finished_games %}
-  <div class="game-box">
-    <div class="game-header">
-      <span><i class="bi bi-calendar3 me-1"></i>{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</span>
-      {% if game.win_side.value == 'mafia' %}
-        <span class="badge bg-danger">🔫 Мафия</span>
-      {% elif game.win_side.value == 'city' %}
-        <span class="badge bg-success">🏙 Город</span>
-      {% else %}
-        <span class="badge bg-secondary">—</span>
+  {% set slots = slots_by_game.get(game.id, []) %}
+  {% set mvp = (slots | sort(attribute='total_score', reverse=true) | list | first) if slots else none %}
+  {% set has_mvp = mvp and mvp.total_score > 0 %}
+  {% set sheriff_slot = (slots | selectattr('role.value', 'equalto', 'sheriff') | list | first) if slots else none %}
+  {% set don_slot = (slots | selectattr('role.value', 'equalto', 'don') | list | first) if slots else none %}
+  {% set elos = (slots | map(attribute='elo_after') | reject('none') | list) if slots else [] %}
+  {% set win = game.win_side.value %}
+  <div class="match-card fade-in-up" style="--d:{{ (loop.index0 % 8) * 35 }}ms" tabindex="0">
+
+    <!-- Match header -->
+    <div class="match-card__header match-card__header--{{ win }}">
+      <div class="match-card__result">
+        <span class="match-card__side-icon">
+          {% if win == 'city' %}<i class="bi bi-shield-fill"></i>
+          {% elif win == 'mafia' %}<i class="bi bi-mask"></i>
+          {% else %}<i class="bi bi-dash-circle"></i>{% endif %}
+        </span>
+        <span class="match-card__result-text">
+          {% if win == 'city' %}Победа города
+          {% elif win == 'mafia' %}Победа мафии
+          {% else %}Ничья{% endif %}
+        </span>
+      </div>
+      <span class="match-card__id">#{{ game.id }}</span>
+    </div>
+
+    <!-- Sub-header: date + "type" context -->
+    <div class="match-card__subheader">
+      <span><i class="bi bi-calendar3"></i>{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</span>
+      {% if game.tournament %}
+      <span class="match-card__chip"><i class="bi bi-trophy"></i>{{ game.tournament.name }}</span>
+      {% endif %}
+      {% if game.round_number %}
+      <span class="match-card__chip match-card__chip--muted">Раунд {{ game.round_number }}</span>
+      {% endif %}
+      {% if not game.is_ranked %}
+      <span class="match-card__chip match-card__chip--muted">Не в рейтинг</span>
       {% endif %}
     </div>
-    <div class="game-meta-small">Игра #{{ game.id }}</div>
 
-    <table>
+    <!-- Summary strip — gracefully collapses per-item when data is missing -->
+    {% if has_mvp or sheriff_slot or don_slot or elos %}
+    <div class="match-summary">
+      {% if has_mvp %}
+      <div class="match-summary__item">
+        <span class="match-summary__label"><i class="bi bi-star-fill"></i>MVP</span>
+        <span class="match-summary__value">{{ player_name(mvp.player, equipped_bulk.get(mvp.player_id, {})) if mvp.player else '?' }}</span>
+        <span class="match-summary__sub">{{ mvp.total_score|round(2) }} балл.</span>
+      </div>
+      {% endif %}
+      {% if sheriff_slot %}
+      <div class="match-summary__item">
+        <span class="match-summary__label"><i class="bi bi-search"></i>Шериф</span>
+        <span class="match-summary__value">{{ player_name(sheriff_slot.player, equipped_bulk.get(sheriff_slot.player_id, {})) if sheriff_slot.player else '?' }}</span>
+      </div>
+      {% endif %}
+      {% if don_slot %}
+      <div class="match-summary__item">
+        <span class="match-summary__label"><i class="bi bi-gem"></i>Дон</span>
+        <span class="match-summary__value">{{ player_name(don_slot.player, equipped_bulk.get(don_slot.player_id, {})) if don_slot.player else '?' }}</span>
+      </div>
+      {% endif %}
+      {% if elos %}
+      <div class="match-summary__item">
+        <span class="match-summary__label"><i class="bi bi-activity"></i>Ø ELO</span>
+        <span class="match-summary__value">{{ (elos|sum / elos|length)|round|int }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Player table -->
+    <table class="match-table">
       <thead>
         <tr>
           <th>#</th>
           <th>Игрок</th>
           <th>Роль</th>
-          <th>Балл</th>
-          <th>ELO</th>
+          <th class="text-end">Балл</th>
+          <th class="text-end">ELO</th>
         </tr>
       </thead>
       <tbody>
-        {% for slot in slots_by_game.get(game.id, []) %}
-        <tr class="{% if slot.is_pu %}pu-row{% endif %}">
-          <td>{{ slot.seat_number }}</td>
-          <td>
-            {% if slot.is_pu %}<span class="pu-mark" title="Первый убиенный">☠</span>{% endif %}
+        {% for slot in slots %}
+        <tr class="{% if slot.is_pu %}match-table__row--pu{% endif %} {% if has_mvp and slot.id == mvp.id %}match-table__row--mvp{% endif %}">
+          <td class="text-muted">{{ slot.seat_number }}</td>
+          <td class="match-table__player">
+            {% if slot.is_pu %}<span class="match-table__pu-mark" title="Первый убиенный">☠</span>{% endif %}
+            {% if has_mvp and slot.id == mvp.id %}<i class="bi bi-star-fill match-table__mvp-star" title="MVP матча"></i>{% endif %}
             {{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}
           </td>
-          <td class="role-{{ slot.role.value }}">
-            {% if slot.role.value == 'civilian' %}Мирный
-            {% elif slot.role.value == 'sheriff' %}Шериф
-            {% elif slot.role.value == 'don' %}Дон
-            {% elif slot.role.value == 'mafia' %}Мафия
-            {% endif %}
+          <td>
+            <span class="match-role match-role--{{ slot.role.value }}">
+              {% if slot.role.value == 'civilian' %}Мирный
+              {% elif slot.role.value == 'sheriff' %}Шериф
+              {% elif slot.role.value == 'don' %}Дон
+              {% elif slot.role.value == 'mafia' %}Мафия
+              {% endif %}
+            </span>
           </td>
-          <td>{{ slot.total_score|round(2) }}</td>
-          <td class="{% if slot.elo_after and slot.elo_after > 1000 %}text-success{% elif slot.elo_after and slot.elo_after < 1000 %}text-danger{% else %}text-muted{% endif %}">
+          <td class="text-end tabular-nums fw-semibold">{{ slot.total_score|round(2) }}</td>
+          <td class="text-end tabular-nums {% if slot.elo_after and slot.elo_after > 1000 %}match-elo-up{% elif slot.elo_after and slot.elo_after < 1000 %}match-elo-down{% else %}match-elo-flat{% endif %}">
             {{ slot.elo_after|round|int if slot.elo_after is not none else '—' }}
           </td>
         </tr>
@@ -195,7 +377,7 @@
     </table>
 
     {% if current_user.is_admin %}
-    <div class="game-actions">
+    <div class="match-card__actions">
       <a href="{{ url_for('games.game_detail', game_id=game.id) }}" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-eye"></i>
       </a>
