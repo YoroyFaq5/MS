@@ -2,6 +2,10 @@
 {% from "_macros.html" import player_name %}
 {% block title %}Игры{% endblock %}
 
+{% macro pretty_date(d) -%}
+{{ d.day }} {{ ['', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'][d.month] }} {{ d.year }}
+{%- endmacro %}
+
 {% block head %}
 <style>
 /* ============================================================
@@ -75,10 +79,31 @@
 
 .match-card__id {
   flex-shrink: 0;
-  font-size: .72rem;
+  padding: .2rem .6rem;
+  border-radius: 99px;
+  background: rgba(199,165,82,.08);
+  border: 1px solid var(--ms-border);
+  font-size: .68rem;
   font-weight: 600;
+  letter-spacing: .01em;
   color: var(--ms-muted);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.match-card__datetime {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .35rem;
+}
+.match-card__time {
+  color: var(--ms-muted);
+  font-variant-numeric: tabular-nums;
+}
+.match-card__time::before {
+  content: "·";
+  margin-right: .35rem;
+  opacity: .6;
 }
 
 .match-card__subheader {
@@ -235,8 +260,8 @@
         <tbody>
           {% for game in pending_games %}
           <tr>
-            <td class="ps-4 text-muted">#{{ game.id }}</td>
-            <td class="fw-medium">{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            <td class="ps-4 text-muted">№{{ game.id }}</td>
+            <td class="fw-medium">{{ pretty_date(game.played_at) }} <span class="text-muted small">{{ game.played_at.strftime('%H:%M') }}</span></td>
             <td class="text-center text-muted">{{ slots_by_game.get(game.id, [])|length }}</td>
             <td class="text-end pe-4">
               <a href="{{ url_for('games.game_detail', game_id=game.id) }}" class="btn btn-outline-secondary btn-sm">
@@ -290,12 +315,15 @@
           {% else %}Ничья{% endif %}
         </span>
       </div>
-      <span class="match-card__id">#{{ game.id }}</span>
+      <span class="match-card__id">Матч №{{ game.id }}</span>
     </div>
 
     <!-- Sub-header: date + "type" context -->
     <div class="match-card__subheader">
-      <span><i class="bi bi-calendar3"></i>{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</span>
+      <span class="match-card__datetime">
+        <i class="bi bi-calendar3"></i>{{ pretty_date(game.played_at) }}
+        <span class="match-card__time">{{ game.played_at.strftime('%H:%M') }}</span>
+      </span>
       {% if game.tournament %}
       <span class="match-card__chip"><i class="bi bi-trophy"></i>{{ game.tournament.name }}</span>
       {% endif %}
