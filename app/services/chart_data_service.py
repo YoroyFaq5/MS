@@ -96,7 +96,7 @@ class ChartDataService:
                 "game_id": game.id,
                 # Для тултипа таймлайна ролей (профиль → статистика).
                 "is_eliminated": slot.is_eliminated,
-                "quality_score": slot.quality_score,  # -1..+1, субъективная оценка ведущего; None если не выставлялась
+                "bonus_score": round(slot.bonus_score, 2),  # админский бонус за игру — реально используется
                 "total_score": round(slot.total_score, 2),
             })
 
@@ -107,8 +107,7 @@ class ChartDataService:
                 break
             win_streak += 1
 
-        judged = [e["quality_score"] for e in entries if e["quality_score"] is not None]
-        avg_quality_score = round(sum(judged) / len(judged), 2) if judged else None
+        avg_bonus_score = round(sum(e["bonus_score"] for e in entries) / len(entries), 2) if entries else None
 
         # Сводка по ролям — за то же окно (последние N игр), не за карьеру
         # целиком (это отдельная метрика — см. ProfileService.get_role_statistics,
@@ -128,7 +127,7 @@ class ChartDataService:
         return {
             "games": entries,
             "win_streak": win_streak,
-            "avg_quality_score": avg_quality_score,
+            "avg_bonus_score": avg_bonus_score,
             "role_summary": role_summary,
             "sparkline_points": _mini_sparkline_points([e["won"] for e in entries]),
         }
