@@ -120,9 +120,22 @@
   </div>
 </div>
 
+{% set is_admin = current_user.is_authenticated and current_user.is_admin %}
+{% set has_games = games_total > 0 %}
+{# Не-админам показываем только один из двух блоков: пока в турнире нет
+   игр — состав участников имеет смысл разглядывать; как только игры
+   пошли, состав уже не так интересен и важнее актуальный рейтинг/команды.
+   Админам всегда показываем оба, как раньше — им состав нужен для
+   управления турниром (добавление/удаление участников) независимо от
+   того, идут уже игры или нет. #}
+{% set show_participants = is_admin or not has_games %}
+{% set show_right_panel = is_admin or has_games %}
+{% set single_column = show_participants != show_right_panel %}
+
 <div class="row g-4">
   <!-- Participants panel -->
-  <div class="col-lg-6">
+  {% if show_participants %}
+  <div class="col-lg-{{ '12' if single_column else '6' }}">
     <div class="card h-100">
       <div class="card-header fw-semibold">👥 Участники ({{ participant_count }})</div>
       <div class="card-body p-0" style="max-height:380px; overflow-y:auto">
@@ -183,9 +196,11 @@
       {% endif %}
     </div>
   </div>
+  {% endif %}
 
   <!-- Teams or Top players -->
-  <div class="col-lg-6">
+  {% if show_right_panel %}
+  <div class="col-lg-{{ '12' if single_column else '6' }}">
     {% if tournament.type.value == 'team' %}
     <div class="card h-100">
       <div class="card-header fw-semibold d-flex justify-content-between">
@@ -313,6 +328,7 @@
     </div>
     {% endif %}
   </div>
+  {% endif %}
 </div>
 
 <!-- Games link -->
