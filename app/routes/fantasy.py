@@ -26,11 +26,21 @@ def _draft_redirect_url(draft: FantasyDraft) -> str:
 @fantasy_bp.route("/")
 def index():
     """List all tournaments with fantasy drafts, plus active series
-    (game evenings) that can be drafted individually."""
+    (game evenings) that can be drafted individually.
+
+    Every enrichment below (pool info / top picks) is ONE cheap query
+    keyed off FantasyDraft/FantasyDraftPick counts for that single
+    tournament/series (typically single/double digits) — not an iterate-
+    -all-history loop. The tournaments list itself is capped so the page
+    stays bounded as the club's history grows (see the /titles/nominations
+    incident: a per-card computation that's cheap today can silently
+    become the next O(N) outage once N grows for years).
+    """
     tournaments = (
         db.session.query(Tournament)
         .filter(Tournament.status.in_(["pending", "active", "finished"]))
         .order_by(Tournament.created_at.desc())
+        .limit(20)
         .all()
     )
     active_series = (
@@ -47,12 +57,53 @@ def index():
                 user_series_drafts[d.tournament_series_id] = d
             else:
                 user_drafts[d.tournament_id] = d
+
+    tournament_cards = [
+        {
+            "tournament": t,
+            "pool": FantasyService.get_pool_info(t.id),
+            "top_picks": FantasyService.get_top_picks(t.id, limit=3),
+        }
+        for t in tournaments
+    ]
+    series_cards = [
+        {
+            "series": s,
+            "pool": FantasyService.get_pool_info(s.series_tournament.tournament_id, s.id),
+            "top_picks": FantasyService.get_top_picks(
+                s.series_tournament.tournament_id, s.id, limit=3
+            ),
+            "games_count": len(s.stage.games) if s.stage else 0,
+        }
+        for s in active_series
+    ]
+
+    global_stats = FantasyService.get_global_stats()
+
+    from app.services.nomination_service import NominationService
+    top_fantasy = NominationService.get_eternal_ranking("fantasy_oracle", limit=3)
+    top_fantasy_ids = [e["player_id"] for e in top_fantasy]
+    top_fantasy_players = {
+        p.id: p for p in db.session.query(Player).filter(Player.id.in_(top_fantasy_ids)).all()
+    } if top_fantasy_ids else {}
+
+    player_ids = set(top_fantasy_ids)
+    for card in tournament_cards + series_cards:
+        player_ids.update(p["player"].id for p in card["top_picks"])
+    equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+
     return render_template(
         "fantasy/index.html",
         tournaments=tournaments,
         user_drafts=user_drafts,
         active_series=active_series,
         user_series_drafts=user_series_drafts,
+        tournament_cards=tournament_cards,
+        series_cards=series_cards,
+        global_stats=global_stats,
+        top_fantasy=top_fantasy,
+        top_fantasy_players=top_fantasy_players,
+        equipped_bulk=equipped_bulk,
     )
 
 

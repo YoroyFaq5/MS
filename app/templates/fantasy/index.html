@@ -1,10 +1,23 @@
 {% extends "base.html" %}
+{% from "_macros.html" import player_name %}
 {% block title %}Fantasy{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-  <h2 class="fw-bold mb-0">🎯 Fantasy Draft</h2>
-  <p class="text-muted small">Собери команду и получай очки за результаты турниров</p>
+{% set STATUS_BADGE = {'open': 'bg-success', 'locked': 'bg-warning text-dark', 'scored': 'bg-info text-dark'} %}
+
+<!-- ── Hero ────────────────────────────────────────────────────────────── -->
+<div class="fantasy-hero">
+  <div class="fantasy-hero__icon">🎯</div>
+  <div class="fantasy-hero__title">Fantasy Draft</div>
+  <div class="fantasy-hero__subtitle">
+    Собери команду игроков клуба и соревнуйся с другими менеджерами —
+    очки начисляются за реальные результаты турниров.
+  </div>
+  <div class="fantasy-hero__stats">
+    <div class="fantasy-hero__stat">🏆 Общий банк: <strong>{{ global_stats.total_bank|int }}</strong> монет</div>
+    <div class="fantasy-hero__stat">👥 Участников: <strong>{{ global_stats.total_participants }}</strong></div>
+    <div class="fantasy-hero__stat">🔥 Активных турниров/серий: <strong>{{ global_stats.active_count }}</strong></div>
+  </div>
 </div>
 
 {% if not current_user.is_authenticated %}
@@ -17,93 +30,139 @@
 </div>
 {% endif %}
 
-{% if active_series %}
-<div class="mb-4">
-  <h6 class="fw-bold text-muted mb-3">🎲 Активные серии турниров</h6>
-  <div class="row g-3">
-    {% for s in active_series %}
-    <div class="col-md-6 col-xl-4">
-      <div class="card h-100 border-danger-subtle">
-        <div class="card-body p-4">
-          <div class="d-flex justify-content-between align-items-start mb-3">
-            <div>
-              <h6 class="fw-bold mb-0">{{ s.name }}</h6>
-              <div class="small text-muted">{{ s.series_tournament.tournament.name }}</div>
-            </div>
-            <span class="badge bg-success">активна</span>
-          </div>
-
-          {% if s.id in user_series_drafts %}
-          {% set draft = user_series_drafts[s.id] %}
-          <div class="mb-3 p-2 rounded bg-body-secondary">
-            <div class="small text-muted mb-1">Ваш драфт</div>
-            <div class="d-flex justify-content-between">
-              <span class="fw-semibold">{{ draft.pick_count }} игроков</span>
-              <span class="badge
-                {% if draft.status.value == 'open' %}bg-success
-                {% elif draft.status.value == 'locked' %}bg-warning text-dark
-                {% else %}bg-info text-dark{% endif %}">
-                {{ draft.status.value }}
-              </span>
-            </div>
-            {% if draft.status.value == 'scored' %}
-            <div class="fw-bold text-warning mt-1">{{ draft.total_points }} очков</div>
-            {% endif %}
-          </div>
-          {% endif %}
-
-          <a href="{{ url_for('fantasy.series_fantasy', series_id=s.id) }}"
-             class="btn btn-sm btn-outline-danger w-100">
-            {% if s.id in user_series_drafts %}Мой драфт →{% else %}Открыть →{% endif %}
-          </a>
-        </div>
-      </div>
-    </div>
-    {% endfor %}
+<!-- ── Как это работает ────────────────────────────────────────────────── -->
+<div class="fantasy-how">
+  <div class="fantasy-how__step">
+    <div class="fantasy-how__icon"><i class="bi bi-people-fill"></i></div>
+    <div class="fantasy-how__label">1. Собери состав из участников турнира</div>
   </div>
+  <div class="fantasy-how__step">
+    <div class="fantasy-how__icon"><i class="bi bi-controller"></i></div>
+    <div class="fantasy-how__label">2. Игроки играют турнир как обычно</div>
+  </div>
+  <div class="fantasy-how__step">
+    <div class="fantasy-how__icon"><i class="bi bi-star-fill"></i></div>
+    <div class="fantasy-how__label">3. Ты получаешь их реальные очки</div>
+  </div>
+  <div class="fantasy-how__step">
+    <div class="fantasy-how__icon"><i class="bi bi-trophy-fill"></i></div>
+    <div class="fantasy-how__label">4. Лучшие менеджеры делят призовой банк</div>
+  </div>
+</div>
+
+<!-- ── Топ-3 Fantasy-менеджеров клуба за всё время ────────────────────── -->
+{% if top_fantasy %}
+<h6 class="fw-bold text-muted mb-3">🏅 Легенды Fantasy клуба</h6>
+<div class="fantasy-leaders">
+  {% for entry in top_fantasy %}
+  {% set player = top_fantasy_players.get(entry.player_id) %}
+  {% if player %}
+  <div class="fantasy-leader-card">
+    <span class="fantasy-leader-card__medal">{{ ['🥇', '🥈', '🥉'][loop.index0] }}</span>
+    <span class="fantasy-leader-card__name">{{ player_name(player, equipped_bulk.get(player.id, {})) }}</span>
+    <span class="fantasy-leader-card__value">{{ entry.value }} очков</span>
+  </div>
+  {% endif %}
+  {% endfor %}
 </div>
 {% endif %}
 
-{% if tournaments %}
-<div class="row g-3">
-  {% for t in tournaments %}
-  <div class="col-md-6 col-xl-4">
-    <div class="card h-100">
-      <div class="card-body p-4">
-        <div class="d-flex justify-content-between align-items-start mb-3">
-          <h6 class="fw-bold mb-0">{{ t.name }}</h6>
-          <span class="badge
-            {% if t.status == 'active' %}bg-success
-            {% elif t.status == 'finished' %}bg-secondary
-            {% else %}bg-warning text-dark{% endif %}">
-            {{ t.status }}
-          </span>
-        </div>
+<!-- ── Активные серии — крупные карточки-события ──────────────────────── -->
+{% if series_cards %}
+<h6 class="fw-bold text-muted mb-3">🔥 Активные серии</h6>
+<div class="fantasy-events">
+  {% for card in series_cards %}
+  {% set s = card.series %}
+  <div class="fantasy-event-card">
+    <div class="fantasy-event-card__badge"><i class="bi bi-broadcast"></i> активна</div>
+    <div class="fantasy-event-card__name">{{ s.name }}</div>
+    <div class="fantasy-event-card__parent">{{ s.series_tournament.tournament.name }}</div>
 
-        {% if t.id in user_drafts %}
-        {% set draft = user_drafts[t.id] %}
-        <div class="mb-3 p-2 rounded bg-body-secondary">
-          <div class="small text-muted mb-1">Ваш драфт</div>
-          <div class="d-flex justify-content-between">
-            <span class="fw-semibold">{{ draft.pick_count }} игроков</span>
-            <span class="badge
-              {% if draft.status.value == 'open' %}bg-success
-              {% elif draft.status.value == 'locked' %}bg-warning text-dark
-              {% else %}bg-info text-dark{% endif %}">
-              {{ draft.status.value }}
-            </span>
-          </div>
-          {% if draft.status.value == 'scored' %}
-          <div class="fw-bold text-warning mt-1">{{ draft.total_points }} очков</div>
-          {% endif %}
-        </div>
-        {% endif %}
+    <div class="fantasy-event-card__stats">
+      <span>👥 <strong>{{ card.pool.participant_count }}</strong> в fantasy</span>
+      <span>🏆 <strong>{{ card.pool.bank|int }}</strong> монет банк</span>
+      <span>🎮 <strong>{{ card.games_count }}</strong> игр сыграно</span>
+      {% if s.series_date %}<span>📅 {{ s.series_date.strftime('%d.%m.%Y') }}</span>{% endif %}
+    </div>
 
-        <a href="{{ url_for('fantasy.tournament_fantasy', tournament_id=t.id) }}"
-           class="btn btn-sm btn-outline-secondary w-100">
-          {% if t.id in user_drafts %}Мой драфт →{% else %}Открыть →{% endif %}
-        </a>
+    {% if card.top_picks %}
+    <div class="fantasy-event-card__picks">
+      {% for p in card.top_picks %}
+      <span class="fantasy-event-card__pick-chip">⭐ {{ p.player.display_name }} ({{ p.pick_count }})</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if s.id in user_series_drafts %}
+    {% set draft = user_series_drafts[s.id] %}
+    <div class="fantasy-user-draft">
+      <div class="small text-muted mb-1">Ваш драфт</div>
+      <div class="d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">{{ draft.pick_count }} игроков</span>
+        <span class="badge {{ STATUS_BADGE.get(draft.status.value, 'bg-secondary') }}">{{ draft.status.value }}</span>
       </div>
+      {% if draft.status.value == 'scored' %}
+      <div class="fw-bold text-warning mt-1">{{ draft.total_points }} очков</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <a href="{{ url_for('fantasy.series_fantasy', series_id=s.id) }}" class="btn btn-danger w-100">
+      {% if s.id in user_series_drafts %}Мой драфт →{% else %}Перейти →{% endif %}
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- ── Турниры ──────────────────────────────────────────────────────────── -->
+{% if tournament_cards %}
+<h6 class="fw-bold text-muted mb-3">🎲 Турниры</h6>
+<div class="row g-3">
+  {% for card in tournament_cards %}
+  {% set t = card.tournament %}
+  <div class="col-md-6 col-xl-4">
+    <div class="fantasy-card">
+      <div class="d-flex justify-content-between align-items-start mb-1">
+        <h6 class="fw-bold mb-0">{{ t.name }}</h6>
+        <span class="badge
+          {% if t.status == 'active' %}bg-success
+          {% elif t.status == 'finished' %}bg-secondary
+          {% else %}bg-warning text-dark{% endif %}">
+          {{ t.status }}
+        </span>
+      </div>
+
+      <div class="fantasy-card__stats">
+        <span>👥 <strong>{{ card.pool.participant_count }}</strong> в fantasy</span>
+        <span>🏆 <strong>{{ card.pool.bank|int }}</strong> монет</span>
+        <span>💰 вход <strong>{{ card.pool.entry_cost|int }}</strong></span>
+      </div>
+
+      {% if card.top_picks %}
+      <div class="fantasy-card__picks">
+        Топ пики: {% for p in card.top_picks %}{{ p.player.display_name }}{% if not loop.last %}, {% endif %}{% endfor %}
+      </div>
+      {% endif %}
+
+      {% if t.id in user_drafts %}
+      {% set draft = user_drafts[t.id] %}
+      <div class="mb-3 p-2 rounded bg-body-secondary">
+        <div class="small text-muted mb-1">Ваш драфт</div>
+        <div class="d-flex justify-content-between">
+          <span class="fw-semibold">{{ draft.pick_count }} игроков</span>
+          <span class="badge {{ STATUS_BADGE.get(draft.status.value, 'bg-secondary') }}">{{ draft.status.value }}</span>
+        </div>
+        {% if draft.status.value == 'scored' %}
+        <div class="fw-bold text-warning mt-1">{{ draft.total_points }} очков</div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <a href="{{ url_for('fantasy.tournament_fantasy', tournament_id=t.id) }}"
+         class="btn btn-sm btn-outline-secondary w-100 mt-auto">
+        {% if t.id in user_drafts %}Мой драфт →{% else %}Открыть →{% endif %}
+      </a>
     </div>
   </div>
   {% endfor %}

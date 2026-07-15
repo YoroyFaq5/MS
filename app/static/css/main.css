@@ -3984,6 +3984,225 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 }
 
 /* ============================================================
+   Fantasy — fantasy/index.html
+   ============================================================ */
+
+.fantasy-hero {
+  position: relative;
+  text-align: center;
+  padding: 2.25rem 1.5rem;
+  border-radius: var(--ms-radius);
+  background:
+    radial-gradient(ellipse at center top, rgba(212,176,106,.14), transparent 65%),
+    var(--ms-surface-raised);
+  border: 1px solid var(--ms-border);
+  margin-bottom: 1.5rem;
+}
+
+.fantasy-hero__icon { font-size: 2rem; margin-bottom: .5rem; }
+
+.fantasy-hero__title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 800;
+  font-size: 1.7rem;
+  color: var(--ms-gold-light);
+}
+
+.fantasy-hero__subtitle {
+  color: var(--ms-text-dim);
+  font-size: .9rem;
+  max-width: 480px;
+  margin: .4rem auto 1.25rem;
+}
+
+.fantasy-hero__stats {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .6rem;
+}
+
+.fantasy-hero__stat {
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: 99px;
+  padding: .45rem 1.1rem;
+  font-size: .85rem;
+  color: var(--ms-text-dim);
+}
+.fantasy-hero__stat strong {
+  color: var(--ms-gold-light);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── All-time Fantasy leaderboard strip ── */
+
+.fantasy-leaders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: .75rem;
+  margin-bottom: 1.5rem;
+}
+
+.fantasy-leader-card {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  padding: .85rem 1rem;
+}
+
+.fantasy-leader-card__medal { font-size: 1.4rem; }
+.fantasy-leader-card__name { font-weight: 700; flex-grow: 1; }
+.fantasy-leader-card__value {
+  color: var(--ms-gold-light);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Giant active-series event cards ── */
+
+.fantasy-events {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.fantasy-event-card {
+  position: relative;
+  background: linear-gradient(160deg, rgba(123,15,15,.12), var(--ms-surface-raised));
+  border: 1px solid rgba(193,84,58,.35);
+  border-radius: var(--ms-radius);
+  padding: 1.5rem;
+  overflow: hidden;
+}
+
+.fantasy-event-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  background: var(--ms-wine);
+  color: var(--ms-text);
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: .25rem .7rem;
+  border-radius: 99px;
+  margin-bottom: .75rem;
+}
+
+.fantasy-event-card__name {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 800;
+  font-size: 1.35rem;
+  margin-bottom: .1rem;
+}
+
+.fantasy-event-card__parent {
+  color: var(--ms-muted);
+  font-size: .82rem;
+  margin-bottom: 1rem;
+}
+
+.fantasy-event-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem .9rem;
+  margin-bottom: 1rem;
+  font-size: .85rem;
+}
+.fantasy-event-card__stats span strong {
+  color: var(--ms-gold-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.fantasy-event-card__picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin-bottom: 1.1rem;
+}
+.fantasy-event-card__pick-chip {
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: 99px;
+  padding: .25rem .7rem;
+  font-size: .76rem;
+}
+
+.fantasy-event-card .fantasy-user-draft {
+  background: rgba(0,0,0,.2);
+  border-radius: var(--ms-radius);
+  padding: .6rem .85rem;
+  margin-bottom: .9rem;
+}
+
+/* ── Regular tournament cards ── */
+
+.fantasy-card {
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  padding: 1.1rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.fantasy-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem .8rem;
+  font-size: .78rem;
+  color: var(--ms-muted);
+  margin: .5rem 0 .75rem;
+}
+.fantasy-card__stats strong { color: var(--ms-text-dim); font-variant-numeric: tabular-nums; }
+
+.fantasy-card__picks {
+  font-size: .74rem;
+  color: var(--ms-muted);
+  margin-bottom: .75rem;
+}
+
+/* ── "Как это работает" strip ── */
+
+.fantasy-how {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.fantasy-how__step {
+  text-align: center;
+  padding: 1rem;
+}
+
+.fantasy-how__icon {
+  width: 44px; height: 44px;
+  margin: 0 auto .6rem;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ms-surface-alt);
+  border: 1px solid var(--ms-border);
+  color: var(--ms-gold-light);
+  font-size: 1.1rem;
+}
+
+.fantasy-how__label { font-size: .82rem; color: var(--ms-text-dim); }
+
+@media (max-width: 576px) {
+  .fantasy-hero__title { font-size: 1.3rem; }
+  .fantasy-event-card__name { font-size: 1.1rem; }
+}
+
+/* ============================================================
    Mobile-first refinements
    ============================================================ */
 

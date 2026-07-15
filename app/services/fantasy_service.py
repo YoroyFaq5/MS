@@ -36,6 +36,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from sqlalchemy import func
+
 from app import db
 from app.models import (
     FantasyDraft, FantasyDraftPick, FantasyDraftStatus,
@@ -685,6 +687,61 @@ class FantasyService:
             user_id=user_id, tournament_id=tournament_id,
             tournament_series_id=tournament_series_id,
         ).first()
+
+    @staticmethod
+    def get_top_picks(
+        tournament_id: int, tournament_series_id: Optional[int] = None, limit: int = 3,
+    ) -> List[dict]:
+        """Самые популярные пики (по числу драфтов, выбравших игрока) для
+        карточки турнира/серии — одна GROUP BY на количество драфтов этого
+        турнира (обычно единицы-десятки), не итерация по игрокам/играм."""
+        rows = (
+            db.session.query(FantasyDraftPick.player_id, func.count(FantasyDraftPick.id))
+            .join(FantasyDraft, FantasyDraft.id == FantasyDraftPick.draft_id)
+            .filter(
+                FantasyDraft.tournament_id == tournament_id,
+                FantasyDraft.tournament_series_id == tournament_series_id,
+            )
+            .group_by(FantasyDraftPick.player_id)
+            .order_by(func.count(FantasyDraftPick.id).desc())
+            .limit(limit)
+            .all()
+        )
+        if not rows:
+            return []
+        players = {
+            p.id: p for p in db.session.query(Player).filter(
+                Player.id.in_([pid for pid, _ in rows])
+            ).all()
+        }
+        return [
+            {"player": players.get(pid), "pick_count": cnt}
+            for pid, cnt in rows if players.get(pid)
+        ]
+
+    @staticmethod
+    def get_global_stats() -> dict:
+        """Сайтовая витрина Fantasy — суммарный банк и число участников за
+        всё время + сколько турниров/серий сейчас активны. Три дешёвых
+        агрегата, считаются один раз на загрузку главной страницы Fantasy
+        (не в цикле по турнирам)."""
+        total_bank = round(
+            db.session.query(func.sum(FantasyDraft.entry_cost_paid)).scalar() or 0.0, 2
+        )
+        total_participants = db.session.query(
+            func.count(func.distinct(FantasyDraft.user_id))
+        ).scalar() or 0
+        active_series_count = db.session.query(TournamentSeries).filter_by(
+            status=SeriesStatus.ACTIVE
+        ).count()
+        active_tournaments_count = db.session.query(Tournament).filter(
+            Tournament.status.in_(["pending", "active"])
+        ).count()
+        return {
+            "total_bank": total_bank,
+            "total_participants": total_participants,
+            "active_count": active_series_count + active_tournaments_count,
+        }
 
     @staticmethod
     def get_available_picks(
