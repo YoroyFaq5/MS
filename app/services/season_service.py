@@ -569,7 +569,9 @@ class SeasonService:
         """
         Живая статистика сезона для страницы номинаций: сыграно игр,
         игроков, средний текущий ELO участников, лучший винрейт сезона,
-        самая длинная победная серия сезона, средний размер стола.
+        самая длинная победная серия сезона. Размер стола сюда намеренно
+        не включён — в этой мафии он всегда ровно 10 (constraint в БД,
+        см. GameSlot.seat_number), считать его "средним" бессмысленно.
 
         Один bulk-запрос по всем слотам сезона + один Python-проход
         (сортировка по player_id/id уже даёт нужную группировку для
@@ -647,7 +649,6 @@ class SeasonService:
         return {
             "games_count": games_count,
             "players_count": len(agg),
-            "avg_table_size": round(len(rows) / games_count, 1) if games_count else 0.0,
             "avg_elo": round(avg_elo) if avg_elo else None,
             "best_win_rate": round(best_wr, 1) if best_wr_pid else None,
             "best_win_rate_player": _name(best_wr_pid),
