@@ -455,8 +455,7 @@ class NominationService:
         rows = (
             db.session.query(
                 GameSlot.player_id,
-                func.sum(GameSlot.bonus_score),
-                func.count(GameSlot.id),
+                GameSlot.bonus_score,
                 GameSlot.role,
                 Game.win_side,
             )
@@ -469,7 +468,7 @@ class NominationService:
     @staticmethod
     def _best_by_bonus_times_wr(rows) -> Optional[int]:
         agg: Dict[int, dict] = {}
-        for player_id, bonus_score, _count, role, win_side in rows:
+        for player_id, bonus_score, role, win_side in rows:
             a = agg.setdefault(player_id, {"bonus_sum": 0.0, "games": 0, "wins": 0})
             a["bonus_sum"] += bonus_score or 0.0
             a["games"] += 1
