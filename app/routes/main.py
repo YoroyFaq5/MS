@@ -49,14 +49,14 @@ def _sparkline_points(results: list, width: int = 56, height: int = 18, pad: flo
 
 @main_bp.route("/")
 def index():
-    top_players = RatingService.compute_all_ratings()[:8]
-
     # ── Движение в рейтинге за 30 дней ────────────────────────────────────
-    # Пересчитываем рейтинг ещё раз, но только по играм ДО (now - 30 дней) —
-    # без отдельной таблицы исторических снапшотов: тот же compute_all_ratings,
-    # просто с cutoff-датой (см. RatingService.compute_all_ratings(as_of=...)).
-    ratings_30d_ago = RatingService.compute_all_ratings(as_of=datetime.now() - timedelta(days=30))
-    rank_30d_ago = {r.player_id: r.rank for r in ratings_30d_ago}
+    # Текущий рейтинг + рейтинг "как было 30 дней назад" одним проходом по
+    # БД (см. RatingService.compute_all_ratings_with_movement) — раньше это
+    # были два отдельных полных запроса по всей истории игр клуба.
+    all_ratings, rank_30d_ago = RatingService.compute_all_ratings_with_movement(
+        as_of=datetime.now() - timedelta(days=30)
+    )
+    top_players = all_ratings[:8]
     for r in top_players:
         old_rank = rank_30d_ago.get(r.player_id)
         # movement > 0 — поднялся, < 0 — опустился, None — 30 дней назад

@@ -256,6 +256,51 @@ class RatingService:
         return _rank(ratings)
 
     @staticmethod
+    def compute_all_ratings_with_movement(
+        as_of: datetime,
+    ) -> tuple[List[PlayerRating], dict[int, int]]:
+        """
+        Same result as calling compute_all_ratings() once with as_of=None
+        and once with as_of=<cutoff>, but fetches the ranked GameSlot rows
+        from the database only ONCE — the homepage's 30-day rank-movement
+        indicator needs both rankings, and re-querying the same rows with
+        a stricter played_at filter was a second full table scan + join
+        for no reason (the cutoff filter is cheap to apply in Python over
+        rows already in memory).
+
+        Returns (current_ratings, rank_30d_ago_by_player_id).
+        """
+        players = (
+            db.session.query(Player)
+            .filter(Player.is_active == True)
+            .all()
+        )
+        all_slots = (
+            db.session.query(GameSlot)
+            .join(Game)
+            .options(contains_eager(GameSlot.game))
+            .filter(Game.is_finished == True, Game.is_ranked == True)
+            .all()
+        )
+
+        def _ratings_for(slots: list) -> List[PlayerRating]:
+            slots_by_player: dict[int, list] = {}
+            for slot in slots:
+                slots_by_player.setdefault(slot.player_id, []).append(slot)
+            ratings: List[PlayerRating] = []
+            for player in players:
+                player_slots = slots_by_player.get(player.id)
+                if not player_slots:
+                    continue
+                ratings.append(_slots_to_player_rating(player, player_slots))
+            return _rank(ratings)
+
+        current_ratings = _ratings_for(all_slots)
+        cutoff_slots = [s for s in all_slots if s.game.played_at <= as_of]
+        rank_30d_ago = {r.player_id: r.rank for r in _ratings_for(cutoff_slots)}
+        return current_ratings, rank_30d_ago
+
+    @staticmethod
     def get_recent_form(player_ids: Sequence[int], limit: int = 8) -> dict:
         """
         Last `limit` ranked/finished results per player (for a mini
