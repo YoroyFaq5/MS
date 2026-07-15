@@ -57,6 +57,28 @@ class TitleService:
         "season_best_sheriff":   "intellect",   # детектив — расследование
         "season_best_mafia":     "aggression",
         "season_best_don":       "aggression",
+        # ── Вечные, раунд 2 ──────────────────────────────────────────
+        "peak_elo":              "rating",
+        "financial_baron":       "special",
+        "cup_king":              "aggression",
+        "season_crowned":        "rating",
+        "club_sniper":           "intellect",
+        "move_master":           "intellect",
+        "fantasy_oracle":        "special",
+        "stability":             "rating",
+        "tournament_terror":     "aggression",
+        "achievement_keeper":    "special",
+        # ── Сезонные, раунд 2 ────────────────────────────────────────
+        "season_champion":         "rating",
+        "season_mvp":              "special",
+        "season_discovery":        "streak",
+        "season_breakthrough":     "streak",
+        "season_mafia_terror":     "aggression",
+        "season_city_shield":      "defense",
+        "season_fantasy_champion": "special",
+        "year_player":             "rating",
+        "season_sharpshooter":     "intellect",
+        "season_marathoner":       "streak",
     }
 
     FLAVOR_LABELS: Dict[str, str] = {
