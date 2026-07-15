@@ -15,7 +15,7 @@
       <li><i class="bi bi-trophy"></i>Результат: <strong class="{{ 'role-popover__win' if g.won else 'role-popover__loss' }}">{{ 'Победа' if g.won else 'Поражение' }}</strong></li>
       <li><i class="bi bi-people"></i>Игроков: 10</li>
       <li><i class="bi {{ 'bi-emoji-dizzy-fill' if g.is_eliminated else 'bi-shield-check' }}"></i>Статус: <strong>{{ 'Выбыл по ходу игры' if g.is_eliminated else 'Дожил до конца' }}</strong></li>
-      <li><i class="bi bi-star-fill"></i>Бонус: <strong>{{ '%+.1f'|format(g.bonus_score) }}</strong></li>
+      <li><i class="bi bi-star-fill"></i>Доп: <strong>{{ '%+.1f'|format(g.bonus_score) }}</strong></li>
       <li><i class="bi bi-coin"></i>Очки: <strong>{{ '%+.2f'|format(g.total_score) }}</strong></li>
     </ul>
     <a href="{{ url_for('games.game_detail', game_id=g.game_id) }}" class="role-popover__link">Смотреть игру <i class="bi bi-arrow-right"></i></a>
@@ -553,7 +553,7 @@
             {% else %}<div class="text-muted small">—</div>{% endif %}
           </div>
           <div class="col-6">
-            <div class="text-muted small mb-1">По бонусным баллам</div>
+            <div class="text-muted small mb-1">По допам</div>
             {% if stats.best_day_bonus %}
             <div class="fw-bold fs-5">+{{ stats.best_day_bonus.bonus }}</div>
             <div class="text-muted small">{{ stats.best_day_bonus.date }}</div>
@@ -769,7 +769,7 @@
           </div>
           <div class="col-md-3">
             <div class="role-avgscore-card">
-              <div class="role-avgscore-card__title">Средний бонус</div>
+              <div class="role-avgscore-card__title">Средний доп</div>
               {% if chart_data.roles.avg_bonus_score is not none %}
               <div class="role-avgscore-card__value"><i class="bi bi-star-fill"></i>{{ '%+.2f'|format(chart_data.roles.avg_bonus_score) }}</div>
               {% else %}

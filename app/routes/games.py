@@ -453,7 +453,7 @@ def new_game():
         db.session.commit()
         _lock_series_fantasy_if_needed(stage_id)
 
-        flash("Игра создана! Заполните бонусы и завершите игру.", "success")
+        flash("Игра создана! Заполните допы и завершите игру.", "success")
         return redirect(url_for("games.game_detail", game_id=game.id))
 
     preselect_tournament = request.args.get("tournament_id", type=int)

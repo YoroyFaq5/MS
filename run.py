@@ -825,7 +825,7 @@ def seed_titles():
         ("season_best_don", "Лучший дон сезона", "Лучший результат за роль дона в этом сезоне.",
          "bi-suit-spade-fill", Rarity.EPIC, TitleType.SEASONAL),
         # Вечные (текущие рекордсмены клуба)
-        ("club_legend", "Легенда клуба", "Максимальная сумма бонусных баллов, умноженная на общий винрейт.",
+        ("club_legend", "Легенда клуба", "Максимальная сумма дополнительных баллов, умноженная на общий винрейт.",
          "bi-gem", Rarity.LEGENDARY, TitleType.ETERNAL),
         ("streak_king", "Король серии", "Самая длинная победная серия за всю историю клуба.",
          "bi-fire", Rarity.EPIC, TitleType.ETERNAL),
@@ -861,7 +861,7 @@ def seed_titles():
         # ── Сезонные, раунд 2 ──────────────────────────────────────────
         ("season_champion", "Чемпион сезона", "Победитель общего зачёта сезона.",
          "bi-award-fill", Rarity.LEGENDARY, TitleType.SEASONAL),
-        ("season_mvp", "MVP сезона", "Больше всего бонусных баллов за сезон, любая роль.",
+        ("season_mvp", "MVP сезона", "Больше всего дополнительных баллов за сезон, любая роль.",
          "bi-star-fill", Rarity.EPIC, TitleType.SEASONAL),
         ("season_discovery", "Открытие сезона", "Лучший винрейт сезона среди игроков с небольшим стажем.",
          "bi-emoji-sunglasses", Rarity.RARE, TitleType.SEASONAL),
