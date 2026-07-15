@@ -25,8 +25,16 @@ def nominations():
     hof_cards = []
     for pt in global_holders:
         code = pt.title.code
-        record = NominationService.get_eternal_record_value(code, pt.player_id)
+        # Один расчёт на титул (не два — top3 и "значение рекорда держателя"
+        # раньше каждый гоняли свой полный запрос по всем игрокам/партиям).
         top3 = NominationService.get_eternal_ranking(code, limit=3)
+        record = next((r for r in top3 if r["player_id"] == pt.player_id), None)
+        if record is None:
+            # Обладатель титула не попал в топ-3 живого пересчёта — бывает,
+            # если пересчёт давно не запускали вручную. Ищем именно его
+            # значение отдельно, но не гоняем это на каждого из 15 титулов
+            # регулярно — только когда действительно расходится с топ-3.
+            record = NominationService.get_eternal_record_value(code, pt.player_id)
         exclusivity = TitleService.get_exclusivity_stats(pt.title_id)
         hof_cards.append({
             "player_title": pt,

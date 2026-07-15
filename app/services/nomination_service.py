@@ -547,20 +547,42 @@ class NominationService:
     @staticmethod
     def _streak_king_ranking(limit: int = 3) -> List[tuple]:
         """
-        Король серии: наибольшая победная серия за всю историю. Использует
-        ProfileService.get_extended_stats() (уже готовый однопроходный расчёт
-        streak'ов) для каждого активного игрока — не дублирует логику подсчёта.
+        Король серии: наибольшая победная серия за всю историю. Один
+        bulk-запрос по ВСЕМ игрокам разом (раньше — ProfileService.
+        get_extended_stats() в цикле по каждому активному игроку, то есть
+        N отдельных полных запросов; это было терпимо, пока функция
+        вызывалась только вручную по кнопке пересчёта, но не годится теперь,
+        когда она читается при каждой загрузке /titles/nominations).
         """
-        from app.services.profile_service import ProfileService
+        rows = (
+            db.session.query(GameSlot.player_id, GameSlot.role, Game.win_side)
+            .join(Game)
+            .filter(Game.is_finished == True)
+            .order_by(GameSlot.player_id.asc(), Game.played_at.asc())
+            .all()
+        )
+        best_by_player: Dict[int, int] = {}
+        current_pid = None
+        current_streak = 0
+        best_streak = 0
+        for player_id, role, win_side in rows:
+            if player_id != current_pid:
+                if current_pid is not None:
+                    best_by_player[current_pid] = best_streak
+                current_pid = player_id
+                current_streak = 0
+                best_streak = 0
+            is_mafia_side = role in (Role.MAFIA, Role.DON)
+            won = (is_mafia_side and win_side == WinSide.MAFIA) or (not is_mafia_side and win_side == WinSide.CITY)
+            if won:
+                current_streak += 1
+                best_streak = max(best_streak, current_streak)
+            else:
+                current_streak = 0
+        if current_pid is not None:
+            best_by_player[current_pid] = best_streak
 
-        player_ids = [
-            p.id for p in db.session.query(Player.id).filter(Player.is_active == True).all()
-        ]
-        scored = []
-        for pid in player_ids:
-            stats = ProfileService.get_extended_stats(pid)
-            if stats and stats.longest_streak > 0:
-                scored.append((pid, stats.longest_streak))
+        scored = [(pid, s) for pid, s in best_by_player.items() if s > 0]
         scored.sort(key=lambda t: t[1], reverse=True)
         return scored[:limit]
 
