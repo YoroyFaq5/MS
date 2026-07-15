@@ -154,9 +154,35 @@ class NominationService:
         }
 
     @staticmethod
+    def get_role_leaders_preview_detailed(season_id: int) -> Dict[str, dict]:
+        """
+        Как get_role_leaders_preview, но с "мясом" для карточки: значение
+        лидера, число игр, и ближайший преследователь с разрывом — для
+        показа интриги на странице номинаций. Тот же единственный
+        bulk-запрос на роль, что и в _role_ranking_in_season, просто не
+        схлопывается до одного player_id."""
+        result = {}
+        for role, title_code in SEASONAL_ROLE_TITLES.items():
+            ranking = NominationService._role_ranking_in_season(role, season_id, limit=2)
+            leader = ranking[0] if ranking else None
+            runner_up = ranking[1] if len(ranking) > 1 else None
+            result[title_code] = {
+                "leader": leader,
+                "runner_up": runner_up,
+                "gap": round(leader["score"] - runner_up["score"], 2) if leader and runner_up else None,
+            }
+        return result
+
+    @staticmethod
     def _best_player_for_role_in_season(role: Role, season_id: int) -> Optional[int]:
+        ranking = NominationService._role_ranking_in_season(role, season_id, limit=1)
+        return ranking[0]["player_id"] if ranking else None
+
+    @staticmethod
+    def _role_ranking_in_season(role: Role, season_id: int, limit: int = 2) -> List[dict]:
         """Один запрос на роль: забирает все завершённые слоты этой роли за
-        сезон, агрегирует по игроку в Python (сумма bonus_score, WR)."""
+        сезон, агрегирует по игроку в Python (сумма bonus_score, WR), отдаёт
+        топ-N как [{"player_id", "score", "games", "win_rate"}, ...]."""
         rows = (
             db.session.query(GameSlot.player_id, GameSlot.bonus_score, Game.win_side)
             .join(Game)
@@ -168,7 +194,7 @@ class NominationService:
             .all()
         )
         if not rows:
-            return None
+            return []
 
         is_mafia_role = role in (Role.MAFIA, Role.DON)
         agg: Dict[int, dict] = {}
@@ -180,12 +206,17 @@ class NominationService:
             if won:
                 a["wins"] += 1
 
-        def score(d: dict) -> float:
+        scored = []
+        for pid, d in agg.items():
             wr = d["wins"] / d["games"] if d["games"] else 0.0
-            return d["bonus_sum"] * wr
-
-        best_player_id = max(agg, key=lambda pid: score(agg[pid]), default=None)
-        return best_player_id
+            scored.append({
+                "player_id": pid,
+                "score": round(d["bonus_sum"] * wr, 2),
+                "games": d["games"],
+                "win_rate": round(wr * 100, 1),
+            })
+        scored.sort(key=lambda e: e["score"], reverse=True)
+        return scored[:limit]
 
     # ── Сезонные номинации, раунд 2 ──────────────────────────────────────────
 

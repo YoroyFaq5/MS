@@ -97,69 +97,120 @@
 </div>
 {% endfor %}
 
-<div class="card mb-4">
-  <div class="card-header fw-semibold">
-    <i class="bi bi-calendar2-range me-2"></i>Номинации сезона
-    {% if current_season %}«{{ current_season.name }}»{% endif %}
-  </div>
-  <div class="card-body">
-    {% if current_season %}
-    <p class="text-muted small">Лидеры по текущим результатам сезона — итоговые номинации присуждаются при закрытии сезона.</p>
-    <div class="row g-3">
-      {% for entry in current_leaders %}
-      <div class="col-md-6 col-lg-3">
-        <div class="stat-card card p-3 text-center h-100">
-          <div class="stat-label mb-1">
-            {% if entry.title and entry.title.icon %}<i class="bi {{ entry.title.icon }} me-1"></i>{% endif %}
-            {{ entry.title.name if entry.title else '—' }}
-          </div>
-          {% if entry.player %}
-          <a href="{{ url_for('profile.view_profile', player_id=entry.player.id) }}" class="stat-value fs-5 text-decoration-none">
-            {{ player_name(entry.player, equipped_bulk.get(entry.player.id, {})) }}
-          </a>
-          {% else %}
-          <div class="stat-value fs-6 text-muted">—</div>
-          {% endif %}
-        </div>
-      </div>
-      {% endfor %}
+<!-- ── Обложка текущего сезона: прогресс, лидер, живая статистика ───────── -->
+{% if current_season %}
+<div class="season-cover mb-4">
+  <div class="season-cover__top">
+    <div>
+      <div class="season-cover__eyebrow">ТЕКУЩИЙ СЕЗОН</div>
+      <div class="season-cover__name">{{ current_season.name }}</div>
     </div>
-    {% else %}
-    <div class="text-muted text-center py-3">Активный сезон не найден.</div>
+    {% if season_live_leader and season_live_leader.player %}
+    <div class="season-cover__leader">
+      <div class="season-cover__leader-label"><i class="bi bi-graph-up-arrow"></i> Лидирует сейчас</div>
+      <a href="{{ url_for('profile.view_profile', player_id=season_live_leader.player.id) }}" class="season-cover__leader-name">
+        {{ player_name(season_live_leader.player, equipped_bulk.get(season_live_leader.player.id, {})) }}
+      </a>
+      <div class="season-cover__leader-score">{{ season_live_leader.score }} очков</div>
+    </div>
     {% endif %}
   </div>
+
+  {% if season_progress %}
+  <div class="season-cover__progress">
+    <div class="season-cover__progress-track">
+      <div class="season-cover__progress-fill" style="width: {{ season_progress.pct }}%"></div>
+    </div>
+    <div class="season-cover__progress-label">
+      {{ season_progress.pct }}% пройдено
+      {% if season_progress.days_remaining > 0 %} • осталось {{ season_progress.days_remaining }} {{ 'день' if season_progress.days_remaining == 1 else 'дней' }}{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if season_stats %}
+  <div class="season-cover__stats">
+    <div class="season-cover__stat"><strong>{{ season_stats.games_count }}</strong><span>игр</span></div>
+    <div class="season-cover__stat"><strong>{{ season_stats.players_count }}</strong><span>игроков</span></div>
+    {% if season_stats.avg_elo %}<div class="season-cover__stat"><strong>{{ season_stats.avg_elo }}</strong><span>средний ELO</span></div>{% endif %}
+    {% if season_stats.best_win_rate %}<div class="season-cover__stat"><strong>{{ season_stats.best_win_rate }}%</strong><span>лучший WR — {{ season_stats.best_win_rate_player }}</span></div>{% endif %}
+    {% if season_stats.longest_streak %}<div class="season-cover__stat"><strong>{{ season_stats.longest_streak }}</strong><span>серия побед — {{ season_stats.longest_streak_player }}</span></div>{% endif %}
+    <div class="season-cover__stat"><strong>{{ season_stats.avg_table_size }}</strong><span>средний стол</span></div>
+  </div>
+  {% endif %}
 </div>
 
-<div class="card">
-  <div class="card-header fw-semibold"><i class="bi bi-clock-history me-2"></i>История сезонных номинаций</div>
-  <div class="card-body">
-    {% if history %}
-    <div class="accordion" id="historyAccordion">
-      {% for h in history %}
-      <div class="accordion-item bg-transparent">
-        <h2 class="accordion-header">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#hist{{ loop.index }}">
-            {{ h.season.name }}
-          </button>
-        </h2>
-        <div id="hist{{ loop.index }}" class="accordion-collapse collapse" data-bs-parent="#historyAccordion">
-          <div class="accordion-body">
-            <div class="d-flex gap-2 flex-wrap">
-              {% for award in h.awards %}
-              <span class="badge bg-body-secondary text-body border">
-                {% if award.title.icon %}<i class="bi {{ award.title.icon }} me-1"></i>{% endif %}
-                {{ award.title.name }} — <strong class="ms-1">{{ player_name({'display_name': award.player_name}, equipped_bulk.get(award.player_id, {})) }}</strong>
-              </span>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-      </div>
-      {% endfor %}
+<!-- ── Номинации сезона — мини-карточки Зала славы ─────────────────────── -->
+<h6 class="fw-bold text-muted mb-3"><i class="bi bi-calendar2-range me-2"></i>Номинации сезона</h6>
+<div class="hof-grid mb-4">
+  {% for entry in current_leaders %}
+  <div class="hof-card hof-card--epic">
+    <div class="hof-card__top">
+      <div class="hof-card__icon"><i class="bi {{ entry.title.icon if entry.title else 'bi-award' }}"></i></div>
     </div>
+    <div class="hof-card__name">{{ entry.title.name if entry.title else '—' }}</div>
+
+    {% if entry.player %}
+    <div class="hof-card__holder">
+      {{ player_name(entry.player, equipped_bulk.get(entry.player.id, {})) }}
+    </div>
+    <div class="hof-card__record">{{ entry.leader.score }} <span style="font-size:.6em">очков</span></div>
+    <div class="hof-card__meta">
+      <span><i class="bi bi-controller"></i> {{ entry.leader.games }} игр</span>
+      <span><i class="bi bi-percent"></i> {{ entry.leader.win_rate }}% WR</span>
+    </div>
+    {% if entry.runner_up_player %}
+    <div class="season-rivalry">
+      🥈 {{ entry.runner_up_player.display_name }} — {{ entry.runner_up.score }}
+      {% if entry.gap is not none %}<span class="season-rivalry__gap">отрыв {{ entry.gap }}</span>{% endif %}
+    </div>
+    {% endif %}
     {% else %}
-    <div class="text-muted text-center py-3">Сезонные номинации ещё не присуждались.</div>
+    <div class="text-muted small">Лидер ещё не определился</div>
     {% endif %}
   </div>
+  {% endfor %}
 </div>
+{% else %}
+<div class="card mb-4">
+  <div class="card-body text-center text-muted py-4">Активный сезон не найден.</div>
+</div>
+{% endif %}
+
+<!-- ── История сезонов — мини Зал славы каждого сезона ─────────────────── -->
+<h6 class="fw-bold text-muted mb-3"><i class="bi bi-clock-history me-2"></i>История сезонов</h6>
+{% if history %}
+<div class="season-history-grid">
+  {% for h in history %}
+  <div class="season-history-card">
+    <div class="season-history-card__name">{{ h.season.name }}</div>
+    {% if h.season.winner_player_id %}
+    <div class="season-history-card__champion">
+      <span class="season-history-card__champion-icon">👑</span>
+      <a href="{{ url_for('profile.view_profile', player_id=h.season.winner_player_id) }}" class="season-history-card__champion-name">
+        {{ player_name({'display_name': h.season.winner_name}, equipped_bulk.get(h.season.winner_player_id, {})) }}
+      </a>
+      {% if h.season.winner_score %}<span class="text-muted small">{{ h.season.winner_score }} очков</span>{% endif %}
+    </div>
+    {% endif %}
+    <div class="season-history-card__awards">
+      {% for role, code in [('Мирный', 'season_best_civilian'), ('Шериф', 'season_best_sheriff'), ('Мафия', 'season_best_mafia'), ('Дон', 'season_best_don')] %}
+      {% set award = h.awards_by_code.get(code) %}
+      {% if award %}
+      <div class="season-history-card__award">
+        <i class="bi {{ award.title.icon or 'bi-award' }}"></i>
+        <span class="season-history-card__award-role">{{ role }}</span>
+        <span class="season-history-card__award-name">{{ player_name({'display_name': award.player_name}, equipped_bulk.get(award.player_id, {})) }}</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-3">Сезонные номинации ещё не присуждались.</div>
+</div>
+{% endif %}
 {% endblock %}

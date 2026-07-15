@@ -3983,6 +3983,188 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   .hof-hero__name { font-size: 1.4rem; }
 }
 
+/* ── Season cover: progress + live leader + live stat row ──────────────── */
+
+.season-cover {
+  background: var(--ms-surface-raised);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  padding: 1.5rem;
+}
+
+.season-cover__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.season-cover__eyebrow {
+  font-size: .68rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+  margin-bottom: .25rem;
+}
+
+.season-cover__name {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: var(--ms-gold-light);
+}
+
+.season-cover__leader { text-align: right; }
+.season-cover__leader-label {
+  font-size: .72rem;
+  color: var(--ms-muted);
+  margin-bottom: .1rem;
+}
+.season-cover__leader-name {
+  display: block;
+  font-weight: 700;
+  color: var(--ms-text);
+  text-decoration: none;
+}
+.season-cover__leader-name:hover { color: var(--ms-gold-light); }
+.season-cover__leader-score {
+  color: var(--ms-gold-light);
+  font-weight: 700;
+  font-size: .85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.season-cover__progress-track {
+  position: relative;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--ms-surface-alt);
+  overflow: hidden;
+  border: 1px solid var(--ms-border);
+}
+.season-cover__progress-fill {
+  position: relative;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--ms-gold-dark), var(--ms-gold-light));
+  transition: width .6s ease;
+}
+.season-cover__progress-fill::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,.35) 50%, transparent 80%);
+  background-size: 200% 100%;
+  animation: achv-progress-shine 2.8s ease-in-out infinite;
+}
+.season-cover__progress-label {
+  font-size: .76rem;
+  color: var(--ms-muted);
+  margin-top: .4rem;
+}
+
+.season-cover__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--ms-border);
+}
+.season-cover__stat {
+  display: flex;
+  flex-direction: column;
+}
+.season-cover__stat strong {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--ms-text);
+  font-variant-numeric: tabular-nums;
+}
+.season-cover__stat span {
+  font-size: .72rem;
+  color: var(--ms-muted);
+}
+
+/* ── Rivalry line inside a nomination card ── */
+
+.season-rivalry {
+  margin-top: .6rem;
+  padding-top: .6rem;
+  border-top: 1px dashed var(--ms-border);
+  font-size: .78rem;
+  color: var(--ms-text-dim);
+}
+.season-rivalry__gap {
+  float: right;
+  color: var(--ms-muted);
+}
+
+/* ── Season history — mini Hall of Fame per season ──────────────────────── */
+
+.season-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.season-history-card {
+  position: relative;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  padding: 1.1rem;
+}
+.season-history-card::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--ms-gold);
+  opacity: .6;
+  border-radius: var(--ms-radius) var(--ms-radius) 0 0;
+}
+
+.season-history-card__name {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: .6rem;
+}
+
+.season-history-card__champion {
+  display: flex;
+  align-items: baseline;
+  gap: .45rem;
+  background: rgba(212,176,106,.08);
+  border-radius: 8px;
+  padding: .5rem .7rem;
+  margin-bottom: .75rem;
+  flex-wrap: wrap;
+}
+.season-history-card__champion-icon { font-size: 1.1rem; }
+.season-history-card__champion-name {
+  font-weight: 700;
+  color: var(--ms-gold-light);
+  text-decoration: none;
+}
+.season-history-card__champion-name:hover { text-decoration: underline; }
+
+.season-history-card__awards {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+.season-history-card__award {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .82rem;
+}
+.season-history-card__award i { color: var(--ms-muted); width: 16px; text-align: center; }
+.season-history-card__award-role { color: var(--ms-muted); min-width: 60px; }
+.season-history-card__award-name { font-weight: 600; }
+
 /* ============================================================
    Fantasy — fantasy/index.html
    ============================================================ */

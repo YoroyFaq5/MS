@@ -561,3 +561,96 @@ class SeasonService:
             return []
         top = ratings[0].season_rating
         return [r for r in ratings if r.season_rating == top]
+
+    # ── Season stat panel (nominations page) ──────────────────────────────────
+
+    @staticmethod
+    def get_season_stats(season_id: int) -> Optional[dict]:
+        """
+        Живая статистика сезона для страницы номинаций: сыграно игр,
+        игроков, средний текущий ELO участников, лучший винрейт сезона,
+        самая длинная победная серия сезона, средний размер стола.
+
+        Один bulk-запрос по всем слотам сезона + один Python-проход
+        (сортировка по player_id/id уже даёт нужную группировку для
+        победной серии за один проход) — НЕ цикл с отдельным запросом на
+        игрока (см. инцидент с зависанием /titles/nominations в этой же
+        сессии: там ровно такой цикл положил страницу на проде).
+        """
+        from app.models import Role, WinSide
+        from sqlalchemy import func
+
+        games_count = db.session.query(func.count(Game.id)).filter(
+            Game.season_id == season_id, Game.is_finished == True
+        ).scalar() or 0
+        if games_count == 0:
+            return None
+
+        rows = (
+            db.session.query(GameSlot.player_id, GameSlot.role, Game.win_side)
+            .join(Game)
+            .filter(Game.season_id == season_id, Game.is_finished == True)
+            .order_by(GameSlot.player_id.asc(), Game.id.asc())
+            .all()
+        )
+
+        agg: dict = {}
+        current_pid = None
+        current_streak = 0
+        best_streak_for_player = 0
+        longest_streak = 0
+        longest_streak_pid = None
+
+        def _flush_player():
+            nonlocal longest_streak, longest_streak_pid
+            if current_pid is not None and best_streak_for_player > longest_streak:
+                longest_streak = best_streak_for_player
+                longest_streak_pid = current_pid
+
+        for player_id, role, win_side in rows:
+            if player_id != current_pid:
+                _flush_player()
+                current_pid = player_id
+                current_streak = 0
+                best_streak_for_player = 0
+            a = agg.setdefault(player_id, {"games": 0, "wins": 0})
+            a["games"] += 1
+            is_mafia_side = role in (Role.MAFIA, Role.DON)
+            won = (is_mafia_side and win_side == WinSide.MAFIA) or (not is_mafia_side and win_side == WinSide.CITY)
+            if won:
+                a["wins"] += 1
+                current_streak += 1
+                best_streak_for_player = max(best_streak_for_player, current_streak)
+            else:
+                current_streak = 0
+        _flush_player()
+
+        MIN_GAMES_FOR_BEST_WR = 3
+        best_wr_pid, best_wr = None, 0.0
+        for pid, d in agg.items():
+            if d["games"] < MIN_GAMES_FOR_BEST_WR:
+                continue
+            wr = d["wins"] / d["games"] * 100
+            if wr > best_wr:
+                best_wr, best_wr_pid = wr, pid
+
+        avg_elo = db.session.query(func.avg(Player.elo)).filter(
+            Player.id.in_(agg.keys())
+        ).scalar()
+
+        def _name(pid):
+            if pid is None:
+                return None
+            p = db.session.get(Player, pid)
+            return p.display_name if p else None
+
+        return {
+            "games_count": games_count,
+            "players_count": len(agg),
+            "avg_table_size": round(len(rows) / games_count, 1) if games_count else 0.0,
+            "avg_elo": round(avg_elo) if avg_elo else None,
+            "best_win_rate": round(best_wr, 1) if best_wr_pid else None,
+            "best_win_rate_player": _name(best_wr_pid),
+            "longest_streak": longest_streak or None,
+            "longest_streak_player": _name(longest_streak_pid) if longest_streak else None,
+        }

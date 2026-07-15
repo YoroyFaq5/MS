@@ -71,30 +71,78 @@ def nominations():
 
     current_season = SeasonService.get_current_season()
     current_leaders = []
+    season_progress = None
+    season_stats = None
+    season_live_leader = None
     if current_season:
-        preview = NominationService.get_role_leaders_preview(current_season.id)
+        detailed = NominationService.get_role_leaders_preview_detailed(current_season.id)
         role_titles = {
             t.code: t for t in db.session.query(Title).filter(
                 Title.code.in_(SEASONAL_ROLE_TITLES.values())
             ).all()
         }
-        leader_ids = [pid for pid in preview.values() if pid]
+        leader_ids = set()
+        for entry in detailed.values():
+            if entry["leader"]:
+                leader_ids.add(entry["leader"]["player_id"])
+            if entry["runner_up"]:
+                leader_ids.add(entry["runner_up"]["player_id"])
         leader_players = {
             p.id: p for p in db.session.query(Player).filter(Player.id.in_(leader_ids)).all()
         } if leader_ids else {}
         for role, title_code in SEASONAL_ROLE_TITLES.items():
-            title = role_titles.get(title_code)
-            player_id = preview.get(title_code)
+            entry = detailed.get(title_code, {})
+            leader = entry.get("leader")
+            runner_up = entry.get("runner_up")
             current_leaders.append({
-                "title": title,
-                "player": leader_players.get(player_id) if player_id else None,
+                "title": role_titles.get(title_code),
+                "player": leader_players.get(leader["player_id"]) if leader else None,
+                "leader": leader,
+                "runner_up_player": leader_players.get(runner_up["player_id"]) if runner_up else None,
+                "runner_up": runner_up,
+                "gap": entry.get("gap"),
             })
 
+        # ── Прогресс сезона: честные даты начала/конца, без выдуманной цели.
+        from datetime import datetime, timezone as _tz
+        now = datetime.now(_tz.utc)
+        starts = current_season.starts_at if current_season.starts_at.tzinfo else current_season.starts_at.replace(tzinfo=_tz.utc)
+        ends = current_season.ends_at if current_season.ends_at.tzinfo else current_season.ends_at.replace(tzinfo=_tz.utc)
+        total_days = max((ends - starts).days, 1)
+        elapsed_days = min(max((now - starts).days, 0), total_days)
+        season_progress = {
+            "pct": round(elapsed_days / total_days * 100),
+            "days_remaining": max((ends - now).days, 0),
+        }
+
+        season_stats = SeasonService.get_season_stats(current_season.id)
+
+        from app.services.rating_service import RatingService
+        season_ratings = RatingService.get_season_rating(current_season.id)
+        if season_ratings:
+            leader_entry = season_ratings[0]
+            season_live_leader = {
+                "player": db.session.get(Player, leader_entry.player_id),
+                "score": round(leader_entry.season_rating, 2),
+            }
+
     history = TitleService.get_seasonal_history()
+    # Переупаковка наград сезона по коду титула — картам истории на
+    # странице удобнее лукап по роли, чем плоский список.
+    for h in history:
+        h["awards_by_code"] = {a["title"]["code"]: a for a in h["awards"]}
+
+    history_player_ids = {award["player_id"] for h in history for award in h["awards"]}
+    history_player_ids.update(
+        h["season"]["winner_player_id"] for h in history if h["season"]["winner_player_id"]
+    )
 
     player_ids = {pt.player_id for pt in global_holders}
     player_ids.update(e["player"].id for e in current_leaders if e["player"])
-    player_ids.update(award["player_id"] for h in history for award in h["awards"])
+    player_ids.update(e["runner_up_player"].id for e in current_leaders if e["runner_up_player"])
+    if season_live_leader and season_live_leader["player"]:
+        player_ids.add(season_live_leader["player"].id)
+    player_ids.update(history_player_ids)
     for card in hof_cards:
         player_ids.update(t["player_id"] for t in card["top3"])
         player_ids.update(h.player_id for h in card["history"])
@@ -112,6 +160,9 @@ def nominations():
         hero_facts=hero_facts,
         current_season=current_season,
         current_leaders=current_leaders,
+        season_progress=season_progress,
+        season_stats=season_stats,
+        season_live_leader=season_live_leader,
         history=history,
         equipped_bulk=equipped_bulk,
         all_players=all_players,
