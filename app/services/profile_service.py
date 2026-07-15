@@ -60,7 +60,9 @@ class PlayerExtendedStats:
     role_breakdown: List[RoleBreakdown] = field(default_factory=list)
     monthly_games: Dict[str, int] = field(default_factory=dict)  # "YYYY-MM" → count
     tournament_count: int = 0
+    tournament_wins: int = 0
     season_wins: int = 0
+    lh_total: float = 0.0        # сумма ЛХ-баллов (бонус за успешный ПУ-звонок)
     pu_count: int = 0            # раз был ПУ (первым убитым)
     pu_sheriff_count: int = 0    # из них — играя за шерифа
     pu_accuracy: Optional[float] = None  # % угаданных мафий (из 3 названных подозреваемых) за игры в роли ПУ
@@ -85,7 +87,9 @@ class PlayerExtendedStats:
             "longest_loss_streak": self.longest_loss_streak,
             "current_streak_signed": self.current_streak_signed,
             "tournament_count": self.tournament_count,
+            "tournament_wins": self.tournament_wins,
             "season_wins": self.season_wins,
+            "lh_total": round(self.lh_total, 2),
             "pu_count": self.pu_count,
             "pu_sheriff_count": self.pu_sheriff_count,
             "pu_accuracy": self.pu_accuracy,
@@ -219,6 +223,7 @@ class ProfileService:
             if slot.is_pu:
                 stats.pu_count += 1
                 pu_mafia_total += slot.pu_mafia_count or 0
+                stats.lh_total += slot.pu_bonus
                 if slot.role == Role.SHERIFF:
                     stats.pu_sheriff_count += 1
 
@@ -289,7 +294,29 @@ class ProfileService:
             winner_player_id=player_id
         ).count()
 
+        stats.tournament_wins = ProfileService._count_tournament_wins(player_id)
+
         return stats
+
+    @staticmethod
+    def _count_tournament_wins(player_id: int) -> int:
+        """Сколько ЗАВЕРШЁННЫХ турниров игрок выиграл (1-е место в общем
+        зачёте турнира) за всю историю — не путать с tournament_count
+        (участие). Тот же паттерн "перебрать все финальные турниры и
+        спросить рейтинг", что уже используется в NominationService
+        (_cup_king) — недёшево при большом числе турниров, но это разовый
+        расчёт для страницы сравнения, не горячий путь."""
+        from app.models import Tournament
+        from app.services.rating_service import RatingService
+
+        tournaments = db.session.query(Tournament).filter(Tournament.status == "finished").all()
+        wins = 0
+        for t in tournaments:
+            ratings = RatingService.get_tournament_rating(t.id)
+            champion = next((r for r in ratings if r.rank == 1), None)
+            if champion and champion.player_id == player_id:
+                wins += 1
+        return wins
 
     # ── Game history ──────────────────────────────────────────────────────────
 
@@ -536,6 +563,19 @@ class ProfileService:
             "club_avg_games": round(sum(games) / n, 1),
         }
 
+    # Категории для карточек-дуэлей/счёта на странице сравнения — один
+    # источник правды для и score-подсчёта, и карточек, и радара очков.
+    # higher_better=False там, где чаще выступать в этой роли/чаще быть
+    # ПУ не является преимуществом (см. тот же выбор в старом compare.html).
+    _COMPARE_CATEGORIES = [
+        ("elo", "ELO", "", True, 1),
+        ("win_rate", "Винрейт", "%", True, 1),
+        ("avg_score", "Средний балл", "", True, 2),
+        ("pu_count", "Раз был ПУ", "", False, 0),
+        ("lh_total", "ЛХ (очки)", "", True, 2),
+        ("longest_streak", "Лучшая серия побед", "", True, 0),
+    ]
+
     @staticmethod
     def compare_players(player_id_a: int, player_id_b: int) -> Optional[dict]:
         """
@@ -543,8 +583,9 @@ class ProfileService:
         пользователя) по одному и тому же набору метрик, что и остальная
         статистика — переиспользует get_statistics/get_role_statistics/
         get_comparison_stats/head_to_head для каждого вместо отдельного
-        агрегирующего запроса. "Кто лучше" по каждой строке решает шаблон
-        (простое сравнение чисел для подсветки — не бизнес-логика).
+        агрегирующего запроса. Дополнительно строит категории с подсчётом
+        счёта, вероятность победы (по формуле Эло) и текстовый разбор —
+        всё чисто детерминированное, без внешних вызовов.
         """
         player_a = db.session.get(Player, player_id_a)
         player_b = db.session.get(Player, player_id_b)
@@ -558,16 +599,114 @@ class ProfileService:
 
         h2h = ProfileService.head_to_head(player_id_a, player_id_b)
 
+        a = stats_a.to_dict()
+        b = stats_b.to_dict()
+
+        from app.services.chart_data_service import ChartDataService
+        elo_history_a = ChartDataService.get_elo_history(player_id_a)
+        elo_history_b = ChartDataService.get_elo_history(player_id_b)
+
+        categories, score = ProfileService._build_comparison_categories(a, b)
+        win_prob_a = ProfileService._elo_win_probability(a["elo"], b["elo"])
+        analysis = ProfileService._build_comparison_analysis(
+            player_a.display_name, player_b.display_name, categories, score, win_prob_a,
+        )
+
         return {
             "player_a": player_a,
             "player_b": player_b,
-            "stats_a": stats_a.to_dict(),
-            "stats_b": stats_b.to_dict(),
+            "stats_a": a,
+            "stats_b": b,
             "role_a": ProfileService.get_role_statistics(player_id_a),
             "role_b": ProfileService.get_role_statistics(player_id_b),
             "rating_a": ProfileService.get_comparison_stats(player_id_a),
             "rating_b": ProfileService.get_comparison_stats(player_id_b),
             "head_to_head": h2h if h2h["shared_games"] > 0 else None,
+            "elo_history_a": elo_history_a,
+            "elo_history_b": elo_history_b,
+            "win_probability_a": win_prob_a,
+            "win_probability_b": round(100 - win_prob_a, 1),
+            "categories": categories,
+            "score": score,
+            "analysis": analysis,
+        }
+
+    @staticmethod
+    def _elo_win_probability(elo_a: float, elo_b: float) -> float:
+        """Классическая логистическая формула Эло — та же форма, что и
+        EloEngine.compute_expected_result, только для отображения (не
+        участвует в реальном начислении рейтинга)."""
+        return round(100 / (1 + 10 ** ((elo_b - elo_a) / 400.0)), 1)
+
+    @staticmethod
+    def _build_comparison_categories(a: dict, b: dict) -> tuple[list, dict]:
+        """Строит список карточек-категорий (значение А/Б, разница,
+        победитель) + счёт побед по категориям — единственное место, где
+        решается "кто лучше по каждой метрике" (шаблон только отображает)."""
+        categories = []
+        score = {"a": 0, "b": 0}
+        for key, label, unit, higher_better, decimals in ProfileService._COMPARE_CATEGORIES:
+            val_a = a.get(key) or 0
+            val_b = b.get(key) or 0
+            if val_a == val_b:
+                winner = None
+            elif (val_a > val_b) == higher_better:
+                winner = "a"
+            else:
+                winner = "b"
+            if winner == "a":
+                score["a"] += 1
+            elif winner == "b":
+                score["b"] += 1
+
+            def _fmt(v: float) -> float | int:
+                return int(round(v)) if decimals == 0 else round(v, decimals)
+
+            categories.append({
+                "key": key, "label": label, "unit": unit, "decimals": decimals,
+                "value_a": _fmt(val_a), "value_b": _fmt(val_b),
+                "winner": winner, "diff": _fmt(abs(val_a - val_b)),
+                "max_value": max(val_a, val_b) or 1,
+            })
+        return categories, score
+
+    @staticmethod
+    def _build_comparison_analysis(
+        name_a: str, name_b: str, categories: list, score: dict, win_prob_a: float,
+    ) -> dict:
+        """Детерминированный (без AI) текстовый разбор — собирается из уже
+        посчитанных категорий по простым правилам, а не генерируется
+        внешней моделью."""
+        if score["a"] == score["b"]:
+            leader, leader_name, opponent_name = None, None, None
+        elif score["a"] > score["b"]:
+            leader, leader_name, opponent_name = "a", name_a, name_b
+        else:
+            leader, leader_name, opponent_name = "b", name_b, name_a
+
+        if leader is None:
+            return {
+                "leader": None,
+                "summary": f"{name_a} и {name_b} идут почти вровень — {score['a']}:{score['b']} по категориям.",
+                "strengths": [],
+                "weaknesses": [],
+                "win_probability": win_prob_a if win_prob_a >= 50 else round(100 - win_prob_a, 1),
+            }
+
+        strengths = [c["label"] for c in categories if c["winner"] == leader]
+        weaknesses = [c["label"] for c in categories if c["winner"] is not None and c["winner"] != leader]
+        win_probability = win_prob_a if leader == "a" else round(100 - win_prob_a, 1)
+
+        return {
+            "leader": leader,
+            "leader_name": leader_name,
+            "summary": (
+                f"{leader_name} превосходит {opponent_name} по большинству ключевых "
+                f"показателей — {max(score['a'], score['b'])}:{min(score['a'], score['b'])} по категориям."
+            ),
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+            "win_probability": win_probability,
         }
 
     # ── Shared aggregation (used by both get_partner_statistics and
