@@ -449,9 +449,21 @@ class NominationService:
         pt = db.session.query(PlayerTitle).filter_by(title_id=title.id, revoked=False).first()
         return pt.player_id if pt else None
 
+    # Каждая "_xxx" функция ниже — тонкая обёртка над "_xxx_ranking(limit)",
+    # которая строит ПОЛНЫЙ отсортированный топ, а не только победителя.
+    # recompute_global_titles() продолжает брать только [0] (выдача титула
+    # не меняется), а get_eternal_ranking()/get_eternal_record_value() (Зал
+    # славы, топ-3, "осязаемое" значение рекорда) переиспользуют тот же
+    # запрос вместо повторного похода в БД.
+
     @staticmethod
     def _legend_of_the_club() -> Optional[int]:
-        """Легенда клуба: max(sum(bonus_score) * общий WR), мин. MIN_GAMES_FOR_GLOBAL_TITLE игр."""
+        ranking = NominationService._legend_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _legend_ranking(limit: int = 3) -> List[tuple]:
+        """Легенда клуба: sum(bonus_score) * общий WR, мин. MIN_GAMES_FOR_GLOBAL_TITLE игр."""
         rows = (
             db.session.query(
                 GameSlot.player_id,
@@ -463,10 +475,6 @@ class NominationService:
             .filter(Game.is_finished == True)
             .all()
         )
-        return NominationService._best_by_bonus_times_wr(rows)
-
-    @staticmethod
-    def _best_by_bonus_times_wr(rows) -> Optional[int]:
         agg: Dict[int, dict] = {}
         for player_id, bonus_score, role, win_side in rows:
             a = agg.setdefault(player_id, {"bonus_sum": 0.0, "games": 0, "wins": 0})
@@ -478,30 +486,38 @@ class NominationService:
                 a["wins"] += 1
 
         eligible = {pid: d for pid, d in agg.items() if d["games"] >= MIN_GAMES_FOR_GLOBAL_TITLE}
-        if not eligible:
-            return None
-
-        def score(d: dict) -> float:
-            return d["bonus_sum"] * (d["wins"] / d["games"])
-
-        return max(eligible, key=lambda pid: score(eligible[pid]))
+        scored = [(pid, round(d["bonus_sum"] * (d["wins"] / d["games"]), 2)) for pid, d in eligible.items()]
+        scored.sort(key=lambda t: t[1], reverse=True)
+        return scored[:limit]
 
     @staticmethod
     def _iron_player() -> Optional[int]:
+        ranking = NominationService._iron_player_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _iron_player_ranking(limit: int = 3) -> List[tuple]:
         """Железный игрок: больше всего сыгранных завершённых игр."""
-        row = (
-            db.session.query(GameSlot.player_id, func.count(GameSlot.id).label("cnt"))
+        rows = (
+            db.session.query(GameSlot.player_id, func.count(GameSlot.id))
             .join(Game)
             .filter(Game.is_finished == True)
             .group_by(GameSlot.player_id)
             .order_by(func.count(GameSlot.id).desc())
-            .first()
+            .limit(limit)
+            .all()
         )
-        return row[0] if row else None
+        return [(pid, cnt) for pid, cnt in rows]
 
     @staticmethod
     def _best_side_wr(city_side: bool) -> Optional[int]:
-        """Гроза мафии (city_side=True) / Тёмный гений (city_side=False)."""
+        ranking = NominationService._best_side_wr_ranking(city_side)
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _best_side_wr_ranking(city_side: bool, limit: int = 3) -> List[tuple]:
+        """Гроза мафии (city_side=True) / Тёмный гений (city_side=False).
+        Значение — WR% (0-100) для той стороны."""
         roles = [Role.CIVILIAN, Role.SHERIFF] if city_side else [Role.MAFIA, Role.DON]
         target_win = WinSide.CITY if city_side else WinSide.MAFIA
 
@@ -519,12 +535,17 @@ class NominationService:
                 a["wins"] += 1
 
         eligible = {pid: d for pid, d in agg.items() if d["games"] >= MIN_GAMES_FOR_GLOBAL_TITLE}
-        if not eligible:
-            return None
-        return max(eligible, key=lambda pid: eligible[pid]["wins"] / eligible[pid]["games"])
+        scored = [(pid, round(d["wins"] / d["games"] * 100, 1)) for pid, d in eligible.items()]
+        scored.sort(key=lambda t: t[1], reverse=True)
+        return scored[:limit]
 
     @staticmethod
     def _streak_king() -> Optional[int]:
+        ranking = NominationService._streak_king_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _streak_king_ranking(limit: int = 3) -> List[tuple]:
         """
         Король серии: наибольшая победная серия за всю историю. Использует
         ProfileService.get_extended_stats() (уже готовый однопроходный расчёт
@@ -535,44 +556,61 @@ class NominationService:
         player_ids = [
             p.id for p in db.session.query(Player.id).filter(Player.is_active == True).all()
         ]
-        best_pid, best_streak = None, 0
+        scored = []
         for pid in player_ids:
             stats = ProfileService.get_extended_stats(pid)
-            if stats and stats.longest_streak > best_streak:
-                best_streak = stats.longest_streak
-                best_pid = pid
-        return best_pid
+            if stats and stats.longest_streak > 0:
+                scored.append((pid, stats.longest_streak))
+        scored.sort(key=lambda t: t[1], reverse=True)
+        return scored[:limit]
 
     # ── Вечные титулы, раунд 2 ────────────────────────────────────────────────
 
     @staticmethod
     def _peak_elo() -> Optional[int]:
+        ranking = NominationService._peak_elo_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _peak_elo_ranking(limit: int = 3) -> List[tuple]:
         """Пик формы: наивысший ELO среди активных игроков клуба на данный
         момент (история максимумов ELO в БД не хранится — см. известные
         ограничения проекта, — поэтому это "текущий пик", а не исторический)."""
-        row = (
-            db.session.query(Player.id)
+        rows = (
+            db.session.query(Player.id, Player.elo)
             .filter(Player.is_active == True)
             .order_by(Player.elo.desc())
-            .first()
+            .limit(limit)
+            .all()
         )
-        return row[0] if row else None
+        return [(pid, round(elo, 1)) for pid, elo in rows]
 
     @staticmethod
     def _financial_baron() -> Optional[int]:
+        ranking = NominationService._financial_baron_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _financial_baron_ranking(limit: int = 3) -> List[tuple]:
         """Финансовый барон: наибольшая сумма заработанных монет за карьеру."""
         from app.models import CoinTransaction
-        row = (
+        rows = (
             db.session.query(CoinTransaction.player_id, func.sum(CoinTransaction.amount))
             .filter(CoinTransaction.amount > 0)
             .group_by(CoinTransaction.player_id)
             .order_by(func.sum(CoinTransaction.amount).desc())
-            .first()
+            .limit(limit)
+            .all()
         )
-        return row[0] if row and (row[1] or 0) > 0 else None
+        return [(pid, round(total, 0)) for pid, total in rows if (total or 0) > 0]
 
     @staticmethod
     def _cup_king() -> Optional[int]:
+        ranking = NominationService._cup_king_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _cup_king_ranking(limit: int = 3) -> List[tuple]:
         """Кубковый король: больше всего побед (1-е место) в турнирах за всю
         историю клуба."""
         from app.models import Tournament
@@ -586,27 +624,37 @@ class NominationService:
             if champion:
                 wins[champion.player_id] = wins.get(champion.player_id, 0) + 1
 
-        if not wins:
-            return None
-        return max(wins, key=lambda pid: wins[pid])
+        scored = sorted(wins.items(), key=lambda t: t[1], reverse=True)
+        return scored[:limit]
 
     @staticmethod
     def _season_crowned() -> Optional[int]:
+        ranking = NominationService._season_crowned_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _season_crowned_ranking(limit: int = 3) -> List[tuple]:
         """Коронованный сезонами: больше всего побед в сезонах за всю историю."""
-        row = (
+        rows = (
             db.session.query(Season.winner_player_id, func.count(Season.id))
             .filter(Season.winner_player_id.isnot(None))
             .group_by(Season.winner_player_id)
             .order_by(func.count(Season.id).desc())
-            .first()
+            .limit(limit)
+            .all()
         )
-        return row[0] if row else None
+        return [(pid, cnt) for pid, cnt in rows]
 
     @staticmethod
     def _club_sniper() -> Optional[int]:
+        ranking = NominationService._club_sniper_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _club_sniper_ranking(limit: int = 3) -> List[tuple]:
         """Снайпер клуба: лучшая точность ПУ-звонка за карьеру (доля угаданных
         мафий из 3 возможных за игру, где игрок был ПУ), мин. MIN_PU_GAMES_FOR_SNIPER
-        ПУ-игр."""
+        ПУ-игр. Значение — % точности."""
         rows = (
             db.session.query(GameSlot.player_id, GameSlot.pu_mafia_count)
             .join(Game)
@@ -620,42 +668,60 @@ class NominationService:
             a["correct"] += pu_mafia_count or 0
 
         eligible = {pid: d for pid, d in agg.items() if d["count"] >= MIN_PU_GAMES_FOR_SNIPER}
-        if not eligible:
-            return None
-        return max(eligible, key=lambda pid: eligible[pid]["correct"] / (eligible[pid]["count"] * 3))
+        scored = [(pid, round(d["correct"] / (d["count"] * 3) * 100, 1)) for pid, d in eligible.items()]
+        scored.sort(key=lambda t: t[1], reverse=True)
+        return scored[:limit]
 
     @staticmethod
     def _move_master() -> Optional[int]:
+        ranking = NominationService._move_master_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _move_master_ranking(limit: int = 3) -> List[tuple]:
         """Мастер хода: больше всего раз признан "лучшим ходом" партии."""
-        row = (
+        rows = (
             db.session.query(GameSlot.player_id, func.count(GameSlot.id))
             .join(Game)
             .filter(Game.is_finished == True, GameSlot.was_best_move == True)
             .group_by(GameSlot.player_id)
             .order_by(func.count(GameSlot.id).desc())
-            .first()
+            .limit(limit)
+            .all()
         )
-        return row[0] if row and row[1] > 0 else None
+        return [(pid, cnt) for pid, cnt in rows if cnt > 0]
 
     @staticmethod
     def _fantasy_oracle() -> Optional[int]:
+        ranking = NominationService._fantasy_oracle_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _fantasy_oracle_ranking(limit: int = 3) -> List[tuple]:
         """Fantasy-оракул: больше всего fantasy-очков за всю историю."""
         from app.models import FantasyDraft
         from app.models.user import User
-        row = (
+        rows = (
             db.session.query(User.player_id, func.sum(FantasyDraft.total_points))
             .join(FantasyDraft, FantasyDraft.user_id == User.id)
             .filter(User.player_id.isnot(None))
             .group_by(User.player_id)
             .order_by(func.sum(FantasyDraft.total_points).desc())
-            .first()
+            .limit(limit)
+            .all()
         )
-        return row[0] if row and (row[1] or 0) > 0 else None
+        return [(pid, round(total, 1)) for pid, total in rows if (total or 0) > 0]
 
     @staticmethod
     def _stability() -> Optional[int]:
+        ranking = NominationService._stability_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _stability_ranking(limit: int = 3) -> List[tuple]:
         """Стабильность: лучший общий винрейт за карьеру (не по стороне
-        отдельно — общий WR по всем ролям), мин. MIN_GAMES_FOR_GLOBAL_TITLE игр."""
+        отдельно — общий WR по всем ролям), мин. MIN_GAMES_FOR_GLOBAL_TITLE игр.
+        Значение — WR%."""
         rows = (
             db.session.query(GameSlot.player_id, GameSlot.role, Game.win_side)
             .join(Game)
@@ -672,12 +738,17 @@ class NominationService:
                 a["wins"] += 1
 
         eligible = {pid: d for pid, d in agg.items() if d["games"] >= MIN_GAMES_FOR_GLOBAL_TITLE}
-        if not eligible:
-            return None
-        return max(eligible, key=lambda pid: eligible[pid]["wins"] / eligible[pid]["games"])
+        scored = [(pid, round(d["wins"] / d["games"] * 100, 1)) for pid, d in eligible.items()]
+        scored.sort(key=lambda t: t[1], reverse=True)
+        return scored[:limit]
 
     @staticmethod
     def _tournament_terror() -> Optional[int]:
+        ranking = NominationService._tournament_terror_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _tournament_terror_ranking(limit: int = 3) -> List[tuple]:
         """Гроза турниров: лучший % топ-3 финишей среди всех своих турниров,
         мин. MIN_TOURNAMENTS_FOR_TERROR турниров участия."""
         from app.models import Tournament, TournamentParticipant
@@ -703,18 +774,75 @@ class NominationService:
             for pid, count in participations.items()
             if count >= MIN_TOURNAMENTS_FOR_TERROR
         }
-        if not eligible:
-            return None
-        return max(eligible, key=lambda pid: eligible[pid])
+        scored = [(pid, round(ratio * 100, 1)) for pid, ratio in eligible.items()]
+        scored.sort(key=lambda t: t[1], reverse=True)
+        return scored[:limit]
 
     @staticmethod
     def _achievement_keeper() -> Optional[int]:
+        ranking = NominationService._achievement_keeper_ranking()
+        return ranking[0][0] if ranking else None
+
+    @staticmethod
+    def _achievement_keeper_ranking(limit: int = 3) -> List[tuple]:
         """Хранитель наград: больше всего разблокированных достижений."""
         from app.models import PlayerAchievement
-        row = (
+        rows = (
             db.session.query(PlayerAchievement.player_id, func.count(PlayerAchievement.id))
             .group_by(PlayerAchievement.player_id)
             .order_by(func.count(PlayerAchievement.id).desc())
-            .first()
+            .limit(limit)
+            .all()
         )
-        return row[0] if row and row[1] > 0 else None
+        return [(pid, cnt) for pid, cnt in rows if cnt > 0]
+
+    # ── Зал славы: витрина только для чтения (не выдаёт/не отзывает титулы) ──
+
+    _RANKING_BUILDERS: Dict[str, tuple] = {}  # заполняется лениво, см. _ranking_builders()
+
+    @staticmethod
+    def _ranking_builders() -> Dict[str, tuple]:
+        """(title_code -> (ranking_fn(limit), unit_label)) — собирается лениво
+        при первом обращении, а не на уровне тела класса, потому что на
+        момент выполнения class body часть staticmethod-ов ниже ещё не
+        определена."""
+        if not NominationService._RANKING_BUILDERS:
+            NominationService._RANKING_BUILDERS.update({
+                TITLE_LEGEND:             (NominationService._legend_ranking, "очков"),
+                TITLE_IRON_PLAYER:        (NominationService._iron_player_ranking, "игр"),
+                TITLE_MAFIA_TERROR:       (lambda limit=3: NominationService._best_side_wr_ranking(True, limit), "% побед за город"),
+                TITLE_DARK_GENIUS:        (lambda limit=3: NominationService._best_side_wr_ranking(False, limit), "% побед за мафию"),
+                TITLE_STREAK_KING:        (NominationService._streak_king_ranking, "побед подряд"),
+                TITLE_PEAK_ELO:           (NominationService._peak_elo_ranking, "ELO"),
+                TITLE_FINANCIAL_BARON:    (NominationService._financial_baron_ranking, "монет"),
+                TITLE_CUP_KING:           (NominationService._cup_king_ranking, "турниров"),
+                TITLE_SEASON_CROWNED:     (NominationService._season_crowned_ranking, "сезонов"),
+                TITLE_CLUB_SNIPER:        (NominationService._club_sniper_ranking, "% точности"),
+                TITLE_MOVE_MASTER:        (NominationService._move_master_ranking, "раз"),
+                TITLE_FANTASY_ORACLE:     (NominationService._fantasy_oracle_ranking, "fantasy-очков"),
+                TITLE_STABILITY:          (NominationService._stability_ranking, "% побед"),
+                TITLE_TOURNAMENT_TERROR:  (NominationService._tournament_terror_ranking, "% топ-3"),
+                TITLE_ACHIEVEMENT_KEEPER: (NominationService._achievement_keeper_ranking, "достижений"),
+            })
+        return NominationService._RANKING_BUILDERS
+
+    @staticmethod
+    def get_eternal_ranking(title_code: str, limit: int = 3) -> List[dict]:
+        """Топ-N для витрины (Зал славы) — [{"player_id", "value", "unit"}, ...],
+        лучший первым. Чисто читающая функция, никогда не выдаёт/не отзывает
+        титулы (этим занимается только recompute_global_titles())."""
+        builders = NominationService._ranking_builders()
+        entry = builders.get(title_code)
+        if not entry:
+            return []
+        ranking_fn, unit = entry
+        return [{"player_id": pid, "value": value, "unit": unit} for pid, value in ranking_fn(limit)]
+
+    @staticmethod
+    def get_eternal_record_value(title_code: str, player_id: int) -> Optional[dict]:
+        """"Осязаемое" значение рекорда ИМЕННО текущего обладателя (может не
+        совпадать с live-топ-1, если пересчёт давно не запускали вручную —
+        показываем значение для того, кто реально держит титул сейчас, а не
+        абстрактного лидера)."""
+        ranking = NominationService.get_eternal_ranking(title_code, limit=50)
+        return next((r for r in ranking if r["player_id"] == player_id), None)

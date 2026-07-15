@@ -1,42 +1,101 @@
 {% extends "base.html" %}
 {% from "_macros.html" import player_name %}
-{% block title %}Номинации{% endblock %}
+{% block title %}Зал славы{% endblock %}
 
 {% block content %}
-{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark', 'mythic': 'bg-danger', 'ultra': 'bg-warning text-dark'} %}
+{% set RARITY_LABEL = {'common': 'Common', 'rare': 'Rare', 'epic': 'Epic', 'legendary': 'Legendary', 'mythic': 'Mythic', 'ultra': 'Ultra'} %}
+{% set TIER_CLASS = {0: 'hof-card--legendary', 1: 'hof-card--legendary', 2: 'hof-card--epic', 3: 'hof-card--rare', 4: 'hof-card--rare'} %}
 
 <div class="mb-4">
-  <h2 class="mb-0 fw-bold"><i class="bi bi-patch-check text-warning me-2"></i>Номинации клуба</h2>
-  <p class="text-muted small mb-0">Титулы клуба и лучшие игроки по ролям каждого сезона</p>
+  <h2 class="mb-0 fw-bold"><i class="bi bi-patch-check text-warning me-2"></i>Зал славы клуба</h2>
+  <p class="text-muted small mb-0">Вечные рекорды клуба и лучшие игроки по ролям каждого сезона</p>
 </div>
 
-<div class="card mb-4">
-  <div class="card-header fw-semibold"><i class="bi bi-award me-2"></i>Титулы клуба (текущие рекордсмены)</div>
-  <div class="card-body">
-    {% if global_holders %}
-    <div class="row g-3">
-      {% for pt in global_holders %}
-      <div class="col-md-6 col-lg-4">
-        <div class="stat-card card p-3 h-100">
-          <div class="d-flex justify-content-between align-items-start mb-1">
-            <span class="fw-semibold">
-              {% if pt.title.icon %}<i class="bi {{ pt.title.icon }} me-1"></i>{% endif %}{{ pt.title.name }}
-            </span>
-            <span class="badge {{ RARITY_BADGE.get(pt.title.rarity.value, 'bg-secondary') }}">{{ pt.title.rarity.value }}</span>
-          </div>
-          <div class="text-muted small mb-2">{{ pt.title.description or '' }}</div>
-          <a href="{{ url_for('profile.view_profile', player_id=pt.player_id) }}" class="fw-bold text-warning text-decoration-none">
-            {{ player_name(pt.player, equipped_bulk.get(pt.player_id, {})) }}
-          </a>
-        </div>
-      </div>
-      {% endfor %}
+<!-- ── Витрина: главный герой Зала славы ─────────────────────────────────── -->
+{% if hero %}
+<div class="hof-hero mb-4">
+  <div class="hof-hero__label">ЗАЛ СЛАВЫ MAFIA STYLE</div>
+  <div class="hof-hero__icon">👑</div>
+  <div class="hof-hero__name">{{ player_name(hero.player, equipped_bulk.get(hero.player.id, {})) }}</div>
+  <div class="hof-hero__title">{{ hero.title.name }}</div>
+  {% if hero_facts %}
+  <div class="hof-hero__facts">
+    {{ hero_facts.elo|int }} ELO • {{ hero_facts.titles_count }} {{ 'титул' if hero_facts.titles_count == 1 else 'титулов' }} • {{ hero_facts.season_wins }} {{ 'сезон' if hero_facts.season_wins == 1 else 'сезонов' }}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ── Вечные титулы — Зал славы, карточки разного размера по редкости ──── -->
+<div class="hof-grid mb-4">
+  {% for c in hof_cards %}
+  <div class="hof-card {{ TIER_CLASS.get(c.tier, 'hof-card--rare') }}" data-bs-toggle="modal" data-bs-target="#hofModal{{ c.title.id }}" role="button">
+    <div class="hof-card__top">
+      <div class="hof-card__icon"><i class="bi {{ c.title.icon or 'bi-award' }}"></i></div>
+      <div class="hof-card__rarity">{{ RARITY_LABEL.get(c.title.rarity.value, c.title.rarity.value) }}</div>
     </div>
-    {% else %}
-    <div class="text-muted text-center py-3">Рекорды клуба ещё не рассчитаны.</div>
+    <div class="hof-card__name">{{ c.title.name }}</div>
+    {% if c.title.description %}<div class="hof-card__desc">{{ c.title.description }}</div>{% endif %}
+
+    <div class="hof-card__holder">
+      {{ player_name(c.player, equipped_bulk.get(c.player_id, {})) }}
+    </div>
+    {% if c.record %}
+    <div class="hof-card__record">{{ c.record.value }} {{ c.record.unit }}</div>
     {% endif %}
+
+    <div class="hof-card__meta">
+      {% if c.exclusivity.held_days is not none %}
+      <span><i class="bi bi-hourglass-split"></i> держит {{ c.exclusivity.held_days }} {{ 'день' if c.exclusivity.held_days == 1 else 'дней' }}</span>
+      {% endif %}
+      <span><i class="bi bi-people"></i> {{ c.exclusivity.exclusivity_pct }}% игроков когда-либо держали</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ── Модалки: топ-3 + история обладателей (по клику на карточку) ──────── -->
+{% for c in hof_cards %}
+<div class="modal fade" id="hofModal{{ c.title.id }}" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content hof-modal">
+      <div class="modal-header border-0">
+        <h5 class="modal-title"><i class="bi {{ c.title.icon or 'bi-award' }} me-2"></i>{{ c.title.name }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        {% if c.title.description %}<p class="text-muted small">{{ c.title.description }}</p>{% endif %}
+
+        <div class="hof-podium mb-4">
+          {% for entry in c.top3 %}
+          {% set player = all_players.get(entry.player_id) %}
+          <div class="hof-podium__row {% if loop.index == 1 %}hof-podium__row--first{% endif %}">
+            <span class="hof-podium__medal">{{ ['🥇', '🥈', '🥉'][loop.index0] }}</span>
+            <span class="hof-podium__name">{{ player_name(player, equipped_bulk.get(entry.player_id, {})) if player else '—' }}</span>
+            <span class="hof-podium__value">{{ entry.value }} {{ entry.unit }}</span>
+          </div>
+          {% else %}
+          <div class="text-muted text-center">Рекорд ещё не установлен.</div>
+          {% endfor %}
+        </div>
+
+        <div class="hof-history__title">История обладателей</div>
+        <ul class="hof-history__list">
+          {% for h in c.history|reverse %}
+          <li class="{% if h.revoked %}hof-history__item--past{% endif %}">
+            <span class="hof-history__date">{{ h.awarded_at.strftime('%d.%m.%Y') }}</span>
+            {{ player_name(h.player, equipped_bulk.get(h.player_id, {})) if h.player else '—' }}
+            {% if not h.revoked %}<span class="badge bg-warning-subtle text-warning border border-warning-subtle ms-1">сейчас</span>{% endif %}
+          </li>
+          {% else %}
+          <li class="text-muted">История пуста.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
   </div>
 </div>
+{% endfor %}
 
 <div class="card mb-4">
   <div class="card-header fw-semibold">

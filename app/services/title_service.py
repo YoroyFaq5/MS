@@ -16,7 +16,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
+
+from sqlalchemy import func
 
 from app import db
 from app.models import Player, Title, PlayerTitle, TitleType
@@ -149,6 +152,50 @@ class TitleService:
             .filter(Title.type == TitleType.ETERNAL, PlayerTitle.revoked == False)
             .all()
         )
+
+    @staticmethod
+    def get_title_history(title_id: int) -> List[PlayerTitle]:
+        """Все награждения конкретным титулом за всю историю (включая
+        отозванные — у ETERNAL-титулов отозванная запись означает "раньше
+        принадлежал этому игроку, сейчас принадлежит другому"), от старых
+        к новым — для показа истории обладателей на карточке в Зале славы."""
+        return (
+            db.session.query(PlayerTitle)
+            .filter_by(title_id=title_id)
+            .order_by(PlayerTitle.awarded_at.asc())
+            .all()
+        )
+
+    @staticmethod
+    def get_exclusivity_stats(title_id: int) -> dict:
+        """Сколько РАЗНЫХ игроков когда-либо держали этот титул и какой это
+        процент от активных игроков клуба — "эксклюзивность" для Зала славы.
+        Плюс, если титул сейчас у кого-то есть, сколько дней он его держит."""
+        holders = (
+            db.session.query(PlayerTitle)
+            .filter_by(title_id=title_id)
+            .all()
+        )
+        unique_holders = {pt.player_id for pt in holders}
+
+        total_active_players = db.session.query(func.count(Player.id)).filter(
+            Player.is_active == True
+        ).scalar() or 0
+
+        current = next((pt for pt in holders if not pt.revoked), None)
+        held_days = None
+        if current:
+            now = datetime.now(timezone.utc) if current.awarded_at.tzinfo else datetime.now()
+            held_days = (now - current.awarded_at).days
+
+        return {
+            "unique_holders": len(unique_holders),
+            "exclusivity_pct": (
+                round(len(unique_holders) / total_active_players * 100, 1)
+                if total_active_players else 0.0
+            ),
+            "held_days": held_days,
+        }
 
     @staticmethod
     def get_season_nominations(season_id: int) -> List[PlayerTitle]:

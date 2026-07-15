@@ -3720,6 +3720,270 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 }
 
 /* ============================================================
+   Hall of Fame — titles/nominations.html
+   ============================================================
+   Same rarity ladder as achievements (common/rare/epic/legendary,
+   no blue/purple) but with real size hierarchy this time: legendary
+   cards are visibly bigger, not just a differently-colored top bar.
+   ============================================================ */
+
+.hof-hero {
+  position: relative;
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  border-radius: var(--ms-radius);
+  background:
+    radial-gradient(ellipse at center top, rgba(212,176,106,.14), transparent 65%),
+    var(--ms-surface-raised);
+  border: 1px solid var(--ms-border);
+  overflow: hidden;
+}
+.hof-hero::before {
+  content: "";
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(90deg, transparent, var(--ms-gold) 20%, var(--ms-gold) 80%, transparent);
+  height: 1px;
+  top: 0;
+  opacity: .5;
+}
+.hof-hero::after {
+  content: "";
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(90deg, transparent, var(--ms-gold) 20%, var(--ms-gold) 80%, transparent);
+  height: 1px;
+  bottom: 0;
+  opacity: .5;
+}
+
+.hof-hero__label {
+  font-size: .72rem;
+  letter-spacing: .25em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+  margin-bottom: 1rem;
+}
+
+.hof-hero__icon {
+  font-size: 2.4rem;
+  filter: drop-shadow(0 0 14px rgba(212,176,106,.5));
+  margin-bottom: .5rem;
+}
+
+.hof-hero__name {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 800;
+  font-size: 2rem;
+  color: var(--ms-gold-light);
+  text-shadow: 0 0 24px rgba(212,176,106,.35);
+}
+
+.hof-hero__title {
+  color: var(--ms-text-dim);
+  font-size: .95rem;
+  margin-top: .15rem;
+  margin-bottom: 1rem;
+}
+
+.hof-hero__facts {
+  display: inline-block;
+  font-size: .85rem;
+  color: var(--ms-muted);
+  padding: .4rem 1.1rem;
+  border-radius: 99px;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+}
+
+/* ── Tiered grid — legendary cards span 2 columns and read taller ──────── */
+
+.hof-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-auto-rows: minmax(150px, auto);
+  gap: 1rem;
+}
+
+.hof-card {
+  position: relative;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  padding: 1.1rem;
+  cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  display: flex;
+  flex-direction: column;
+  --accent: var(--ms-muted);
+}
+
+.hof-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow: 0 10px 26px rgba(0,0,0,.45), 0 0 20px color-mix(in srgb, var(--accent) 30%, transparent);
+  z-index: 2;
+}
+
+.hof-card::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent);
+  border-radius: var(--ms-radius) var(--ms-radius) 0 0;
+}
+
+.hof-card--rare {
+  --accent: #B8B8B8;
+}
+
+.hof-card--epic {
+  --accent: var(--ms-wine-light);
+  grid-column: span 1;
+}
+
+.hof-card--legendary {
+  --accent: var(--ms-gold-light);
+  background: rgba(212,176,106,.05);
+  grid-column: span 2;
+  padding: 1.5rem;
+}
+@media (min-width: 768px) {
+  .hof-card--legendary { grid-row: span 1; }
+  .hof-card--legendary .hof-card__name { font-size: 1.25rem; }
+  .hof-card--legendary .hof-card__icon { font-size: 2rem; }
+}
+
+.hof-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: .5rem;
+}
+
+.hof-card__icon {
+  font-size: 1.5rem;
+  color: var(--accent);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 45%, transparent));
+}
+
+.hof-card__rarity {
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.hof-card__name {
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: .25rem;
+}
+
+.hof-card__desc {
+  color: var(--ms-muted);
+  font-size: .78rem;
+  margin-bottom: .75rem;
+  flex-grow: 1;
+}
+
+.hof-card__holder {
+  font-weight: 700;
+  color: var(--ms-gold-light);
+  margin-bottom: .15rem;
+}
+
+.hof-card__record {
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: .6rem;
+}
+
+.hof-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem .9rem;
+  font-size: .7rem;
+  color: var(--ms-muted);
+  margin-top: auto;
+}
+
+/* ── Modal: podium + history ── */
+
+.hof-modal {
+  background: var(--ms-surface-raised);
+  border: 1px solid var(--ms-border);
+  color: var(--ms-text);
+}
+
+.hof-podium {
+  background: var(--ms-surface);
+  border-radius: var(--ms-radius);
+  padding: .75rem;
+}
+
+.hof-podium__row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: .6rem;
+  padding: .5rem .25rem;
+  border-bottom: 1px solid var(--ms-border);
+}
+.hof-podium__row:last-child { border-bottom: none; }
+
+.hof-podium__row--first {
+  background: rgba(212,176,106,.08);
+  border-radius: 8px;
+  border-bottom: none;
+}
+
+.hof-podium__medal { font-size: 1.2rem; }
+.hof-podium__name { font-weight: 600; }
+.hof-podium__value {
+  color: var(--ms-gold-light);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hof-history__title {
+  font-size: .8rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--ms-muted);
+  margin: 1rem 0 .5rem;
+}
+
+.hof-history__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.hof-history__list li {
+  padding: .4rem 0;
+  border-bottom: 1px solid var(--ms-border);
+  font-size: .85rem;
+}
+.hof-history__list li:last-child { border-bottom: none; }
+.hof-history__item--past { color: var(--ms-muted); }
+
+.hof-history__date {
+  color: var(--ms-muted);
+  font-size: .75rem;
+  margin-right: .5rem;
+}
+
+@media (max-width: 576px) {
+  .hof-card--legendary { grid-column: span 1; padding: 1.1rem; }
+  .hof-hero__name { font-size: 1.4rem; }
+}
+
+/* ============================================================
    Mobile-first refinements
    ============================================================ */
 
