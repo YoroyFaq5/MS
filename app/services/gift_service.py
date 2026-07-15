@@ -92,6 +92,13 @@ class GiftService:
             {"item_name": item.name, "sender_name": sender.display_name, "message": message},
         )
 
+        try:
+            from app.services.achievement_service import AchievementService
+            AchievementService.check_after_purchase(sender.id)
+            AchievementService.check_after_purchase(to_player_id)
+        except Exception:
+            logger.exception(f"Achievement check failed after gift {sender.id} -> {to_player_id}")
+
         return GiftResult.success(
             f"«{item.name}» подарен игроку «{recipient.display_name}».", data=transfer
         )

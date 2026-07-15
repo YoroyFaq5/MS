@@ -303,6 +303,13 @@ class ShopService:
 
         inv.is_equipped = True
         db.session.commit()
+
+        try:
+            from app.services.achievement_service import AchievementService
+            AchievementService.check_after_purchase(player.id)
+        except Exception:
+            logger.exception(f"Achievement check failed after equip for player #{player.id}")
+
         return ShopResult.success(f"«{item.name}» экипирован.", data=inv)
 
     @staticmethod

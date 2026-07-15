@@ -243,6 +243,9 @@ class AchievementService:
         pa.pinned = True
         pa.pinned_order = next_order
         db.session.commit()
+
+        AchievementService.unlock(player_id, "pinned_first_achievement")
+
         return AchievementResult.success("Достижение закреплено.", data=pa)
 
     @staticmethod

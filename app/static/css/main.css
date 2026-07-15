@@ -852,6 +852,265 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 }
 
 /* ============================================================
+   Achievements — epic cards
+   ============================================================
+   Same restrained gold/wine/silver rarity ladder as the accent rules
+   above (no blue/purple), just with a lot more chrome: glowing icon
+   medallion, corner seal on unlock, a slow shine sweep for Legendary,
+   and a deliberately mysterious treatment for hidden+locked cards.
+   ============================================================ */
+
+:root {
+  --achv-common:    var(--ms-muted);
+  --achv-rare:      #B8B8B8;
+  --achv-epic:      var(--ms-wine-light);
+  --achv-legendary: var(--ms-gold-light);
+}
+
+.achv-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: 1.25rem;
+}
+
+.achv-progress-wrap {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.achv-progress-track {
+  position: relative;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--ms-surface-alt);
+  overflow: hidden;
+  border: 1px solid var(--ms-border);
+}
+
+.achv-progress-fill {
+  position: relative;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--ms-gold-dark), var(--ms-gold-light));
+  transition: width .6s ease;
+}
+
+.achv-progress-fill::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,.35) 50%, transparent 80%);
+  background-size: 200% 100%;
+  animation: achv-progress-shine 2.8s ease-in-out infinite;
+}
+
+@keyframes achv-progress-shine {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.achv-filter-pill {
+  border: 1px solid var(--ms-border);
+  background: var(--ms-surface);
+  color: var(--ms-text-dim);
+  border-radius: 99px;
+  padding: .3rem .85rem;
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s ease;
+  white-space: nowrap;
+}
+.achv-filter-pill:hover {
+  border-color: var(--ms-gold);
+  color: var(--ms-text);
+}
+.achv-filter-pill.active {
+  background: var(--ms-gold);
+  border-color: var(--ms-gold);
+  color: #0D0D0D;
+}
+
+.achv-section-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin: 1.75rem 0 .9rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--ms-border);
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.achv-section-title:first-child { margin-top: 0; }
+
+.achv-section-count {
+  font-size: .72rem;
+  font-weight: 500;
+  color: var(--ms-muted);
+}
+
+.achv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: .85rem;
+}
+
+.achv-card {
+  position: relative;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  padding: 1.1rem 1rem;
+  overflow: hidden;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  --accent: var(--achv-common);
+}
+
+.achv-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent);
+  opacity: .9;
+}
+
+.achv-card--rare      { --accent: var(--achv-rare); }
+.achv-card--epic      { --accent: var(--achv-epic); }
+.achv-card--legendary { --accent: var(--achv-legendary); background: rgba(212,176,106,.05); }
+
+.achv-card.is-unlocked:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow: 0 10px 26px rgba(0,0,0,.45), 0 0 20px color-mix(in srgb, var(--accent) 35%, transparent);
+  z-index: 2;
+}
+
+/* Legendary unlocked — a slow diagonal shine sweeps across the card,
+   the site's one deliberately "showy" flourish, reserved for the rarest
+   tier so it still reads as special rather than noisy chrome everywhere. */
+.achv-card--legendary.is-unlocked::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(212,176,106,.16) 50%, transparent 70%);
+  background-size: 250% 250%;
+  animation: achv-legendary-shine 5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes achv-legendary-shine {
+  0%, 100% { background-position: 200% 200%; }
+  50%      { background-position: -50% -50%; }
+}
+
+.achv-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  margin-bottom: .6rem;
+}
+
+.achv-card__icon {
+  flex: none;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.25rem;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--accent) 35%, var(--ms-surface-raised)), var(--ms-surface-raised));
+  color: var(--accent);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 45%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.achv-card__name {
+  font-weight: 700;
+  font-size: .92rem;
+  line-height: 1.25;
+  margin-bottom: .15rem;
+}
+
+.achv-card__rarity {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.achv-card__category {
+  color: var(--ms-muted);
+  font-size: .68rem;
+  margin-bottom: .5rem;
+}
+
+.achv-card__desc {
+  color: var(--ms-text-dim);
+  font-size: .8rem;
+  line-height: 1.4;
+  min-height: 2.2em;
+  margin-bottom: .75rem;
+}
+
+.achv-card__footer {
+  font-size: .76rem;
+}
+
+.achv-card__unlocked-flag {
+  color: var(--ms-gold-light);
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  margin-bottom: .5rem;
+}
+
+/* Wax-seal style corner badge on unlocked cards */
+.achv-card__seal {
+  position: absolute;
+  top: -10px; right: -10px;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 35% 30%, var(--ms-gold-light), var(--ms-gold-dark));
+  color: #1a1400;
+  border-radius: 50%;
+  font-size: .85rem;
+  box-shadow: 0 3px 10px rgba(0,0,0,.5);
+}
+
+/* Locked — muted and grayscale, but not flattened to invisible; a small
+   lock badge replaces the seal so the state reads at a glance. */
+.achv-card.is-locked {
+  opacity: .55;
+  filter: grayscale(.85);
+}
+.achv-card.is-locked .achv-card__icon {
+  background: var(--ms-surface-alt);
+  color: var(--ms-muted);
+  border-color: var(--ms-border);
+  filter: none;
+}
+.achv-card.is-locked::before { opacity: .35; }
+
+/* Hidden + locked ("mystery") — distinct from a plain locked card: a slow
+   pulsing glow on the icon hints something special is behind it, without
+   spoiling what. Deliberately not grayscaled as hard as a regular locked
+   card so it still invites curiosity. */
+.achv-card.is-mystery {
+  opacity: .8;
+  filter: none;
+}
+.achv-card.is-mystery .achv-card__icon {
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--ms-gold) 30%, var(--ms-surface-raised)), var(--ms-surface-raised));
+  color: var(--ms-gold-light);
+  border-color: color-mix(in srgb, var(--ms-gold) 45%, transparent);
+  animation: achv-mystery-pulse 2.4s ease-in-out infinite;
+}
+@keyframes achv-mystery-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ms-gold) 35%, transparent); }
+  50%      { box-shadow: 0 0 12px 3px color-mix(in srgb, var(--ms-gold) 35%, transparent); }
+}
+
+/* ============================================================
    Titles showcase (профиль — "Титулы клуба")
    ============================================================
    Two independent color signals, on purpose:

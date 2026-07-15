@@ -2,11 +2,12 @@
 {% from "_macros.html" import player_name %}
 {% block title %}Достижения — {{ player.display_name }}{% endblock %}
 
-{% set RARITY_BADGE = {'common': 'bg-secondary', 'rare': 'bg-info text-dark', 'epic': 'bg-primary', 'legendary': 'bg-warning text-dark', 'mythic': 'bg-danger', 'ultra': 'bg-warning text-dark'} %}
+{% set RARITY_LABEL = {'common': 'Common', 'rare': 'Rare', 'epic': 'Epic', 'legendary': 'Legendary', 'mythic': 'Mythic', 'ultra': 'Ultra'} %}
 {% set CATEGORY_LABELS = {'games': 'Игры', 'wins': 'Победы', 'rating': 'Рейтинг', 'tournaments': 'Турниры', 'seasons': 'Сезоны', 'fantasy': 'Fantasy', 'economy': 'Экономика', 'social': 'Социальные', 'special': 'Специальные'} %}
+{% set CATEGORY_ICONS = {'games': 'bi-controller', 'wins': 'bi-trophy-fill', 'rating': 'bi-graph-up-arrow', 'tournaments': 'bi-award-fill', 'seasons': 'bi-calendar3', 'fantasy': 'bi-joystick', 'economy': 'bi-coin', 'social': 'bi-people-fill', 'special': 'bi-gem'} %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
     <h2 class="mb-0 fw-bold">🏆 Достижения — {{ player_name(player, equipped) }}</h2>
     <a href="{{ url_for('profile.view_profile', player_id=player_id) }}" class="text-muted small">← К профилю</a>
@@ -17,48 +18,125 @@
   </div>
 </div>
 
-<div class="row g-3">
-  {% for item in items %}
-  <div class="col-md-6 col-xl-4">
-    <div class="card h-100 rarity-{{ item.rarity }} {% if not item.unlocked %}achievement-locked{% endif %}">
-      <div class="card-body p-4">
-        <div class="d-flex justify-content-between align-items-start mb-2">
-          <h6 class="fw-semibold mb-0">
-            {% if item.icon %}<i class="bi {{ item.icon }} me-1"></i>{% endif %}{{ item.name }}
-          </h6>
-          <span class="badge {{ RARITY_BADGE.get(item.rarity, 'bg-secondary') }}">{{ item.rarity }}</span>
-        </div>
-        <div class="text-muted small mb-2">{{ CATEGORY_LABELS.get(item.category, item.category) }}</div>
-        {% if item.description %}
-        <p class="text-muted small mb-3">{{ item.description }}</p>
-        {% endif %}
-
-        {% if item.unlocked %}
-          <div class="text-success small mb-2">
-            <i class="bi bi-check-circle-fill me-1"></i>Получено
-            {% if item.unlocked_at %}{{ item.unlocked_at[:10] }}{% endif %}
-          </div>
-          {% if is_own %}
-            {% if item.pinned %}
-            <form method="POST" action="{{ url_for('profile.unpin_achievement', player_id=player_id, achievement_id=item.id) }}">
-              <button type="submit" class="btn btn-sm btn-outline-warning w-100">
-                <i class="bi bi-pin-angle-fill me-1"></i>Открепить
-              </button>
-            </form>
-            {% else %}
-            <form method="POST" action="{{ url_for('profile.pin_achievement', player_id=player_id, achievement_id=item.id) }}">
-              <button type="submit" class="btn btn-sm btn-outline-secondary w-100">
-                <i class="bi bi-pin-angle me-1"></i>Закрепить
-              </button>
-            </form>
-            {% endif %}
-          {% endif %}
-        {% else %}
-          <div class="text-muted small"><i class="bi bi-lock-fill me-1"></i>Не получено</div>
-        {% endif %}
-      </div>
+<div class="achv-toolbar">
+  <div class="achv-progress-wrap">
+    <div class="achv-progress-track">
+      <div class="achv-progress-fill" style="width: {{ completion_pct }}%;"></div>
     </div>
   </div>
+  <button type="button" class="achv-filter-pill active" data-achv-filter="all">Все</button>
+  <button type="button" class="achv-filter-pill" data-achv-filter="unlocked">Получено</button>
+  <button type="button" class="achv-filter-pill" data-achv-filter="locked">Не получено</button>
+  {% for cat in CATEGORY_LABELS.keys() %}
+    {% if items | selectattr('category', 'equalto', cat) | list | length > 0 %}
+    <button type="button" class="achv-filter-pill" data-achv-category="{{ cat }}">{{ CATEGORY_LABELS[cat] }}</button>
+    {% endif %}
   {% endfor %}
 </div>
+
+{% set ns = namespace(current_category=None) %}
+{% for item in items %}
+  {% if item.category != ns.current_category %}
+    {% if ns.current_category is not none %}</div>{% endif %}
+    {% set ns.current_category = item.category %}
+    <h3 class="achv-section-title" data-achv-section="{{ item.category }}">
+      <i class="bi {{ CATEGORY_ICONS.get(item.category, 'bi-star') }}"></i>
+      {{ CATEGORY_LABELS.get(item.category, item.category) }}
+      <span class="achv-section-count">
+        {{ items | selectattr('category', 'equalto', item.category) | selectattr('unlocked') | list | length }}/{{ items | selectattr('category', 'equalto', item.category) | list | length }}
+      </span>
+    </h3>
+    <div class="achv-grid">
+  {% endif %}
+
+  {% set state = 'is-unlocked' if item.unlocked else ('is-mystery' if item.is_hidden else 'is-locked') %}
+  <div class="achv-card achv-card--{{ item.rarity }} {{ state }}"
+       data-achv-state="{{ 'unlocked' if item.unlocked else 'locked' }}"
+       data-achv-category="{{ item.category }}">
+    {% if item.unlocked %}
+    <div class="achv-card__seal"><i class="bi bi-check-lg"></i></div>
+    {% endif %}
+    <div class="achv-card__head">
+      <div class="achv-card__icon">
+        <i class="bi {{ item.icon or 'bi-star' }}"></i>
+      </div>
+      <div class="flex-grow-1">
+        <div class="achv-card__name">{{ item.name }}</div>
+        <div class="achv-card__rarity">{{ RARITY_LABEL.get(item.rarity, item.rarity) }}</div>
+      </div>
+    </div>
+    {% if item.description %}
+    <p class="achv-card__desc">{{ item.description }}</p>
+    {% endif %}
+
+    <div class="achv-card__footer">
+      {% if item.unlocked %}
+        <div class="achv-card__unlocked-flag">
+          <i class="bi bi-check-circle-fill"></i>Получено
+          {% if item.unlocked_at %}· {{ item.unlocked_at[:10] }}{% endif %}
+        </div>
+        {% if is_own %}
+          {% if item.pinned %}
+          <form method="POST" action="{{ url_for('profile.unpin_achievement', player_id=player_id, achievement_id=item.id) }}">
+            <button type="submit" class="btn btn-sm btn-outline-warning w-100">
+              <i class="bi bi-pin-angle-fill me-1"></i>Открепить
+            </button>
+          </form>
+          {% else %}
+          <form method="POST" action="{{ url_for('profile.pin_achievement', player_id=player_id, achievement_id=item.id) }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary w-100">
+              <i class="bi bi-pin-angle me-1"></i>Закрепить
+            </button>
+          </form>
+          {% endif %}
+        {% endif %}
+      {% else %}
+        <div class="text-muted"><i class="bi bi-lock-fill me-1"></i>Не получено</div>
+      {% endif %}
+    </div>
+  </div>
+{% endfor %}
+{% if ns.current_category is not none %}</div>{% endif %}
+
+<script>
+(function () {
+  var pills = document.querySelectorAll('.achv-filter-pill');
+  var cards = document.querySelectorAll('.achv-card');
+  var sections = document.querySelectorAll('[data-achv-section]');
+
+  function applyFilter(mode, category) {
+    cards.forEach(function (card) {
+      var stateOk = mode === 'all' || card.dataset.achvState === mode;
+      var catOk = !category || card.dataset.achvCategory === category;
+      card.style.display = (stateOk && catOk) ? '' : 'none';
+    });
+    sections.forEach(function (section) {
+      var cat = section.dataset.achvSection;
+      if (category && cat !== category) {
+        section.style.display = 'none';
+        return;
+      }
+      section.style.display = '';
+      var grid = section.nextElementSibling;
+      var visible = grid ? Array.prototype.some.call(grid.children, function (c) {
+        return c.style.display !== 'none';
+      }) : false;
+      section.style.display = visible ? '' : 'none';
+      if (grid) grid.style.display = visible ? '' : 'none';
+    });
+  }
+
+  pills.forEach(function (pill) {
+    pill.addEventListener('click', function () {
+      pills.forEach(function (p) { p.classList.remove('active'); });
+      pill.classList.add('active');
+      if (pill.dataset.achvFilter) {
+        applyFilter(pill.dataset.achvFilter, null);
+      } else if (pill.dataset.achvCategory) {
+        applyFilter('all', pill.dataset.achvCategory);
+      }
+    });
+  });
+})();
+</script>
 {% endblock %}
