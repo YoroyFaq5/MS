@@ -10,11 +10,12 @@
     <div class="d-flex align-items-center gap-3 flex-wrap">
       <h2 class="mb-0 fw-bold">{{ tournament.name }}</h2>
       <span class="badge fs-6
-        {% if tournament.status == 'active' %}bg-success
+        {% if tournament.status == 'active' or (series_tournament_id and tournament.status == 'pending') %}bg-success
         {% elif tournament.status == 'finished' %}bg-secondary
         {% else %}bg-warning text-dark{% endif %}">
         {% if tournament.status == 'active' %}🟢 Активен
         {% elif tournament.status == 'finished' %}✅ Завершён
+        {% elif series_tournament_id %}🔴 Идёт по сериям
         {% else %}⏳ Ожидает{% endif %}
       </span>
     </div>
@@ -54,7 +55,7 @@
   <!-- Actions -->
   <div class="d-flex gap-2 flex-wrap">
     {% if current_user.is_authenticated and current_user.is_admin %}
-    {% if tournament.status == 'pending' %}
+    {% if tournament.status == 'pending' and not series_tournament_id %}
     <form method="POST" action="{{ url_for('tournaments.activate_tournament', tournament_id=tournament.id) }}">
       <button class="btn btn-success" onclick="return confirm('Запустить турнир?')">
         <i class="bi bi-play-fill me-1"></i>Запустить

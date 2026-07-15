@@ -314,6 +314,8 @@
     <span class="tourney-status tourney-status--active"><span class="tourney-status__dot"></span>Активен</span>
     {% elif t.status == 'finished' %}
     <span class="tourney-status tourney-status--finished"><i class="bi bi-check-circle-fill"></i>Завершён</span>
+    {% elif series_tournament_ids.get(t.id) %}
+    <span class="tourney-status tourney-status--active"><span class="tourney-status__dot"></span>Идёт по сериям</span>
     {% else %}
     <span class="tourney-status tourney-status--pending"><i class="bi bi-hourglass-split"></i>Ожидает</span>
     {% endif %}
@@ -322,7 +324,7 @@
   {% if featured %}
   {% set t = featured %}
   <a href="{{ url_for('tournaments.tournament_detail', tournament_id=t.id) }}" class="tourney-featured fade-in-up text-decoration-none text-reset" style="--d:0ms">
-    {% if t.status == 'pending' %}<span class="tourney-ribbon">Скоро</span>{% endif %}
+    {% if t.status == 'pending' and not series_tournament_ids.get(t.id) %}<span class="tourney-ribbon">Скоро</span>{% endif %}
     <div class="tourney-featured__crest">
       <i class="bi {{ 'bi-people-fill' if t.type.value == 'team' else 'bi-person-badge-fill' }}"></i>
     </div>
@@ -363,9 +365,9 @@
   <div class="tourney-grid">
     {% for t in tournaments %}
     {% if t.id != (featured.id if featured else none) %}
-    <div class="tourney-card tourney-card--{{ t.status }}{% if loop.index0 < 9 %} fade-in-up{% endif %}"
+    <div class="tourney-card tourney-card--{{ 'active' if (t.status == 'active' or series_tournament_ids.get(t.id)) else t.status }}{% if loop.index0 < 9 %} fade-in-up{% endif %}"
          {% if loop.index0 < 9 %}style="--d:{{ (loop.index0 % 9) * 45 }}ms"{% endif %}>
-      {% if t.status == 'pending' %}<span class="tourney-ribbon">Скоро</span>{% endif %}
+      {% if t.status == 'pending' and not series_tournament_ids.get(t.id) %}<span class="tourney-ribbon">Скоро</span>{% endif %}
 
       <div class="tourney-card__head">
         <div class="tourney-card__crest"><i class="bi {{ 'bi-people-fill' if t.type.value == 'team' else 'bi-person-badge-fill' }}"></i></div>
