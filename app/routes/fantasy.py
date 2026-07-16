@@ -144,6 +144,7 @@ def tournament_fantasy(tournament_id: int):
         series=None,
         leaderboard=leaderboard,
         pool_info=pool_info,
+        entry_cost=pool_info["entry_cost"],
         my_draft=my_draft,
         available_players=available,
         max_picks=max_picks,
@@ -167,11 +168,12 @@ def series_fantasy(series_id: int):
     — own leaderboard/prize pool, scored off that evening's stage rating
     instead of the whole tournament's.
 
-    Exclusivity groups (see FantasyService._assign_group): once the user
-    has a draft, it belongs to a group and picks are exclusive within it —
-    the leaderboard/pool shown narrow to just that group (own mini-league,
-    own bank). Before drafting (no group assigned yet), shows the combined
-    view across all groups so newcomers can still see the whole picture."""
+    Exclusivity groups (see FantasyService._assign_group): a draft's picks
+    are exclusive only within its own group (own mini-league, own bank),
+    but the page shows EVERY group's leaderboard/pool — hiding the others
+    would make it look like the rest of the field vanished. The viewer's
+    own group (if any) is surfaced first and expanded by default; the
+    rest are collapsed but one click away."""
     series = db.session.get(TournamentSeries, series_id) or abort(404)
     tournament = series.series_tournament.tournament
 
@@ -183,23 +185,46 @@ def series_fantasy(series_id: int):
             available = FantasyService.get_available_picks(current_user, tournament.id, series_id)
 
     my_group = my_draft.group_number if my_draft else None
-    leaderboard = FantasyService.get_leaderboard(tournament.id, series_id, group_number=my_group)
-    pool_info = FantasyService.get_pool_info(tournament.id, series_id, group_number=my_group)
+
+    FantasyService._self_heal_series(series_id)
+    group_rows = db.session.query(FantasyDraft.group_number).filter(
+        FantasyDraft.tournament_series_id == series_id,
+    ).distinct().all()
+    group_numbers = sorted({g for (g,) in group_rows if g is not None})
+    # Legacy drafts predating this feature have group_number=None — treat
+    # them as their own single implicit group so they still show up.
+    if any(g is None for (g,) in group_rows):
+        group_numbers.append(None)
+
+    groups = [
+        {
+            "group_number": g,
+            "is_mine": g == my_group,
+            "leaderboard": FantasyService.get_leaderboard(tournament.id, series_id, group_number=g),
+            "pool_info": FantasyService.get_pool_info(tournament.id, series_id, group_number=g),
+        }
+        for g in group_numbers
+    ]
+    groups.sort(key=lambda row: (not row["is_mine"], row["group_number"] is None, row["group_number"]))
 
     from app.services.fantasy_service import SERIES_PICKS_PER_DRAFTER
     max_picks = SERIES_PICKS_PER_DRAFTER
 
     pick_player_ids = {p.player_id for p in my_draft.picks} if my_draft else set()
-    for e in leaderboard:
-        pick_player_ids.update(pk["player_id"] for pk in e.picks)
+    for grp in groups:
+        for e in grp["leaderboard"]:
+            pick_player_ids.update(pk["player_id"] for pk in e.picks)
     equipped_bulk = ShopService.get_equipped_bulk(list(pick_player_ids))
+
+    from app.services.economy_service import EconomyService
+    entry_cost = EconomyService.get_settings().fantasy_entry_cost
 
     return render_template(
         "fantasy/tournament.html",
         tournament=tournament,
         series=series,
-        leaderboard=leaderboard,
-        pool_info=pool_info,
+        groups=groups,
+        entry_cost=entry_cost,
         my_draft=my_draft,
         my_group=my_group,
         available_players=available,

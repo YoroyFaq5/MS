@@ -2,6 +2,90 @@
 {% from "_macros.html" import player_name %}
 {% block title %}Fantasy — {{ tournament.name }}{% if series %} — {{ series.name }}{% endif %}{% endblock %}
 
+{% macro render_leaderboard(entries, equipped_bulk) %}
+{% if entries %}
+<div class="table-responsive">
+<table class="table table-hover mb-0 align-middle">
+  <thead>
+    <tr>
+      <th class="ps-4">#</th>
+      <th>Участник</th>
+      <th class="text-center">Выборов</th>
+      <th class="text-center">Статус</th>
+      <th class="text-end pe-4">Очки</th>
+      <th class="pe-3"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in entries %}
+    <tr class="fantasy-board-row
+        {% if e.rank <= 3 %}fantasy-board-row--rank-{{ e.rank }}{% endif %}
+        {% if current_user.is_authenticated and e.user_id == current_user.id %}table-active{% endif %}"
+        {% if e.picks %}
+        data-bs-toggle="collapse" data-bs-target="#fpicks-{{ e.draft_id }}"
+        role="button" aria-expanded="false" aria-controls="fpicks-{{ e.draft_id }}"
+        {% endif %}>
+      <td class="ps-4">
+        {% if e.rank == 1 %}🥇
+        {% elif e.rank == 2 %}🥈
+        {% elif e.rank == 3 %}🥉
+        {% else %}<span class="text-muted">{{ e.rank }}</span>{% endif %}
+      </td>
+      <td class="fw-medium">
+        {{ e.display_name }}
+        {% if current_user.is_authenticated and e.user_id == current_user.id %}
+        <span class="badge bg-body-secondary text-muted border ms-1 small">Вы</span>
+        {% endif %}
+      </td>
+      <td class="text-center text-muted">{{ e.pick_count }}</td>
+      <td class="text-center">
+        <span class="badge
+          {% if e.status == 'open' %}bg-success
+          {% elif e.status == 'locked' %}bg-warning text-dark
+          {% else %}bg-secondary{% endif %}">
+          {% if e.status == 'open' %}Открыт
+          {% elif e.status == 'locked' %}Зафиксирован
+          {% else %}Подсчитан{% endif %}
+        </span>
+      </td>
+      <td class="text-end pe-4 fw-bold
+        {% if e.total_points > 0 %}text-success{% else %}text-muted{% endif %}">
+        {{ e.total_points }}
+      </td>
+      <td class="pe-3 text-end">
+        {% if e.picks %}<i class="bi bi-chevron-down fantasy-board-row__chevron"></i>{% endif %}
+      </td>
+    </tr>
+    {% if e.picks %}
+    <tr class="collapse" id="fpicks-{{ e.draft_id }}">
+      <td colspan="6" class="p-0 border-0">
+        <div class="fantasy-board-detail__inner">
+          <div class="fantasy-board-detail__picks">
+            {% for pk in e.picks %}
+            <span class="fantasy-pick-chip">
+              {{ player_name(pk.player, equipped_bulk.get(pk.player_id, {})) if pk.player else pk.display_name }}
+              <span class="fantasy-pick-chip__points {% if pk.points_earned > 0 %}text-success{% else %}text-muted{% endif %}">
+                {{ pk.points_earned }}
+              </span>
+            </span>
+            {% endfor %}
+          </div>
+        </div>
+      </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
+  Пока нет участников Fantasy для этого турнира
+</div>
+{% endif %}
+{% endmacro %}
+
 {% block content %}
 <div class="d-flex align-items-center gap-3 mb-4">
   <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
@@ -27,11 +111,12 @@
   {% endif %}
 </div>
 
-{% if series and my_group %}
+{% if series and groups %}
 <div class="alert alert-secondary small mb-3">
   <i class="bi bi-diagram-3 me-1"></i>
-  В этой серии пики эксклюзивны — игрок, выбранный менеджером из вашей группы, недоступен другим менеджерам
-  той же группы. Лидерборд и призовой фонд ниже — только для группы {{ my_group }}; в других группах свои.
+  В этой серии пики эксклюзивны только внутри своей группы — игрок, выбранный менеджером из вашей группы,
+  недоступен другим менеджерам той же группы, но свободен в других. У каждой группы свой лидерборд и свой
+  призовой фонд — все группы показаны ниже{% if my_group %}, ваша ({{ my_group }}) — сверху{% endif %}.
 </div>
 {% endif %}
 
@@ -136,7 +221,7 @@
           <div class="fs-2 mb-2">🎯</div>
           <p class="text-muted small mb-1">Создайте драфт и выберите {{ max_picks }} игроков</p>
           <p class="small mb-3">
-            Стоимость участия: <strong>{{ pool_info.entry_cost | int }} монет</strong>
+            Стоимость участия: <strong>{{ entry_cost | int }} монет</strong>
             {% if current_user.player %}
             · ваш баланс: <strong>{{ (current_user.player.coins or 0) | int }}</strong>
             {% endif %}
@@ -165,11 +250,10 @@
     </div>
     {% endif %}
 
-    <!-- Prize pool -->
+    {% if not series %}
+    <!-- Prize pool (tournament-wide — single implicit group) -->
     <div class="card mt-3">
-      <div class="card-header fw-semibold small">
-        💰 Призовой фонд{% if series and my_group %} — группа {{ my_group }}{% endif %}
-      </div>
+      <div class="card-header fw-semibold small">💰 Призовой фонд</div>
       <div class="card-body p-3">
         <div class="small">
           <div class="d-flex justify-content-between mb-1">
@@ -193,103 +277,58 @@
         <div class="form-text mt-2">Итог драфта — сумма рейтинговых очков выбранных игроков в турнире.</div>
       </div>
     </div>
+    {% endif %}
   </div>
 
-  <!-- Right: leaderboard -->
+  <!-- Right: leaderboard(s) -->
   <div class="col-lg-7">
-    <div class="card">
-      <div class="card-header fw-semibold">
-        🏆 Fantasy-лидерборд{% if series and my_group %} — группа {{ my_group }}{% endif %}
-      </div>
-      <div class="card-body p-0">
-        {% if leaderboard %}
-        {% set col_count = 6 + (1 if series and not my_group else 0) %}
-        <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
-          <thead>
-            <tr>
-              <th class="ps-4">#</th>
-              <th>Участник</th>
-              {% if series and not my_group %}<th class="text-center">Группа</th>{% endif %}
-              <th class="text-center">Выборов</th>
-              <th class="text-center">Статус</th>
-              <th class="text-end pe-4">Очки</th>
-              <th class="pe-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for e in leaderboard %}
-            <tr class="fantasy-board-row
-                {% if e.rank <= 3 %}fantasy-board-row--rank-{{ e.rank }}{% endif %}
-                {% if current_user.is_authenticated and e.user_id == current_user.id %}table-active{% endif %}"
-                {% if e.picks %}
-                data-bs-toggle="collapse" data-bs-target="#fpicks-{{ e.draft_id }}"
-                role="button" aria-expanded="false" aria-controls="fpicks-{{ e.draft_id }}"
-                {% endif %}>
-              <td class="ps-4">
-                {% if e.rank == 1 %}🥇
-                {% elif e.rank == 2 %}🥈
-                {% elif e.rank == 3 %}🥉
-                {% else %}<span class="text-muted">{{ e.rank }}</span>{% endif %}
-              </td>
-              <td class="fw-medium">
-                {{ e.display_name }}
-                {% if current_user.is_authenticated and e.user_id == current_user.id %}
-                <span class="badge bg-body-secondary text-muted border ms-1 small">Вы</span>
-                {% endif %}
-              </td>
-              {% if series and not my_group %}
-              <td class="text-center text-muted small">{{ e.group_number or '—' }}</td>
-              {% endif %}
-              <td class="text-center text-muted">{{ e.pick_count }}</td>
-              <td class="text-center">
-                <span class="badge
-                  {% if e.status == 'open' %}bg-success
-                  {% elif e.status == 'locked' %}bg-warning text-dark
-                  {% else %}bg-secondary{% endif %}">
-                  {% if e.status == 'open' %}Открыт
-                  {% elif e.status == 'locked' %}Зафиксирован
-                  {% else %}Подсчитан{% endif %}
-                </span>
-              </td>
-              <td class="text-end pe-4 fw-bold
-                {% if e.total_points > 0 %}text-success{% else %}text-muted{% endif %}">
-                {{ e.total_points }}
-              </td>
-              <td class="pe-3 text-end">
-                {% if e.picks %}<i class="bi bi-chevron-down fantasy-board-row__chevron"></i>{% endif %}
-              </td>
-            </tr>
-            {% if e.picks %}
-            <tr class="collapse" id="fpicks-{{ e.draft_id }}">
-              <td colspan="{{ col_count }}" class="p-0 border-0">
-                <div class="fantasy-board-detail__inner">
-                  <div class="fantasy-board-detail__picks">
-                    {% for pk in e.picks %}
-                    <span class="fantasy-pick-chip">
-                      {{ player_name(pk.player, equipped_bulk.get(pk.player_id, {})) if pk.player else pk.display_name }}
-                      <span class="fantasy-pick-chip__points {% if pk.points_earned > 0 %}text-success{% else %}text-muted{% endif %}">
-                        {{ pk.points_earned }}
-                      </span>
-                    </span>
-                    {% endfor %}
-                  </div>
-                </div>
-              </td>
-            </tr>
+    {% if series %}
+      {% for grp in groups %}
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center fw-semibold
+            {% if not grp.is_mine %}fantasy-board-row{% endif %}"
+            {% if not grp.is_mine %}
+            data-bs-toggle="collapse" data-bs-target="#fgroup-{{ grp.group_number or 'none' }}"
+            role="button" aria-expanded="false" aria-controls="fgroup-{{ grp.group_number or 'none' }}"
+            {% endif %}>
+          <span>
+            🏆 Группа {{ grp.group_number or '—' }}
+            {% if grp.is_mine %}
+            <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle ms-2">Ваша группа</span>
             {% endif %}
-            {% endfor %}
-          </tbody>
-        </table>
+          </span>
+          {% if not grp.is_mine %}<i class="bi bi-chevron-down fantasy-board-row__chevron"></i>{% endif %}
         </div>
-        {% else %}
-        <div class="text-center text-muted py-5">
+        <div class="collapse {% if grp.is_mine %}show{% endif %}" id="fgroup-{{ grp.group_number or 'none' }}">
+          <div class="d-flex flex-wrap gap-3 small px-3 py-2 border-bottom">
+            <span class="text-muted">Взнос: <strong class="text-body">{{ grp.pool_info.entry_cost | int }}</strong></span>
+            <span class="text-muted">Участников: <strong class="text-body">{{ grp.pool_info.participant_count }}</strong></span>
+            <span class="text-muted">Банк: <strong class="text-warning">{{ grp.pool_info.bank | int }}</strong></span>
+            <span class="text-muted">🥇 <strong class="text-warning">{{ grp.pool_info.payout_1st | int }}</strong></span>
+            <span class="text-muted">🥈 <strong class="text-body">{{ grp.pool_info.payout_2nd | int }}</strong></span>
+          </div>
+          <div class="card-body p-0">
+            {{ render_leaderboard(grp.leaderboard, equipped_bulk) }}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not groups %}
+      <div class="card">
+        <div class="card-body text-center text-muted py-5">
           <i class="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
-          Пока нет участников Fantasy для этого турнира
+          Пока нет ни одного драфта в этой серии
         </div>
-        {% endif %}
+      </div>
+      {% endif %}
+    {% else %}
+    <div class="card">
+      <div class="card-header fw-semibold">🏆 Fantasy-лидерборд</div>
+      <div class="card-body p-0">
+        {{ render_leaderboard(leaderboard, equipped_bulk) }}
       </div>
     </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
