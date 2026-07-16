@@ -9,15 +9,21 @@ from app import db
 from app.models import FantasyDraft, Tournament, Player, TournamentSeries, SeriesStatus
 from app.services import FantasyService, PermissionService, Permission
 from app.services.shop_service import ShopService
-from app.auth_decorators import requires_permission
+from app.auth_decorators import requires_permission, admin_required
 
 fantasy_bp = Blueprint("fantasy", __name__)
 
 
 def _draft_redirect_url(draft: FantasyDraft) -> str:
-    """Pick/unpick actions are shared between tournament-wide and
-    series-scoped drafts (same routes, keyed off draft_id) — this sends
-    the user back to whichever page they came from."""
+    """Pick/unpick/cancel actions are shared between the player-facing
+    pages and the admin drafts-management page (same routes, keyed off
+    draft_id) — sends the user back to whichever page they came from.
+    An admin acting on someone ELSE's draft goes back to the admin list
+    (they're managing multiple drafts there, not their own)."""
+    if current_user.is_authenticated and current_user.is_admin and draft.user_id != current_user.id:
+        if draft.tournament_series_id:
+            return url_for("fantasy.admin_series_drafts", series_id=draft.tournament_series_id)
+        return url_for("fantasy.admin_tournament_drafts", tournament_id=draft.tournament_id)
     if draft.tournament_series_id:
         return url_for("fantasy.series_fantasy", series_id=draft.tournament_series_id)
     return url_for("fantasy.tournament_fantasy", tournament_id=draft.tournament_id)
@@ -253,3 +259,95 @@ def cancel_draft(draft_id: int):
     result = FantasyService.cancel_draft(current_user, draft_id)
     flash(result.message, "success" if result.ok else "danger")
     return redirect(redirect_url)
+
+
+def _admin_draft_rows(drafts, tournament_id, series_id):
+    """Per-draft available-picks list for the admin management page —
+    reuses FantasyService.get_available_picks with the DRAFT OWNER (not
+    the admin) as the picking user, same as the owner would see on their
+    own page. Only computed for OPEN drafts (locked/scored ones show
+    read-only, per PermissionService.can_edit_draft/add_pick/remove_pick/
+    cancel_draft, which all still gate on status == OPEN even for admins)."""
+    rows = []
+    for d in drafts:
+        available = (
+            FantasyService.get_available_picks(d.user, tournament_id, series_id)
+            if d.status.value == "open" and d.user else []
+        )
+        rows.append({"draft": d, "available": available})
+    return rows
+
+
+@fantasy_bp.route("/tournament/<int:tournament_id>/admin")
+@admin_required
+def admin_tournament_drafts(tournament_id: int):
+    """Admin-only: view and manage every user's draft for a tournament-wide
+    Fantasy pool (add/remove picks, cancel) — for fixing mistakes or
+    helping players who can't manage their own draft (e.g. legacy-migration
+    login issues). Reuses the same add_pick/remove_pick/cancel_draft routes
+    a regular drafter uses, since those already permit admins to act on
+    any draft (see PermissionService.can_edit_draft)."""
+    t = db.session.get(Tournament, tournament_id) or abort(404)
+    drafts = (
+        db.session.query(FantasyDraft)
+        .filter_by(tournament_id=tournament_id, tournament_series_id=None)
+        .order_by(FantasyDraft.created_at)
+        .all()
+    )
+    from app.models import TournamentParticipant
+    from app.services.fantasy_service import _allowed_picks
+    participant_count = db.session.query(TournamentParticipant).filter_by(
+        tournament_id=tournament_id
+    ).count()
+    max_picks = _allowed_picks(participant_count)
+
+    draft_rows = _admin_draft_rows(drafts, tournament_id, None)
+    equipped_bulk = ShopService.get_equipped_bulk(
+        [pick.player_id for row in draft_rows for pick in row["draft"].picks]
+    )
+
+    return render_template(
+        "fantasy/admin_drafts.html",
+        tournament=t,
+        series=None,
+        draft_rows=draft_rows,
+        max_picks=max_picks,
+        equipped_bulk=equipped_bulk,
+        back_url=url_for("fantasy.tournament_fantasy", tournament_id=tournament_id),
+    )
+
+
+@fantasy_bp.route("/series/<int:series_id>/admin")
+@admin_required
+def admin_series_drafts(series_id: int):
+    """Admin-only equivalent of admin_tournament_drafts, scoped to one
+    series — drafts are grouped by exclusivity group_number (see
+    FantasyService._assign_group) so the admin can see at a glance which
+    group a mistake needs fixing in."""
+    series = db.session.get(TournamentSeries, series_id) or abort(404)
+    tournament = series.series_tournament.tournament
+    FantasyService._self_heal_series(series_id)
+
+    drafts = (
+        db.session.query(FantasyDraft)
+        .filter_by(tournament_series_id=series_id)
+        .order_by(FantasyDraft.group_number.is_(None), FantasyDraft.group_number, FantasyDraft.created_at)
+        .all()
+    )
+    from app.services.fantasy_service import SERIES_PICKS_PER_DRAFTER
+    max_picks = SERIES_PICKS_PER_DRAFTER
+
+    draft_rows = _admin_draft_rows(drafts, tournament.id, series_id)
+    equipped_bulk = ShopService.get_equipped_bulk(
+        [pick.player_id for row in draft_rows for pick in row["draft"].picks]
+    )
+
+    return render_template(
+        "fantasy/admin_drafts.html",
+        tournament=tournament,
+        series=series,
+        draft_rows=draft_rows,
+        max_picks=max_picks,
+        equipped_bulk=equipped_bulk,
+        back_url=url_for("fantasy.series_fantasy", series_id=series_id),
+    )

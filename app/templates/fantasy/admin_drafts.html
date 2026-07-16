@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% from "_macros.html" import player_name %}
+{% block title %}Fantasy — драфты (админ) — {{ tournament.name }}{% if series %} — {{ series.name }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  <div>
+    <h2 class="mb-0 fw-bold">
+      🛠 Драфты: {{ tournament.name }}{% if series %} — {{ series.name }}{% endif %}
+    </h2>
+    <p class="text-muted small mb-0">
+      Управление чужими драфтами — добавление/удаление пиков и отмена, только пока драфт открыт.
+    </p>
+  </div>
+</div>
+
+{% if not draft_rows %}
+<div class="alert alert-secondary small">Пока нет ни одного драфта.</div>
+{% endif %}
+
+<div class="row g-3">
+  {% set ns = namespace(last_group=none) %}
+  {% for row in draft_rows %}
+  {% set d = row.draft %}
+  {% if series and d.group_number != ns.last_group %}
+    {% set ns.last_group = d.group_number %}
+    <div class="col-12 mt-2 mb-n2">
+      <div class="text-muted small fw-semibold text-uppercase">
+        {% if d.group_number %}Группа {{ d.group_number }}{% else %}Без группы{% endif %}
+      </div>
+    </div>
+  {% endif %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
+        <span>{{ d.user.display_name if d.user else '—' }}</span>
+        <span class="badge
+          {% if d.status.value == 'open' %}bg-success
+          {% elif d.status.value == 'locked' %}bg-warning text-dark
+          {% else %}bg-info text-dark{% endif %}">
+          {% if d.status.value == 'open' %}Открыт
+          {% elif d.status.value == 'locked' %}Зафиксирован
+          {% else %}Подсчитан{% endif %}
+        </span>
+      </div>
+      <div class="card-body p-0">
+        {% if d.picks %}
+        <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle small">
+          <thead>
+            <tr>
+              <th class="ps-3">Игрок</th>
+              <th class="text-end">Очки</th>
+              {% if d.status.value == 'open' %}<th></th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for pick in d.picks %}
+            <tr>
+              <td class="ps-3">{{ player_name(pick.player, equipped_bulk.get(pick.player_id, {})) if pick.player else '?' }}</td>
+              <td class="text-end fw-bold {% if pick.points_earned > 0 %}text-success{% else %}text-muted{% endif %}">
+                {{ pick.points_earned }}
+              </td>
+              {% if d.status.value == 'open' %}
+              <td class="pe-2 text-end">
+                <form method="POST"
+                      action="{{ url_for('fantasy.remove_pick', draft_id=d.id, player_id=pick.player_id) }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">✕</button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-active">
+              <td class="ps-3 fw-bold">Итого</td>
+              <td class="text-end fw-bold text-warning">{{ d.total_points }}</td>
+              {% if d.status.value == 'open' %}<td></td>{% endif %}
+            </tr>
+          </tfoot>
+        </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-3 small">Игроки не выбраны</div>
+        {% endif %}
+      </div>
+
+      {% if d.status.value == 'open' %}
+        {% if row.available and d.pick_count < max_picks %}
+        <div class="card-footer">
+          <form method="POST" action="{{ url_for('fantasy.add_pick', draft_id=d.id) }}" class="d-flex gap-2">
+            <select name="player_id" class="form-select form-select-sm" required>
+              <option value="">+ добавить игрока</option>
+              {% for p in row.available %}
+              <option value="{{ p.id }}">{{ p.display_name }} (ELO {{ p.elo|int }})</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-success text-nowrap">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </form>
+          <div class="form-text">{{ d.pick_count }}/{{ max_picks }} выбрано</div>
+        </div>
+        {% elif d.pick_count >= max_picks %}
+        <div class="card-footer text-success small">
+          <i class="bi bi-check-circle me-1"></i>Все {{ max_picks }} игроков выбраны
+        </div>
+        {% endif %}
+        <div class="card-footer">
+          <form method="POST" action="{{ url_for('fantasy.cancel_draft', draft_id=d.id) }}"
+                onsubmit="return confirm('Отменить драфт {{ d.user.display_name if d.user else '' }}? Взнос ({{ d.entry_cost_paid | int }} монет) будет возвращён.');">
+            <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+              <i class="bi bi-x-circle me-1"></i>Отменить драфт
+            </button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

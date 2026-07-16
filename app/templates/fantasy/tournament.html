@@ -19,6 +19,12 @@
     Ваша группа: {{ my_group }}
   </span>
   {% endif %}
+  {% if current_user.is_authenticated and current_user.is_admin %}
+  <a href="{{ url_for('fantasy.admin_series_drafts', series_id=series.id) if series else url_for('fantasy.admin_tournament_drafts', tournament_id=tournament.id) }}"
+     class="btn btn-outline-secondary btn-sm {% if not (series and my_group) %}ms-auto{% endif %}">
+    <i class="bi bi-tools me-1"></i>Драфты (админ)
+  </a>
+  {% endif %}
 </div>
 
 {% if series and my_group %}
