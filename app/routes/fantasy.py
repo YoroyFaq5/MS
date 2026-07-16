@@ -280,10 +280,15 @@ def _admin_draft_rows(drafts, tournament_id, series_id):
 
 def _eligible_admin_draft_users(tournament_id, tournament_series_id):
     """Users the admin can open a new draft FOR — same eligibility
-    FantasyService.create_draft would itself enforce (not a tournament
-    participant, no existing draft for this tournament/series, has a
-    linked player for the entry-fee balance), computed upfront just to
-    keep the dropdown free of choices that would only fail on submit."""
+    FantasyService.create_draft would itself enforce (not playing in this
+    evening/tournament, no existing draft for this tournament/series, has
+    a linked player for the entry-fee balance), computed upfront just to
+    keep the dropdown free of choices that would only fail on submit.
+
+    For a series with a confirmed roster set, "playing in this evening"
+    means THAT roster, not the whole tournament's — see the same fix in
+    FantasyService.create_draft (a season/tournament participant who
+    simply isn't playing this particular evening must stay eligible)."""
     from app.models import TournamentParticipant
     from app.models.user import User
 
@@ -292,11 +297,19 @@ def _eligible_admin_draft_users(tournament_id, tournament_series_id):
             tournament_id=tournament_id, tournament_series_id=tournament_series_id,
         ).all()
     }
-    participant_player_ids = {
-        row[0] for row in db.session.query(TournamentParticipant.player_id).filter_by(
-            tournament_id=tournament_id
-        ).all()
-    }
+
+    playing_player_ids = None
+    if tournament_series_id:
+        series = db.session.get(TournamentSeries, tournament_series_id)
+        if series and series.confirmed_player_ids is not None:
+            playing_player_ids = set(series.confirmed_player_ids)
+    if playing_player_ids is None:
+        playing_player_ids = {
+            row[0] for row in db.session.query(TournamentParticipant.player_id).filter_by(
+                tournament_id=tournament_id
+            ).all()
+        }
+
     users = (
         db.session.query(User)
         .filter(User.player_id.isnot(None))
@@ -305,7 +318,7 @@ def _eligible_admin_draft_users(tournament_id, tournament_series_id):
     )
     return [
         u for u in users
-        if u.id not in existing_user_ids and u.player_id not in participant_player_ids
+        if u.id not in existing_user_ids and u.player_id not in playing_player_ids
     ]
 
 

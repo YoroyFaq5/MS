@@ -183,13 +183,25 @@ class FantasyService:
                 else "У вас уже есть драфт для этого турнира."
             )
 
-        # Anti-abuse: user cannot draft their own tournament
+        # Anti-abuse: cannot draft an evening/tournament you're playing in
+        # yourself. For a series draft with a confirmed roster (see
+        # series_tournaments.py::set_series_roster), this must check THAT
+        # roster, not the whole tournament's — otherwise a season/tournament
+        # participant who simply isn't playing THIS particular evening
+        # would be wrongly blocked from drafting it (see get_available_picks,
+        # which already narrows the same way). No confirmed roster set ->
+        # fall back to the whole tournament's participants, same as before.
         if user.player_id:
-            is_participant = db.session.query(TournamentParticipant).filter_by(
-                tournament_id=tournament_id, player_id=user.player_id
-            ).first()
+            if series and series.confirmed_player_ids is not None:
+                is_participant = user.player_id in series.confirmed_player_ids
+            else:
+                is_participant = db.session.query(TournamentParticipant).filter_by(
+                    tournament_id=tournament_id, player_id=user.player_id
+                ).first() is not None
             if is_participant:
                 return FantasyResult.fail(
+                    "Вы не можете создать фэнтези-драфт для серии, в которой играете сами."
+                    if series else
                     "Вы не можете создать фэнтези-драфт для турнира, "
                     "в котором участвуете как игрок."
                 )
