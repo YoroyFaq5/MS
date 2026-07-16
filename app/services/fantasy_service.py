@@ -936,6 +936,44 @@ class FantasyService:
         )
 
     @staticmethod
+    def get_all_draft_history(
+        tournament_id: Optional[int] = None,
+        tournament_series_id: Optional[int] = None,
+        user_id: Optional[int] = None,
+        is_practice: Optional[bool] = None,
+        page: int = 1,
+        per_page: int = 30,
+    ) -> dict:
+        """
+        Public, filterable, paginated feed of EVERY draft ever created by
+        ANY user — for a club-wide "История драфтов" page. Always
+        paginated: unlike get_user_draft_history (bounded by one person's
+        own draft count), this table only grows across the site's whole
+        lifetime, so an unbounded "show everything" query here would
+        eventually repeat the /titles/nominations incident (a page that's
+        cheap today silently becoming an O(N) outage once N grows for
+        years) — see NominationService._streak_king_ranking's history.
+        """
+        query = db.session.query(FantasyDraft)
+        if tournament_id is not None:
+            query = query.filter(FantasyDraft.tournament_id == tournament_id)
+        if tournament_series_id is not None:
+            query = query.filter(FantasyDraft.tournament_series_id == tournament_series_id)
+        if user_id is not None:
+            query = query.filter(FantasyDraft.user_id == user_id)
+        if is_practice is not None:
+            query = query.filter(FantasyDraft.is_practice == is_practice)
+
+        total = query.count()
+        drafts = (
+            query.order_by(FantasyDraft.created_at.desc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+        return {"drafts": drafts, "total": total, "page": page, "per_page": per_page}
+
+    @staticmethod
     def get_top_picks(
         tournament_id: int, tournament_series_id: Optional[int] = None, limit: int = 3,
     ) -> List[dict]:

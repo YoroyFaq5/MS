@@ -28,13 +28,17 @@
     <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-danger ms-3">Войти</a>
   </div>
 </div>
-{% else %}
-<div class="d-flex justify-content-end mb-3">
+{% endif %}
+<div class="d-flex justify-content-end gap-2 mb-3">
+  {% if current_user.is_authenticated %}
   <a href="{{ url_for('fantasy.draft_history') }}" class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-clock-history me-1"></i>Мои драфты
   </a>
+  {% endif %}
+  <a href="{{ url_for('fantasy.draft_history_all') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-collection me-1"></i>История драфтов
+  </a>
 </div>
-{% endif %}
 
 <!-- ── Как это работает ────────────────────────────────────────────────── -->
 <div class="fantasy-how">

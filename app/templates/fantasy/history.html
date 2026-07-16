@@ -9,6 +9,9 @@
     <h2 class="mb-0 fw-bold">🕘 Мои драфты</h2>
     <p class="text-muted small mb-0">История всех ваших Fantasy-драфтов — платных и тренировочных.</p>
   </div>
+  <a href="{{ url_for('fantasy.draft_history_all') }}" class="btn btn-outline-secondary btn-sm ms-auto">
+    <i class="bi bi-collection me-1"></i>Все драфты клуба
+  </a>
 </div>
 
 {% if not rows %}

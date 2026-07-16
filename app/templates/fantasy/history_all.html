@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% from "_macros.html" import player_name %}
+{% block title %}История драфтов — Fantasy{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('fantasy.index') }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  <div>
+    <h2 class="mb-0 fw-bold">🗂 История драфтов</h2>
+    <p class="text-muted small mb-0">Все Fantasy-драфты клуба — платные и тренировочные, всех участников.</p>
+  </div>
+  {% if current_user.is_authenticated %}
+  <a href="{{ url_for('fantasy.draft_history') }}" class="btn btn-outline-secondary btn-sm ms-auto">
+    <i class="bi bi-person me-1"></i>Только мои
+  </a>
+  {% endif %}
+</div>
+
+<div class="card mb-3">
+  <div class="card-body p-3">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small text-muted mb-1">Турнир</label>
+        <select name="tournament_id" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Все турниры</option>
+          {% for t in tournaments_with_drafts %}
+          <option value="{{ t.id }}" {% if filters.tournament_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small text-muted mb-1">Серия</label>
+        <select name="series_id" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Все серии</option>
+          {% for s in series_with_drafts %}
+          <option value="{{ s.id }}" {% if filters.series_id == s.id %}selected{% endif %}>
+            {{ s.series_tournament.tournament.name }} — {{ s.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small text-muted mb-1">Участник</label>
+        <select name="user_id" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Все участники</option>
+          {% for u in users_with_drafts %}
+          <option value="{{ u.id }}" {% if filters.user_id == u.id %}selected{% endif %}>{{ u.display_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small text-muted mb-1">Режим</label>
+        <select name="mode" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Все режимы</option>
+          <option value="paid" {% if filters.mode == 'paid' %}selected{% endif %}>💰 Платные</option>
+          <option value="practice" {% if filters.mode == 'practice' %}selected{% endif %}>🎓 Тренировочные</option>
+        </select>
+      </div>
+    </form>
+  </div>
+</div>
+
+<p class="text-muted small">Всего драфтов: {{ total }}</p>
+
+{% if not rows %}
+<div class="alert alert-secondary small">Ничего не найдено по этим фильтрам.</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for row in rows %}
+  {% set d = row.draft %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
+        <span>{{ d.user.display_name if d.user else '—' }}</span>
+        {% if d.is_practice %}
+        <span class="badge bg-secondary-subtle text-secondary-emphasis border" title="Тренировочный драфт">🎓</span>
+        {% else %}
+        <span class="badge bg-warning-subtle text-warning-emphasis border" title="Платный драфт">💰</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <div class="small fw-medium mb-2">
+          {{ d.tournament.name if d.tournament else '—' }}
+          {% if d.tournament_series %} — {{ d.tournament_series.name }}{% endif %}
+        </div>
+        <div class="d-flex flex-wrap gap-2 mb-2 small">
+          <span class="badge
+            {% if d.status.value == 'open' %}bg-success
+            {% elif d.status.value == 'locked' %}bg-warning text-dark
+            {% else %}bg-info text-dark{% endif %}">
+            {% if d.status.value == 'open' %}Открыт
+            {% elif d.status.value == 'locked' %}Зафиксирован
+            {% else %}Подсчитан{% endif %}
+          </span>
+          {% if d.group_number %}
+          <span class="badge bg-body-secondary text-muted border">Группа {{ d.group_number }}</span>
+          {% endif %}
+          {% if row.rank %}
+          <span class="badge bg-danger-subtle text-danger-emphasis border">
+            {% if row.rank == 1 %}🥇{% elif row.rank == 2 %}🥈{% elif row.rank == 3 %}🥉{% endif %}
+            {{ row.rank }} из {{ row.field_size }}
+          </span>
+          {% endif %}
+        </div>
+
+        {% if d.picks %}
+        <div class="small mb-2">
+          {% for pick in d.picks %}
+          <div class="d-flex justify-content-between border-bottom py-1">
+            <span>{{ player_name(pick.player, equipped_bulk.get(pick.player_id, {})) if pick.player else '?' }}</span>
+            <span class="fw-bold {% if pick.points_earned > 0 %}text-success{% else %}text-muted{% endif %}">{{ pick.points_earned }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted small mb-2">Игроки не выбраны</div>
+        {% endif %}
+
+        <div class="d-flex justify-content-between small">
+          <span class="text-muted">{{ d.created_at.strftime('%d.%m.%Y') }}</span>
+          <span class="fw-bold text-warning">{{ d.total_points }} очков</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if total_pages > 1 %}
+<nav class="mt-4">
+  <ul class="pagination pagination-sm justify-content-center">
+    {% for p in range(1, total_pages + 1) %}
+    <li class="page-item {% if p == page %}active{% endif %}">
+      <a class="page-link"
+         href="{{ url_for('fantasy.draft_history_all', page=p, tournament_id=filters.tournament_id, series_id=filters.series_id, user_id=filters.user_id, mode=filters.mode) }}">
+        {{ p }}
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}

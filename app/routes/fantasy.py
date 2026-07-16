@@ -201,15 +201,11 @@ def index():
     )
 
 
-@fantasy_bp.route("/history")
-@login_required
-def draft_history():
-    """Personal history of every draft (paid + practice, any tournament or
-    series, any status) the current user has ever created — 'Мои драфты'.
-    Cancelled drafts are gone (cancel_draft deletes them), so this only
-    ever shows drafts that ran their course."""
-    drafts = FantasyService.get_user_draft_history(current_user.id)
-
+def _history_rows_with_rank(drafts):
+    """Attach each SCORED draft's final rank/field-size within its own
+    leaderboard scope (tournament/series/group/is_practice). Only ever
+    called on an already-bounded, already-paginated list of drafts — see
+    get_all_draft_history's docstring for why that bound matters."""
     rows = []
     pick_player_ids = set()
     for d in drafts:
@@ -227,13 +223,91 @@ def draft_history():
                     break
         pick_player_ids.update(p.player_id for p in d.picks)
         rows.append({"draft": d, "rank": rank, "field_size": field_size})
+    return rows, pick_player_ids
 
+
+@fantasy_bp.route("/history")
+@login_required
+def draft_history():
+    """Personal history of every draft (paid + practice, any tournament or
+    series, any status) the current user has ever created — 'Мои драфты'.
+    Cancelled drafts are gone (cancel_draft deletes them), so this only
+    ever shows drafts that ran their course."""
+    drafts = FantasyService.get_user_draft_history(current_user.id)
+    rows, pick_player_ids = _history_rows_with_rank(drafts)
     equipped_bulk = ShopService.get_equipped_bulk(list(pick_player_ids))
 
     return render_template(
         "fantasy/history.html",
         rows=rows,
         equipped_bulk=equipped_bulk,
+    )
+
+
+@fantasy_bp.route("/history/all")
+def draft_history_all():
+    """Public, club-wide feed of every draft ever created by anyone —
+    filterable by tournament, series, drafter, and paid/practice. Points
+    and picks are already visible on every leaderboard, so there's no
+    privacy concern in surfacing them here too; always paginated (see
+    FantasyService.get_all_draft_history)."""
+    from app.models.user import User
+
+    tournament_id = request.args.get("tournament_id", type=int)
+    series_id = request.args.get("series_id", type=int)
+    user_id = request.args.get("user_id", type=int)
+    mode = request.args.get("mode")  # "paid" | "practice" | None (both)
+    is_practice = {"paid": False, "practice": True}.get(mode)
+    page = max(1, request.args.get("page", 1, type=int))
+    per_page = 30
+
+    result = FantasyService.get_all_draft_history(
+        tournament_id=tournament_id, tournament_series_id=series_id,
+        user_id=user_id, is_practice=is_practice, page=page, per_page=per_page,
+    )
+    rows, pick_player_ids = _history_rows_with_rank(result["drafts"])
+    equipped_bulk = ShopService.get_equipped_bulk(list(pick_player_ids))
+
+    # Filter dropdowns — joined against FantasyDraft so only tournaments/
+    # series/users that actually have a draft show up (no dead options).
+    tournaments_with_drafts = (
+        db.session.query(Tournament)
+        .join(FantasyDraft, FantasyDraft.tournament_id == Tournament.id)
+        .distinct()
+        .order_by(Tournament.created_at.desc())
+        .all()
+    )
+    series_with_drafts = (
+        db.session.query(TournamentSeries)
+        .join(FantasyDraft, FantasyDraft.tournament_series_id == TournamentSeries.id)
+        .distinct()
+        .order_by(TournamentSeries.created_at.desc())
+        .all()
+    )
+    users_with_drafts = (
+        db.session.query(User)
+        .join(FantasyDraft, FantasyDraft.user_id == User.id)
+        .distinct()
+        .order_by(User.username)
+        .all()
+    )
+
+    total_pages = max(1, (result["total"] + per_page - 1) // per_page)
+
+    return render_template(
+        "fantasy/history_all.html",
+        rows=rows,
+        equipped_bulk=equipped_bulk,
+        tournaments_with_drafts=tournaments_with_drafts,
+        series_with_drafts=series_with_drafts,
+        users_with_drafts=users_with_drafts,
+        filters={
+            "tournament_id": tournament_id, "series_id": series_id,
+            "user_id": user_id, "mode": mode,
+        },
+        page=page,
+        total_pages=total_pages,
+        total=result["total"],
     )
 
 
