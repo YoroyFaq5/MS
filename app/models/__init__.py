@@ -1437,6 +1437,19 @@ class TournamentSeries(db.Model):
         nullable=False,
     )
 
+    # Кто именно подтверждён на этот вечер — отдельно от полного состава
+    # турнира (TournamentParticipant). NULL = состав ещё не объявлен,
+    # фэнтези-драфт по умолчанию открыт на весь турнирный ростер (см.
+    # FantasyService.get_available_picks). Заполняется ДО генерации
+    # рассадки — рассадка создаёт первую игру серии, а та уже блокирует
+    # драфты (games.py::_lock_series_fantasy_if_needed), так что если
+    # привязать список играющих только к моменту рассадки, драфтеры
+    # узнают состав, когда выбирать уже поздно. Те же ID можно (не
+    # обязательно) переиспользовать как значения по умолчанию при
+    # самой генерации рассадки — два независимых списка, синхронизация
+    # не требуется, признанное совпадение это UX-удобство, не инвариант.
+    _confirmed_player_ids = Column("confirmed_player_ids", Text, nullable=True)
+
     series_tournament = relationship("SeriesTournament", back_populates="series")
     stage = relationship("TournamentStage", foreign_keys=[stage_id])
 
@@ -1446,6 +1459,19 @@ class TournamentSeries(db.Model):
 
     def __repr__(self) -> str:
         return f"<TournamentSeries {self.name!r} [{self.status.value}]>"
+
+    @property
+    def confirmed_player_ids(self) -> Optional[list]:
+        if not self._confirmed_player_ids:
+            return None
+        try:
+            return json.loads(self._confirmed_player_ids)
+        except Exception:
+            return None
+
+    @confirmed_player_ids.setter
+    def confirmed_player_ids(self, value: Optional[list]):
+        self._confirmed_player_ids = json.dumps(value) if value else None
 
     def to_dict(self) -> dict:
         return {
@@ -1457,6 +1483,7 @@ class TournamentSeries(db.Model):
             "order": self.order,
             "status": self.status.value,
             "games_count": len(self.stage.games) if self.stage else 0,
+            "confirmed_player_ids": self.confirmed_player_ids,
             "created_at": self.created_at.isoformat(),
         }
 

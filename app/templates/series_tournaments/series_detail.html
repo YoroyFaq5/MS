@@ -21,6 +21,13 @@
     {% if series.series_date %}
     <p class="text-muted small mt-1 mb-0">{{ series.series_date.strftime('%d.%m.%Y') }}</p>
     {% endif %}
+    {% if series.confirmed_player_ids %}
+    <p class="small mt-1 mb-0">
+      <i class="bi bi-people-fill text-success me-1"></i>
+      Состав на вечер подтверждён ({{ series.confirmed_player_ids|length }}):
+      {% for p in tournament_players if p.id in series.confirmed_player_ids %}{{ p.display_name }}{% if not loop.last %}, {% endif %}{% endfor %}
+    </p>
+    {% endif %}
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <a href="{{ url_for('fantasy.series_fantasy', series_id=series.id) }}" class="btn btn-outline-danger">
@@ -30,6 +37,9 @@
     <a href="{{ url_for('games.new_game', tournament_id=tournament.id, stage_id=series.stage_id) }}"
        class="btn btn-danger"><i class="bi bi-plus-lg me-1"></i>Добавить игру</a>
     {% if tournament_players|length >= 10 %}
+    <button class="btn btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#rosterPanel">
+      <i class="bi bi-people-fill me-1"></i>Состав на вечер
+    </button>
     <button class="btn btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#seatingPanel">
       <i class="bi bi-shuffle me-1"></i>Сгенерировать рассадку
     </button>
@@ -47,6 +57,59 @@
 </div>
 
 {% if series.status.value == 'active' and current_user.is_authenticated and current_user.is_admin and tournament_players|length >= 10 %}
+<div class="collapse mb-4" id="rosterPanel">
+  <div class="card border-success">
+    <div class="card-header fw-semibold text-success">
+      <i class="bi bi-people-fill me-1"></i>Кто играет сегодня (для Fantasy)
+    </div>
+    <div class="card-body">
+      <p class="text-muted small mb-3">
+        Отметьте, кто точно играет сегодня — до рассадки, пока драфты ещё открыты.
+        Fantasy-драфт на эту серию сузится только до отмеченных, чтобы люди не выбирали
+        того, кого сегодня нет. Рассадка — отдельный шаг, ничего не сломает, если состав
+        потом слегка изменится.
+      </p>
+      <form method="POST" action="{{ url_for('series_tournaments.set_series_roster', series_id=series.id) }}">
+        <div class="d-flex gap-2 mb-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAllRosterChecks(true)">Выбрать всех</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAllRosterChecks(false)">Снять всех</button>
+          <span class="text-muted small align-self-center ms-auto" id="rosterCount"></span>
+        </div>
+        <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-1 mb-3" style="max-height:260px; overflow-y:auto">
+          {% for p in tournament_players %}
+          <div class="col">
+            <div class="form-check">
+              <input class="form-check-input roster-check" type="checkbox" name="player_ids"
+                     value="{{ p.id }}" id="roster-p-{{ p.id }}"
+                     {% if series.confirmed_player_ids and p.id in series.confirmed_player_ids %}checked{% endif %}
+                     onchange="updateRosterCount()">
+              <label class="form-check-label small" for="roster-p-{{ p.id }}">
+                {{ player_name(p, equipped_bulk.get(p.id, {})) }}
+              </label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-success">
+          <i class="bi bi-check-lg me-1"></i>Подтвердить состав
+        </button>
+        <span class="text-muted small ms-2">Ничего не отмечено = драфт открыт на весь турнир, как раньше.</span>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+function setAllRosterChecks(checked) {
+  document.querySelectorAll('.roster-check').forEach(cb => { cb.checked = checked; });
+  updateRosterCount();
+}
+function updateRosterCount() {
+  const n = document.querySelectorAll('.roster-check:checked').length;
+  document.getElementById('rosterCount').textContent = n + ' выбрано';
+}
+document.addEventListener('DOMContentLoaded', updateRosterCount);
+</script>
+
 <div class="collapse mb-4" id="seatingPanel">
   <div class="card border-primary">
     <div class="card-header fw-semibold text-primary">
@@ -68,7 +131,9 @@
           <div class="col">
             <div class="form-check">
               <input class="form-check-input seating-check" type="checkbox" name="player_ids"
-                     value="{{ p.id }}" id="seat-p-{{ p.id }}" onchange="updateSeatingCount()">
+                     value="{{ p.id }}" id="seat-p-{{ p.id }}"
+                     {% if series.confirmed_player_ids and p.id in series.confirmed_player_ids %}checked{% endif %}
+                     onchange="updateSeatingCount()">
               <label class="form-check-label small" for="seat-p-{{ p.id }}">
                 {{ player_name(p, equipped_bulk.get(p.id, {})) }}
               </label>

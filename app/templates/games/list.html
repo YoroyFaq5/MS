@@ -559,6 +559,14 @@
               <a href="{{ url_for('games.game_detail', game_id=game.id) }}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-eye"></i>
               </a>
+              {% if current_user.is_authenticated and current_user.is_admin %}
+              <form method="POST" action="{{ url_for('games.delete_game', game_id=game.id) }}"
+                    class="d-inline" onsubmit="return confirm('Удалить незавершённую игру #{{ game.id }}?')">
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}

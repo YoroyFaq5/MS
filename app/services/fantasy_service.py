@@ -749,14 +749,28 @@ class FantasyService:
     ) -> List[Player]:
         """
         Players available for the user to pick — in tournament, not self,
-        not already picked in THIS draft. Eligibility pool is always the
-        whole tournament's participants (same players are draftable for
-        any individual series/evening, not just those who already have
-        results recorded for that specific evening — drafting happens
-        before the evening is played).
+        not already picked in THIS draft.
+
+        Default eligibility pool is the whole tournament's participants
+        (same players are draftable for any individual series/evening, not
+        just those who already have results recorded for that specific
+        evening — drafting happens before the evening is played).
+
+        If the series has a confirmed roster set (TournamentSeries.
+        confirmed_player_ids — an admin explicitly declared who's actually
+        playing that evening, see series_tournaments.py::set_series_roster),
+        narrow the pool to just those players instead — drafting a player
+        who isn't even at the table tonight would score zero anyway, so
+        this just keeps the picker honest about who can realistically earn
+        points.
         """
         draft = FantasyService.get_user_draft(user.id, tournament_id, tournament_series_id)
         already_picked = {p.player_id for p in draft.picks} if draft else set()
+
+        confirmed_ids = None
+        if tournament_series_id:
+            series = db.session.get(TournamentSeries, tournament_series_id)
+            confirmed_ids = series.confirmed_player_ids if series else None
 
         participants = (
             db.session.query(TournamentParticipant)
@@ -769,6 +783,8 @@ class FantasyService:
                 continue                    # cannot pick self
             if p.player_id in already_picked:
                 continue
+            if confirmed_ids is not None and p.player_id not in confirmed_ids:
+                continue                    # not confirmed for this evening
             if p.player and p.player.is_active:
                 result.append(p.player)
         return sorted(result, key=lambda pl: pl.display_name)

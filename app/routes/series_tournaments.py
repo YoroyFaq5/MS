@@ -174,6 +174,31 @@ def cancel_series(series_id: int):
     ))
 
 
+@series_tournaments_bp.route("/series/<int:series_id>/set-roster", methods=["POST"])
+@admin_required
+def set_series_roster(series_id: int):
+    """
+    Кто подтверждён играющим сегодня — отдельно и ЗАРАНЕЕ от рассадки
+    (рассадка создаёт первую игру серии, а та уже блокирует fantasy-
+    драфты, так что если единственным источником состава была бы
+    рассадка, драфтеры узнавали бы, кого можно выбирать, уже после того,
+    как выбирать поздно). Сохраняется на TournamentSeries и сужает
+    FantasyService.get_available_picks() для этой серии.
+    """
+    series = _get_series_or_404(series_id)
+    player_ids = request.form.getlist("player_ids", type=int)
+    series.confirmed_player_ids = player_ids or None
+    db.session.commit()
+    if player_ids:
+        flash(f"Состав на вечер подтверждён: {len(player_ids)} игроков.", "success")
+    else:
+        flash("Состав снят — фэнтези-драфт снова открыт на весь турнир.", "success")
+    return redirect(url_for(
+        "series_tournaments.series_detail",
+        series_tournament_id=series.series_tournament_id, series_id=series_id,
+    ))
+
+
 @series_tournaments_bp.route("/series/<int:series_id>/generate-seating", methods=["POST"])
 @admin_required
 def generate_series_seating(series_id: int):
