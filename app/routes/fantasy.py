@@ -158,17 +158,27 @@ def create_draft(tournament_id: int):
 def series_fantasy(series_id: int):
     """Fantasy scoped to one series (game evening) inside a series-tournament
     — own leaderboard/prize pool, scored off that evening's stage rating
-    instead of the whole tournament's."""
+    instead of the whole tournament's.
+
+    Exclusivity groups (see FantasyService._assign_group): once the user
+    has a draft, it belongs to a group and picks are exclusive within it —
+    the leaderboard/pool shown narrow to just that group (own mini-league,
+    own bank). Before drafting (no group assigned yet), shows the combined
+    view across all groups so newcomers can still see the whole picture."""
     series = db.session.get(TournamentSeries, series_id) or abort(404)
     tournament = series.series_tournament.tournament
-    leaderboard = FantasyService.get_leaderboard(tournament.id, series_id)
-    pool_info = FantasyService.get_pool_info(tournament.id, series_id)
+
     my_draft = None
     available = []
     if current_user.is_authenticated:
         my_draft = FantasyService.get_user_draft(current_user.id, tournament.id, series_id)
         if my_draft and my_draft.status.value == "open":
             available = FantasyService.get_available_picks(current_user, tournament.id, series_id)
+
+    my_group = my_draft.group_number if my_draft else None
+    leaderboard = FantasyService.get_leaderboard(tournament.id, series_id, group_number=my_group)
+    pool_info = FantasyService.get_pool_info(tournament.id, series_id, group_number=my_group)
+
     from app.models import TournamentParticipant
     participant_count = db.session.query(TournamentParticipant).filter_by(
         tournament_id=tournament.id
@@ -187,6 +197,7 @@ def series_fantasy(series_id: int):
         leaderboard=leaderboard,
         pool_info=pool_info,
         my_draft=my_draft,
+        my_group=my_group,
         available_players=available,
         max_picks=max_picks,
         equipped_bulk=equipped_bulk,

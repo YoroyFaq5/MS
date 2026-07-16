@@ -85,6 +85,7 @@ class FantasyLeaderboardEntry:
     pick_count: int
     draft_id: int
     status: str = "open"
+    group_number: Optional[int] = None
 
     def to_dict(self) -> dict:
         return {
@@ -96,6 +97,7 @@ class FantasyLeaderboardEntry:
             "pick_count": self.pick_count,
             "draft_id": self.draft_id,
             "status": self.status,
+            "group_number": self.group_number,
         }
 
 
@@ -189,19 +191,60 @@ class FantasyService:
         if not spend.ok:
             return FantasyResult.fail(spend.message)
 
+        group_number = FantasyService._assign_group(series, tournament_id) if series else None
+
         draft = FantasyDraft(
             user_id=user.id,
             tournament_id=tournament_id,
             tournament_series_id=tournament_series_id,
             status=FantasyDraftStatus.OPEN,
             entry_cost_paid=entry_cost,
+            group_number=group_number,
         )
         db.session.add(draft)
         db.session.commit()
+        group_note = f" Группа {group_number}." if group_number else ""
         return FantasyResult.success(
-            f"Драфт для «{label}» создан, списано {entry_cost:.0f} монет. Выберите игроков.",
+            f"Драфт для «{label}» создан, списано {entry_cost:.0f} монет.{group_note} Выберите игроков.",
             data=draft,
         )
+
+    @staticmethod
+    def _assign_group(series: TournamentSeries, tournament_id: int) -> int:
+        """
+        Группа эксклюзивности пиков внутри серии — заполняются по порядку
+        присоединения; следующая открывается, когда текущая достигает
+        вместимости (эксклюзивный пул доступных игроков ÷ лимит пиков на
+        драфтера — обычно confirmed_player_ids серии, иначе весь состав
+        турнира). Уже назначенные драфты никогда не переезжают в другую
+        группу задним числом, даже если позже открылась более свободная.
+        """
+        if series.confirmed_player_ids:
+            pool_size = len(series.confirmed_player_ids)
+        else:
+            pool_size = db.session.query(TournamentParticipant).filter_by(
+                tournament_id=tournament_id
+            ).count()
+
+        participant_count = db.session.query(TournamentParticipant).filter_by(
+            tournament_id=tournament_id
+        ).count()
+        max_picks = _allowed_picks(participant_count)
+        capacity = max(1, pool_size // max_picks) if pool_size > 0 else 1
+
+        counts = dict(
+            db.session.query(FantasyDraft.group_number, func.count(FantasyDraft.id))
+            .filter(
+                FantasyDraft.tournament_series_id == series.id,
+                FantasyDraft.group_number.isnot(None),
+            )
+            .group_by(FantasyDraft.group_number)
+            .all()
+        )
+        group = 1
+        while counts.get(group, 0) >= capacity:
+            group += 1
+        return group
 
     @staticmethod
     def _self_heal_series(tournament_series_id: int) -> None:
@@ -288,6 +331,27 @@ class FantasyService:
         ).first()
         if already:
             return FantasyResult.fail(f"«{player.display_name}» уже в вашем драфте.")
+
+        # Эксклюзивность — только для серийных драфтов, только внутри своей
+        # группы (см. _assign_group): тот же игрок не может быть выбран
+        # ДРУГИМ драфтом этой же (серия, группа), но свободно доступен
+        # драфтерам из другой группы той же серии.
+        if draft.tournament_series_id and draft.group_number:
+            taken_elsewhere = (
+                db.session.query(FantasyDraftPick)
+                .join(FantasyDraft, FantasyDraft.id == FantasyDraftPick.draft_id)
+                .filter(
+                    FantasyDraft.tournament_series_id == draft.tournament_series_id,
+                    FantasyDraft.group_number == draft.group_number,
+                    FantasyDraft.id != draft.id,
+                    FantasyDraftPick.player_id == player_id,
+                )
+                .first()
+            )
+            if taken_elsewhere:
+                return FantasyResult.fail(
+                    f"«{player.display_name}» уже выбран другим менеджером в вашей группе."
+                )
 
         pick = FantasyDraftPick(draft_id=draft_id, player_id=player_id)
         db.session.add(pick)
@@ -582,11 +646,24 @@ class FantasyService:
                     {"tournament_name": label, "points": draft.total_points},
                 )
 
-        # ── Prize pool payout (this series' bank only) ───────────────────
-        bank = round(sum(d.entry_cost_paid for d in all_drafts), 2)
-        if bank > 0:
-            settings = EconomyService.get_settings()
-            leaderboard = FantasyService.get_leaderboard(t.id, tournament_series_id)
+        # ── Prize pool payout — one bank + one leaderboard PER EXCLUSIVITY
+        # GROUP, not one for the whole series (see _assign_group — groups
+        # share the same small confirmed-roster pool, so each is its own
+        # self-contained mini-competition with its own entry fees/payout).
+        # group_number is None for drafts created before this feature
+        # shipped — treated as a single implicit group, same as the old
+        # whole-series behavior.
+        settings = EconomyService.get_settings()
+        groups = sorted({d.group_number for d in all_drafts}, key=lambda g: (g is None, g))
+        for group_number in groups:
+            group_drafts = [d for d in all_drafts if d.group_number == group_number]
+            bank = round(sum(d.entry_cost_paid for d in group_drafts), 2)
+            if bank <= 0:
+                continue
+            leaderboard = FantasyService.get_leaderboard(
+                t.id, tournament_series_id, group_number=group_number,
+            )
+            group_label = f"{label} (группа {group_number})" if group_number else label
             for place, share in (
                 (1, settings.fantasy_first_place_share),
                 (2, settings.fantasy_second_place_share),
@@ -603,34 +680,41 @@ class FantasyService:
                 EconomyService.add_coins(
                     user.player,
                     amount,
-                    f"Fantasy место #{place} в «{label}» (банк {bank:.0f})",
+                    f"Fantasy место #{place} в «{group_label}» (банк {bank:.0f})",
                     CoinSourceType.FANTASY_REWARD,
                     ref_tournament_id=t.id,
                     commit=False,
                 )
                 BotNotifyService.notify_player(
                     user.player.id, "fantasy-prize",
-                    {"tournament_name": label, "place": place, "amount": amount},
+                    {"tournament_name": group_label, "place": place, "amount": amount},
                 )
-            if commit:
-                db.session.commit()
+        if commit:
+            db.session.commit()
 
         return results
 
     @staticmethod
-    def get_pool_info(tournament_id: int, tournament_series_id: Optional[int] = None) -> dict:
+    def get_pool_info(
+        tournament_id: int, tournament_series_id: Optional[int] = None,
+        group_number: Optional[int] = None,
+    ) -> dict:
         """
         Entry cost, participant count, current bank and projected payouts
-        for the tournament's (or one series') Fantasy page. Bank is the sum
-        of what was actually charged to each draft (entry_cost_paid), so it
-        stays correct even if the admin changes the entry cost mid-way.
+        for the tournament's (or one series', or one exclusivity group
+        within a series') Fantasy page. Bank is the sum of what was
+        actually charged to each draft (entry_cost_paid), so it stays
+        correct even if the admin changes the entry cost mid-way.
         """
         from app.services.economy_service import EconomyService
 
         settings = EconomyService.get_settings()
-        drafts = db.session.query(FantasyDraft).filter_by(
+        query = db.session.query(FantasyDraft).filter_by(
             tournament_id=tournament_id, tournament_series_id=tournament_series_id,
-        ).all()
+        )
+        if group_number is not None:
+            query = query.filter(FantasyDraft.group_number == group_number)
+        drafts = query.all()
 
         bank = round(sum(d.entry_cost_paid for d in drafts), 2)
         return {
@@ -646,7 +730,15 @@ class FantasyService:
     @staticmethod
     def get_leaderboard(
         tournament_id: int, tournament_series_id: Optional[int] = None,
+        group_number: Optional[int] = None,
     ) -> List[FantasyLeaderboardEntry]:
+        """
+        group_number=None (default) with a series that DOES use exclusivity
+        groups returns the combined list across all groups, each entry
+        tagged with its own group_number (see FantasyLeaderboardEntry) —
+        callers that need one group's standalone ranking/payout (score_series)
+        pass group_number explicitly.
+        """
         # Self-heal BEFORE the query, once for the whole series — not per
         # draft in the loop below, and not after ORDER BY has already run
         # (both of which the older version did, so the rank order could
@@ -654,12 +746,13 @@ class FantasyService:
         if tournament_series_id:
             FantasyService._self_heal_series(tournament_series_id)
 
-        drafts = (
-            db.session.query(FantasyDraft)
-            .filter_by(tournament_id=tournament_id, tournament_series_id=tournament_series_id)
-            .order_by(FantasyDraft.total_points.desc())
-            .all()
+        query = db.session.query(FantasyDraft).filter_by(
+            tournament_id=tournament_id, tournament_series_id=tournament_series_id,
         )
+        if group_number is not None:
+            query = query.filter(FantasyDraft.group_number == group_number)
+        drafts = query.order_by(FantasyDraft.total_points.desc()).all()
+
         entries = []
         for rank, d in enumerate(drafts, start=1):
             user = d.user
@@ -673,6 +766,7 @@ class FantasyService:
                 total_points=d.total_points,
                 pick_count=d.pick_count,
                 draft_id=d.id,
+                group_number=d.group_number,
                 status=d.status.value,
             ))
         return entries
@@ -763,6 +857,10 @@ class FantasyService:
         who isn't even at the table tonight would score zero anyway, so
         this just keeps the picker honest about who can realistically earn
         points.
+
+        If the draft belongs to an exclusivity group (series-scoped, see
+        _assign_group), also excludes players already picked by ANY OTHER
+        draft in that same (series, group) — not just this user's own draft.
         """
         draft = FantasyService.get_user_draft(user.id, tournament_id, tournament_series_id)
         already_picked = {p.player_id for p in draft.picks} if draft else set()
@@ -771,6 +869,20 @@ class FantasyService:
         if tournament_series_id:
             series = db.session.get(TournamentSeries, tournament_series_id)
             confirmed_ids = series.confirmed_player_ids if series else None
+
+        taken_by_group = set()
+        if draft and draft.tournament_series_id and draft.group_number:
+            rows = (
+                db.session.query(FantasyDraftPick.player_id)
+                .join(FantasyDraft, FantasyDraft.id == FantasyDraftPick.draft_id)
+                .filter(
+                    FantasyDraft.tournament_series_id == draft.tournament_series_id,
+                    FantasyDraft.group_number == draft.group_number,
+                    FantasyDraft.id != draft.id,
+                )
+                .all()
+            )
+            taken_by_group = {pid for (pid,) in rows}
 
         participants = (
             db.session.query(TournamentParticipant)
@@ -783,6 +895,8 @@ class FantasyService:
                 continue                    # cannot pick self
             if p.player_id in already_picked:
                 continue
+            if p.player_id in taken_by_group:
+                continue                    # exclusively picked by a group-mate
             if confirmed_ids is not None and p.player_id not in confirmed_ids:
                 continue                    # not confirmed for this evening
             if p.player and p.player.is_active:

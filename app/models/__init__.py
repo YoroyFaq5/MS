@@ -763,6 +763,15 @@ class FantasyDraft(db.Model):
         nullable=False,
         default=FantasyDraftStatus.OPEN,
     )
+    # Только для tournament_series_id IS NOT NULL — эксклюзивность пиков
+    # (см. FantasyService._assign_group/get_available_picks) считается
+    # ВНУТРИ (tournament_series_id, group_number), не по всей серии: пул
+    # подтверждённых на вечер игроков мал (обычно ~10), одной группе
+    # эксклюзивных менеджеров может не хватить на всех желающих — вместо
+    # этого открывается следующая группа со своим независимым лидербордом
+    # и призовым банком (см. get_leaderboard/score_series). NULL для
+    # обычных turnирный-wide драфтов (там пики остаются общими, как раньше).
+    group_number  = Column(Integer, nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -797,6 +806,7 @@ class FantasyDraft(db.Model):
             "user_id":       self.user_id,
             "tournament_id": self.tournament_id,
             "tournament_series_id": self.tournament_series_id,
+            "group_number":  self.group_number,
             "total_points":  self.total_points,
             "entry_cost_paid": self.entry_cost_paid,
             "status":        self.status.value,

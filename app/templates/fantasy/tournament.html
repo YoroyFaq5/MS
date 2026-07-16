@@ -14,7 +14,20 @@
       {% if series %}за эту серию{% else %}за весь турнир{% endif %}
     </p>
   </div>
+  {% if series and my_group %}
+  <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle ms-auto">
+    Ваша группа: {{ my_group }}
+  </span>
+  {% endif %}
 </div>
+
+{% if series and my_group %}
+<div class="alert alert-secondary small mb-3">
+  <i class="bi bi-diagram-3 me-1"></i>
+  В этой серии пики эксклюзивны — игрок, выбранный менеджером из вашей группы, недоступен другим менеджерам
+  той же группы. Лидерборд и призовой фонд ниже — только для группы {{ my_group }}; в других группах свои.
+</div>
+{% endif %}
 
 <div class="row g-4">
   <!-- Left: my draft -->
@@ -138,7 +151,9 @@
 
     <!-- Prize pool -->
     <div class="card mt-3">
-      <div class="card-header fw-semibold small">💰 Призовой фонд</div>
+      <div class="card-header fw-semibold small">
+        💰 Призовой фонд{% if series and my_group %} — группа {{ my_group }}{% endif %}
+      </div>
       <div class="card-body p-3">
         <div class="small">
           <div class="d-flex justify-content-between mb-1">
@@ -167,7 +182,9 @@
   <!-- Right: leaderboard -->
   <div class="col-lg-7">
     <div class="card">
-      <div class="card-header fw-semibold">🏆 Fantasy-лидерборд</div>
+      <div class="card-header fw-semibold">
+        🏆 Fantasy-лидерборд{% if series and my_group %} — группа {{ my_group }}{% endif %}
+      </div>
       <div class="card-body p-0">
         {% if leaderboard %}
         <div class="table-responsive">
@@ -176,6 +193,7 @@
             <tr>
               <th class="ps-4">#</th>
               <th>Участник</th>
+              {% if series and not my_group %}<th class="text-center">Группа</th>{% endif %}
               <th class="text-center">Выборов</th>
               <th class="text-center">Статус</th>
               <th class="text-end pe-4">Очки</th>
@@ -196,6 +214,9 @@
                 <span class="badge bg-body-secondary text-muted border ms-1 small">Вы</span>
                 {% endif %}
               </td>
+              {% if series and not my_group %}
+              <td class="text-center text-muted small">{{ e.group_number or '—' }}</td>
+              {% endif %}
               <td class="text-center text-muted">{{ e.pick_count }}</td>
               <td class="text-center">
                 <span class="badge
