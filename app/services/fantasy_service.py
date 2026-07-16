@@ -388,6 +388,48 @@ class FantasyService:
         return FantasyResult.success("Игрок убран из драфта.")
 
     @staticmethod
+    def cancel_draft(user: User, draft_id: int) -> FantasyResult:
+        """
+        Fully withdraw an OPEN draft: refunds the entry fee and deletes the
+        draft (picks cascade). Only OPEN drafts can be cancelled — once
+        locked, the evening/tournament may already be underway, so pulling
+        out isn't fair to the rest of the pool. For series drafts, this
+        also frees the drafter's spot in their exclusivity group for the
+        next person to join (group_number isn't reassigned to anyone else
+        retroactively — see _assign_group — the slot just becomes free).
+        """
+        from app.services.economy_service import EconomyService
+
+        draft = db.session.get(FantasyDraft, draft_id)
+        if not draft or (draft.user_id != user.id and not user.is_admin):
+            return FantasyResult.fail("Доступ запрещён.")
+        if draft.tournament_series_id:
+            FantasyService._self_heal_series(draft.tournament_series_id)
+        if draft.status != FantasyDraftStatus.OPEN:
+            return FantasyResult.fail("Драфт уже зафиксирован — отменить нельзя.")
+
+        owner = draft.user
+        refund = draft.entry_cost_paid
+        tournament_id = draft.tournament_id
+        tournament_series_id = draft.tournament_series_id
+
+        db.session.delete(draft)
+        if refund > 0 and owner and owner.player:
+            EconomyService.add_coins(
+                owner.player,
+                refund,
+                "Fantasy: возврат взноса за отменённый драфт",
+                CoinSourceType.FANTASY_REWARD,
+                ref_tournament_id=tournament_id,
+                commit=False,
+            )
+        db.session.commit()
+        return FantasyResult.success(
+            f"Драфт отменён, возвращено {refund:.0f} монет.",
+            data={"tournament_id": tournament_id, "tournament_series_id": tournament_series_id},
+        )
+
+    @staticmethod
     def lock_drafts_for_tournament(tournament_id: int, commit: bool = True) -> int:
         """
         Lock all OPEN drafts when a tournament starts.

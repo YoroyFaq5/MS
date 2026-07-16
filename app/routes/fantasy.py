@@ -239,3 +239,17 @@ def remove_pick(draft_id: int, player_id: int):
     result = FantasyService.remove_pick(current_user, draft_id, player_id)
     flash(result.message, "success" if result.ok else "info")
     return redirect(_draft_redirect_url(draft))
+
+
+@fantasy_bp.route("/draft/<int:draft_id>/cancel", methods=["POST"])
+@login_required
+def cancel_draft(draft_id: int):
+    draft = db.session.get(FantasyDraft, draft_id) or abort(404)
+    if not PermissionService.can_edit_draft(current_user, draft):
+        abort(403)
+    # captured before cancel_draft deletes the row — _draft_redirect_url
+    # needs a live draft object
+    redirect_url = _draft_redirect_url(draft)
+    result = FantasyService.cancel_draft(current_user, draft_id)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(redirect_url)
