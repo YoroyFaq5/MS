@@ -82,6 +82,20 @@ logger = logging.getLogger(__name__)
 SERIES_GROUP_SIZE = 3
 SERIES_PICKS_PER_DRAFTER = 3
 
+# Shared ordering for the history pages (get_user_draft_history/
+# get_all_draft_history) — groups drafts by tournament -> series -> group
+# -> mode so it's visually obvious which event/group each one belongs to,
+# newest tournament/series/draft first within each level.
+_HISTORY_GROUPED_ORDER = (
+    FantasyDraft.tournament_id.desc(),
+    FantasyDraft.tournament_series_id.is_(None),
+    FantasyDraft.tournament_series_id.desc(),
+    FantasyDraft.is_practice,
+    FantasyDraft.group_number.is_(None),
+    FantasyDraft.group_number,
+    FantasyDraft.created_at.desc(),
+)
+
 
 def _allowed_picks(participant_count: int, is_series: bool = False) -> int:
     if is_series:
@@ -920,18 +934,20 @@ class FantasyService:
     def get_user_draft_history(user_id: int) -> List[FantasyDraft]:
         """
         Every draft (paid and practice, any tournament/series, any status)
-        this user has ever created, newest first — for a personal "Мои
-        драфты" history page. Cancelled drafts don't appear (cancel_draft
-        deletes the row entirely, see its docstring) — this only shows
-        drafts that ran their course. Bounded by one user's own draft
-        count, not a club-wide scan, so no pagination/perf concern here
-        (see the /titles/nominations incident for why that distinction
-        matters — this is nothing like that unbounded case).
+        this user has ever created, grouped by tournament → series → group
+        → mode (newest tournament first, see _HISTORY_GROUPED_ORDER) — for
+        a personal "Мои драфты" history page where it should be obvious
+        which event/group each draft belongs to. Cancelled drafts don't
+        appear (cancel_draft deletes the row entirely, see its docstring)
+        — this only shows drafts that ran their course. Bounded by one
+        user's own draft count, not a club-wide scan, so no pagination/
+        perf concern here (see the /titles/nominations incident for why
+        that distinction matters — this is nothing like that unbounded case).
         """
         return (
             db.session.query(FantasyDraft)
             .filter_by(user_id=user_id)
-            .order_by(FantasyDraft.created_at.desc())
+            .order_by(*_HISTORY_GROUPED_ORDER)
             .all()
         )
 
@@ -946,13 +962,18 @@ class FantasyService:
     ) -> dict:
         """
         Public, filterable, paginated feed of EVERY draft ever created by
-        ANY user — for a club-wide "История драфтов" page. Always
-        paginated: unlike get_user_draft_history (bounded by one person's
-        own draft count), this table only grows across the site's whole
-        lifetime, so an unbounded "show everything" query here would
-        eventually repeat the /titles/nominations incident (a page that's
-        cheap today silently becoming an O(N) outage once N grows for
-        years) — see NominationService._streak_king_ranking's history.
+        ANY user, grouped by tournament → series → group → mode (newest
+        tournament first, see _HISTORY_GROUPED_ORDER) so it's obvious
+        which event/group each draft belongs to — for a club-wide
+        "История драфтов" page. Always paginated: unlike
+        get_user_draft_history (bounded by one person's own draft count),
+        this table only grows across the site's whole lifetime, so an
+        unbounded "show everything" query here would eventually repeat
+        the /titles/nominations incident (a page that's cheap today
+        silently becoming an O(N) outage once N grows for years) — see
+        NominationService._streak_king_ranking's history. A group can
+        straddle a page boundary at club scale — acceptable trade-off for
+        keeping every page bounded and cheap.
         """
         query = db.session.query(FantasyDraft)
         if tournament_id is not None:
@@ -966,7 +987,7 @@ class FantasyService:
 
         total = query.count()
         drafts = (
-            query.order_by(FantasyDraft.created_at.desc())
+            query.order_by(*_HISTORY_GROUPED_ORDER)
             .offset((page - 1) * per_page)
             .limit(per_page)
             .all()
