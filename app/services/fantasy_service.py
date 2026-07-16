@@ -106,6 +106,7 @@ class FantasyLeaderboardEntry:
     draft_id: int
     status: str = "open"
     group_number: Optional[int] = None
+    picks: list = field(default_factory=list)  # [{"player_id", "display_name", "points_earned"}]
 
     def to_dict(self) -> dict:
         return {
@@ -118,6 +119,7 @@ class FantasyLeaderboardEntry:
             "draft_id": self.draft_id,
             "status": self.status,
             "group_number": self.group_number,
+            "picks": self.picks,
         }
 
 
@@ -829,6 +831,15 @@ class FantasyService:
                 draft_id=d.id,
                 group_number=d.group_number,
                 status=d.status.value,
+                picks=[
+                    {
+                        "player_id": p.player_id,
+                        "player": p.player,
+                        "display_name": p.player.display_name if p.player else "?",
+                        "points_earned": p.points_earned,
+                    }
+                    for p in d.picks
+                ],
             ))
         return entries
 

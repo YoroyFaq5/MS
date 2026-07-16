@@ -131,11 +131,12 @@ def tournament_fantasy(tournament_id: int):
     from app.services.fantasy_service import _allowed_picks
     max_picks = _allowed_picks(participant_count)
 
-    # Персонализация ников — только для реальных Player (пики драфта),
-    # не для leaderboard (там User — участники fantasy, другая сущность).
-    equipped_bulk = ShopService.get_equipped_bulk(
-        [p.player_id for p in my_draft.picks] if my_draft else []
-    )
+    # Персонализация ников для пиков — своих и всех показанных в лидерборде
+    # (детализация "кто кого выбрал", см. FantasyLeaderboardEntry.picks).
+    pick_player_ids = {p.player_id for p in my_draft.picks} if my_draft else set()
+    for e in leaderboard:
+        pick_player_ids.update(pk["player_id"] for pk in e.picks)
+    equipped_bulk = ShopService.get_equipped_bulk(list(pick_player_ids))
 
     return render_template(
         "fantasy/tournament.html",
@@ -188,9 +189,10 @@ def series_fantasy(series_id: int):
     from app.services.fantasy_service import SERIES_PICKS_PER_DRAFTER
     max_picks = SERIES_PICKS_PER_DRAFTER
 
-    equipped_bulk = ShopService.get_equipped_bulk(
-        [p.player_id for p in my_draft.picks] if my_draft else []
-    )
+    pick_player_ids = {p.player_id for p in my_draft.picks} if my_draft else set()
+    for e in leaderboard:
+        pick_player_ids.update(pk["player_id"] for pk in e.picks)
+    equipped_bulk = ShopService.get_equipped_bulk(list(pick_player_ids))
 
     return render_template(
         "fantasy/tournament.html",

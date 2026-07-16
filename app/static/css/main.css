@@ -4379,6 +4379,52 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 
 .fantasy-how__label { font-size: .82rem; color: var(--ms-text-dim); }
 
+/* ── Draft leaderboard: expandable "who picked whom" rows ── */
+
+.fantasy-board-row td { transition: background-color .15s ease; }
+.fantasy-board-row[data-bs-toggle="collapse"] { cursor: pointer; }
+.fantasy-board-row[data-bs-toggle="collapse"]:hover td { background-color: var(--ms-surface-alt); }
+
+.fantasy-board-row--rank-1 { border-left: 3px solid var(--ms-gold-light); }
+.fantasy-board-row--rank-2 { border-left: 3px solid #B8B8B8; }
+.fantasy-board-row--rank-3 { border-left: 3px solid var(--ms-wine-light); }
+
+.fantasy-board-row__chevron {
+  transition: transform .2s ease;
+  color: var(--ms-muted);
+}
+.fantasy-board-row[aria-expanded="true"] .fantasy-board-row__chevron {
+  transform: rotate(180deg);
+}
+
+.fantasy-board-detail__inner {
+  background: rgba(0,0,0,.18);
+  padding: .85rem 1.25rem;
+}
+.fantasy-board-detail__picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+.fantasy-pick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: 99px;
+  padding: .3rem .4rem .3rem .8rem;
+  font-size: .8rem;
+}
+.fantasy-pick-chip__points {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--ms-surface-alt);
+  border-radius: 99px;
+  padding: .1rem .55rem;
+  font-size: .74rem;
+}
+
 @media (max-width: 576px) {
   .fantasy-hero__title { font-size: 1.3rem; }
   .fantasy-event-card__name { font-size: 1.1rem; }

@@ -203,6 +203,7 @@
       </div>
       <div class="card-body p-0">
         {% if leaderboard %}
+        {% set col_count = 6 + (1 if series and not my_group else 0) %}
         <div class="table-responsive">
         <table class="table table-hover mb-0 align-middle">
           <thead>
@@ -213,11 +214,18 @@
               <th class="text-center">Выборов</th>
               <th class="text-center">Статус</th>
               <th class="text-end pe-4">Очки</th>
+              <th class="pe-3"></th>
             </tr>
           </thead>
           <tbody>
             {% for e in leaderboard %}
-            <tr class="{% if current_user.is_authenticated and e.user_id == current_user.id %}table-active{% endif %}">
+            <tr class="fantasy-board-row
+                {% if e.rank <= 3 %}fantasy-board-row--rank-{{ e.rank }}{% endif %}
+                {% if current_user.is_authenticated and e.user_id == current_user.id %}table-active{% endif %}"
+                {% if e.picks %}
+                data-bs-toggle="collapse" data-bs-target="#fpicks-{{ e.draft_id }}"
+                role="button" aria-expanded="false" aria-controls="fpicks-{{ e.draft_id }}"
+                {% endif %}>
               <td class="ps-4">
                 {% if e.rank == 1 %}🥇
                 {% elif e.rank == 2 %}🥈
@@ -248,7 +256,28 @@
                 {% if e.total_points > 0 %}text-success{% else %}text-muted{% endif %}">
                 {{ e.total_points }}
               </td>
+              <td class="pe-3 text-end">
+                {% if e.picks %}<i class="bi bi-chevron-down fantasy-board-row__chevron"></i>{% endif %}
+              </td>
             </tr>
+            {% if e.picks %}
+            <tr class="collapse" id="fpicks-{{ e.draft_id }}">
+              <td colspan="{{ col_count }}" class="p-0 border-0">
+                <div class="fantasy-board-detail__inner">
+                  <div class="fantasy-board-detail__picks">
+                    {% for pk in e.picks %}
+                    <span class="fantasy-pick-chip">
+                      {{ player_name(pk.player, equipped_bulk.get(pk.player_id, {})) if pk.player else pk.display_name }}
+                      <span class="fantasy-pick-chip__points {% if pk.points_earned > 0 %}text-success{% else %}text-muted{% endif %}">
+                        {{ pk.points_earned }}
+                      </span>
+                    </span>
+                    {% endfor %}
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
             {% endfor %}
           </tbody>
         </table>
