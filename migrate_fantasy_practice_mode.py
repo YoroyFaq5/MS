@@ -55,14 +55,23 @@ with app.app_context():
         )).scalar()
 
         if old_unique_exists and not already_has_is_practice:
+            # Порядок важен: старый индекс поддерживает FK на user_id (leftmost
+            # column) — MySQL не даст его DROP, пока нет другого подходящего
+            # индекса. Поэтому сначала добавляем новый (тоже с user_id первым),
+            # потом дропаем старый, потом переименовываем новый на его место.
+            conn.execute(text(
+                "ALTER TABLE fantasy_drafts "
+                "ADD UNIQUE KEY uq_fantasy_user_tournament_series_new "
+                "(user_id, tournament_id, tournament_series_id, is_practice);"
+            ))
             conn.execute(text(
                 "ALTER TABLE fantasy_drafts "
                 "DROP INDEX uq_fantasy_user_tournament_series;"
             ))
             conn.execute(text(
                 "ALTER TABLE fantasy_drafts "
-                "ADD UNIQUE KEY uq_fantasy_user_tournament_series "
-                "(user_id, tournament_id, tournament_series_id, is_practice);"
+                "RENAME INDEX uq_fantasy_user_tournament_series_new "
+                "TO uq_fantasy_user_tournament_series;"
             ))
             conn.commit()
             print("OK: пересоздан уникальный индекс с is_practice.")
