@@ -40,21 +40,26 @@
 {% endif %}
 
 <div class="row g-3">
-  {% set ns = namespace(last_group=none) %}
+  {% set ns = namespace(last_key=none) %}
   {% for row in draft_rows %}
   {% set d = row.draft %}
-  {% if series and d.group_number != ns.last_group %}
-    {% set ns.last_group = d.group_number %}
+  {% set group_key = (d.is_practice, d.group_number) %}
+  {% if series and group_key != ns.last_key %}
+    {% set ns.last_key = group_key %}
     <div class="col-12 mt-2 mb-n2">
       <div class="text-muted small fw-semibold text-uppercase">
         {% if d.group_number %}Группа {{ d.group_number }}{% else %}Без группы{% endif %}
+        {% if d.is_practice %} — тренировка{% endif %}
       </div>
     </div>
   {% endif %}
   <div class="col-md-6 col-xl-4">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
-        <span>{{ d.user.display_name if d.user else '—' }}</span>
+        <span>
+          {{ d.user.display_name if d.user else '—' }}
+          {% if d.is_practice %}<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1" title="Бесплатный тренировочный драфт">🎓</span>{% endif %}
+        </span>
         <span class="badge
           {% if d.status.value == 'open' %}bg-success
           {% elif d.status.value == 'locked' %}bg-warning text-dark

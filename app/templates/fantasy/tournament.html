@@ -86,37 +86,26 @@
 {% endif %}
 {% endmacro %}
 
-{% block content %}
-<div class="d-flex align-items-center gap-3 mb-4">
-  <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
-  <div>
-    <h2 class="mb-0 fw-bold">
-      🎯 Fantasy: {{ tournament.name }}{% if series %} — {{ series.name }}{% endif %}
-    </h2>
-    <p class="text-muted small mb-0">
-      Выберите {{ max_picks }} игроков — итог драфта: сумма их рейтинговых очков
-      {% if series %}за эту серию{% else %}за весь турнир{% endif %}
-    </p>
-  </div>
-  {% if series and my_group %}
-  <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle ms-auto">
-    Ваша группа: {{ my_group }}
-  </span>
-  {% endif %}
-  {% if current_user.is_authenticated and current_user.is_admin %}
-  <a href="{{ url_for('fantasy.admin_series_drafts', series_id=series.id) if series else url_for('fantasy.admin_tournament_drafts', tournament_id=tournament.id) }}"
-     class="btn btn-outline-secondary btn-sm {% if not (series and my_group) %}ms-auto{% endif %}">
-    <i class="bi bi-tools me-1"></i>Драфты (админ)
-  </a>
-  {% endif %}
-</div>
+{% macro render_mode(mode_key, ctx) %}
+{% set my_draft = ctx.my_draft %}
+{% set my_group = ctx.my_group %}
+{% set is_practice = ctx.is_practice %}
 
-{% if series and groups %}
+{% if series and ctx.groups %}
 <div class="alert alert-secondary small mb-3">
   <i class="bi bi-diagram-3 me-1"></i>
-  В этой серии пики эксклюзивны только внутри своей группы — игрок, выбранный менеджером из вашей группы,
-  недоступен другим менеджерам той же группы, но свободен в других. У каждой группы свой лидерборд и свой
-  призовой фонд — все группы показаны ниже{% if my_group %}, ваша ({{ my_group }}) — сверху{% endif %}.
+  {% if is_practice %}
+  Тренировочный режим — без взноса и без права на приз, но пики так же эксклюзивны внутри своей группы.
+  {% else %}
+  Пики эксклюзивны только внутри своей группы — игрок, выбранный менеджером из вашей группы, недоступен
+  другим менеджерам той же группы, но свободен в других. У каждой группы свой лидерборд и свой призовой фонд.
+  {% endif %}
+  Все группы показаны ниже{% if my_group %}, ваша ({{ my_group }}) — сверху{% endif %}.
+</div>
+{% elif is_practice %}
+<div class="alert alert-secondary small mb-3">
+  <i class="bi bi-mortarboard me-1"></i>
+  Тренировочный режим — бесплатно, без права на приз. Можно пользоваться драфтом просто как инструментом.
 </div>
 {% endif %}
 
@@ -127,7 +116,7 @@
       {% if my_draft %}
       <div class="card mb-3">
         <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
-          <span>📋 Ваш драфт</span>
+          <span>📋 {% if is_practice %}Ваш тренировочный драфт{% else %}Ваш драфт{% endif %}</span>
           <span class="badge
             {% if my_draft.status.value == 'open' %}bg-success
             {% elif my_draft.status.value == 'locked' %}bg-warning text-dark
@@ -181,13 +170,13 @@
           {% endif %}
         </div>
 
-        {% if my_draft.status.value == 'open' and available_players and my_draft.pick_count < max_picks %}
+        {% if my_draft.status.value == 'open' and ctx.available and my_draft.pick_count < max_picks %}
         <div class="card-footer">
           <form method="POST" action="{{ url_for('fantasy.add_pick', draft_id=my_draft.id) }}"
                 class="d-flex gap-2">
             <select name="player_id" class="form-select form-select-sm" required>
               <option value="">+ добавить игрока</option>
-              {% for p in available_players %}
+              {% for p in ctx.available %}
               <option value="{{ p.id }}">{{ p.display_name }} (ELO {{ p.elo|int }})</option>
               {% endfor %}
             </select>
@@ -205,7 +194,7 @@
         {% if my_draft.status.value == 'open' %}
         <div class="card-footer">
           <form method="POST" action="{{ url_for('fantasy.cancel_draft', draft_id=my_draft.id) }}"
-                onsubmit="return confirm('Отменить драфт? Взнос ({{ my_draft.entry_cost_paid | int }} монет) будет возвращён.');">
+                onsubmit="return confirm('{% if is_practice %}Отменить тренировочный драфт?{% else %}Отменить драфт? Взнос ({{ my_draft.entry_cost_paid | int }} монет) будет возвращён.{% endif %}');">
             <button type="submit" class="btn btn-sm btn-outline-danger w-100">
               <i class="bi bi-x-circle me-1"></i>Отменить драфт
             </button>
@@ -218,17 +207,22 @@
       {% if (series and series.status.value == 'active') or (not series and tournament.status != 'finished') %}
       <div class="card">
         <div class="card-body text-center py-4">
-          <div class="fs-2 mb-2">🎯</div>
-          <p class="text-muted small mb-1">Создайте драфт и выберите {{ max_picks }} игроков</p>
+          <div class="fs-2 mb-2">{% if is_practice %}🎓{% else %}🎯{% endif %}</div>
+          <p class="text-muted small mb-1">Создайте {% if is_practice %}тренировочный {% endif %}драфт и выберите {{ max_picks }} игроков</p>
           <p class="small mb-3">
+            {% if is_practice %}
+            Стоимость участия: <strong class="text-success">бесплатно</strong>
+            {% else %}
             Стоимость участия: <strong>{{ entry_cost | int }} монет</strong>
             {% if current_user.player %}
             · ваш баланс: <strong>{{ (current_user.player.coins or 0) | int }}</strong>
             {% endif %}
+            {% endif %}
           </p>
           <form method="POST" action="{{ create_draft_url }}">
-            <button type="submit" class="btn btn-danger">
-              <i class="bi bi-plus-lg me-1"></i>Создать драфт
+            {% if is_practice %}<input type="hidden" name="is_practice" value="1">{% endif %}
+            <button type="submit" class="btn {% if is_practice %}btn-outline-secondary{% else %}btn-danger{% endif %}">
+              <i class="bi bi-plus-lg me-1"></i>Создать {% if is_practice %}тренировочный {% endif %}драфт
             </button>
           </form>
         </div>
@@ -250,28 +244,28 @@
     </div>
     {% endif %}
 
-    {% if not series %}
+    {% if not series and not is_practice %}
     <!-- Prize pool (tournament-wide — single implicit group) -->
     <div class="card mt-3">
       <div class="card-header fw-semibold small">💰 Призовой фонд</div>
       <div class="card-body p-3">
         <div class="small">
           <div class="d-flex justify-content-between mb-1">
-            <span>Стоимость участия</span><strong>{{ pool_info.entry_cost | int }} монет</strong>
+            <span>Стоимость участия</span><strong>{{ ctx.pool_info.entry_cost | int }} монет</strong>
           </div>
           <div class="d-flex justify-content-between mb-1">
-            <span>Участников</span><strong>{{ pool_info.participant_count }}</strong>
+            <span>Участников</span><strong>{{ ctx.pool_info.participant_count }}</strong>
           </div>
           <div class="d-flex justify-content-between mb-2">
             <span>Призовой фонд</span>
-            <strong class="text-warning">{{ pool_info.bank | int }} монет</strong>
+            <strong class="text-warning">{{ ctx.pool_info.bank | int }} монет</strong>
           </div>
           <hr class="my-2">
           <div class="d-flex justify-content-between mb-1">
-            <span>🥇 1-е место</span><strong class="text-warning">{{ pool_info.payout_1st | int }}</strong>
+            <span>🥇 1-е место</span><strong class="text-warning">{{ ctx.pool_info.payout_1st | int }}</strong>
           </div>
           <div class="d-flex justify-content-between">
-            <span>🥈 2-е место</span><strong>{{ pool_info.payout_2nd | int }}</strong>
+            <span>🥈 2-е место</span><strong>{{ ctx.pool_info.payout_2nd | int }}</strong>
           </div>
         </div>
         <div class="form-text mt-2">Итог драфта — сумма рейтинговых очков выбранных игроков в турнире.</div>
@@ -283,13 +277,13 @@
   <!-- Right: leaderboard(s) -->
   <div class="col-lg-7">
     {% if series %}
-      {% for grp in groups %}
+      {% for grp in ctx.groups %}
       <div class="card mb-3">
         <div class="card-header d-flex justify-content-between align-items-center fw-semibold
             {% if not grp.is_mine %}fantasy-board-row{% endif %}"
             {% if not grp.is_mine %}
-            data-bs-toggle="collapse" data-bs-target="#fgroup-{{ grp.group_number or 'none' }}"
-            role="button" aria-expanded="false" aria-controls="fgroup-{{ grp.group_number or 'none' }}"
+            data-bs-toggle="collapse" data-bs-target="#fgroup-{{ mode_key }}-{{ grp.group_number or 'none' }}"
+            role="button" aria-expanded="false" aria-controls="fgroup-{{ mode_key }}-{{ grp.group_number or 'none' }}"
             {% endif %}>
           <span>
             🏆 Группа {{ grp.group_number or '—' }}
@@ -299,7 +293,8 @@
           </span>
           {% if not grp.is_mine %}<i class="bi bi-chevron-down fantasy-board-row__chevron"></i>{% endif %}
         </div>
-        <div class="collapse {% if grp.is_mine %}show{% endif %}" id="fgroup-{{ grp.group_number or 'none' }}">
+        <div class="collapse {% if grp.is_mine %}show{% endif %}" id="fgroup-{{ mode_key }}-{{ grp.group_number or 'none' }}">
+          {% if not is_practice %}
           <div class="d-flex flex-wrap gap-3 small px-3 py-2 border-bottom">
             <span class="text-muted">Взнос: <strong class="text-body">{{ grp.pool_info.entry_cost | int }}</strong></span>
             <span class="text-muted">Участников: <strong class="text-body">{{ grp.pool_info.participant_count }}</strong></span>
@@ -307,28 +302,93 @@
             <span class="text-muted">🥇 <strong class="text-warning">{{ grp.pool_info.payout_1st | int }}</strong></span>
             <span class="text-muted">🥈 <strong class="text-body">{{ grp.pool_info.payout_2nd | int }}</strong></span>
           </div>
+          {% endif %}
           <div class="card-body p-0">
             {{ render_leaderboard(grp.leaderboard, equipped_bulk) }}
           </div>
         </div>
       </div>
       {% endfor %}
-      {% if not groups %}
+      {% if not ctx.groups %}
       <div class="card">
         <div class="card-body text-center text-muted py-5">
           <i class="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
-          Пока нет ни одного драфта в этой серии
+          Пока нет ни одного {% if is_practice %}тренировочного {% endif %}драфта в этой серии
         </div>
       </div>
       {% endif %}
     {% else %}
     <div class="card">
-      <div class="card-header fw-semibold">🏆 Fantasy-лидерборд</div>
+      <div class="card-header fw-semibold">🏆 {% if is_practice %}Тренировочный лидерборд{% else %}Fantasy-лидерборд{% endif %}</div>
       <div class="card-body p-0">
-        {{ render_leaderboard(leaderboard, equipped_bulk) }}
+        {{ render_leaderboard(ctx.leaderboard, equipped_bulk) }}
       </div>
     </div>
     {% endif %}
   </div>
 </div>
+{% endmacro %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  <div>
+    <h2 class="mb-0 fw-bold">
+      🎯 Fantasy: {{ tournament.name }}{% if series %} — {{ series.name }}{% endif %}
+    </h2>
+    <p class="text-muted small mb-0">
+      Выберите {{ max_picks }} игроков — итог драфта: сумма их рейтинговых очков
+      {% if series %}за эту серию{% else %}за весь турнир{% endif %}
+    </p>
+  </div>
+  {% if current_user.is_authenticated and current_user.is_admin %}
+  <a href="{{ url_for('fantasy.admin_series_drafts', series_id=series.id) if series else url_for('fantasy.admin_tournament_drafts', tournament_id=tournament.id) }}"
+     class="btn btn-outline-secondary btn-sm ms-auto">
+    <i class="bi bi-tools me-1"></i>Драфты (админ)
+  </a>
+  {% endif %}
+</div>
+
+<ul class="nav nav-tabs mb-3" id="fantasyModeTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="fantasy-tab-paid" data-bs-toggle="tab" data-bs-target="#fantasy-pane-paid"
+            data-mode="paid" type="button" role="tab" aria-controls="fantasy-pane-paid" aria-selected="true">
+      💰 На деньги
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="fantasy-tab-practice" data-bs-toggle="tab" data-bs-target="#fantasy-pane-practice"
+            data-mode="practice" type="button" role="tab" aria-controls="fantasy-pane-practice" aria-selected="false">
+      🎓 Бесплатно (тренировка)
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content" id="fantasyModeTabsContent">
+  <div class="tab-pane fade show active" id="fantasy-pane-paid" role="tabpanel" aria-labelledby="fantasy-tab-paid">
+    {{ render_mode("paid", modes.paid) }}
+  </div>
+  <div class="tab-pane fade" id="fantasy-pane-practice" role="tabpanel" aria-labelledby="fantasy-tab-practice">
+    {{ render_mode("practice", modes.practice) }}
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('tab') === 'practice') {
+    var el = document.getElementById('fantasy-tab-practice');
+    if (el) new bootstrap.Tab(el).show();
+  }
+  document.querySelectorAll('#fantasyModeTabs [data-bs-toggle="tab"]').forEach(function (t) {
+    t.addEventListener('shown.bs.tab', function (e) {
+      var mode = e.target.getAttribute('data-mode');
+      var url = new URL(window.location);
+      if (mode === 'practice') { url.searchParams.set('tab', 'practice'); }
+      else { url.searchParams.delete('tab'); }
+      window.history.replaceState({}, '', url);
+    });
+  });
+});
+</script>
 {% endblock %}

@@ -39,6 +39,21 @@ Prize pool:
 - Paid out once, when the tournament's drafts are scored: 1st place gets
   EconomySettings.fantasy_first_place_share of the bank, 2nd place gets
   fantasy_second_place_share. No coins are created beyond the bank.
+
+Practice mode (is_practice=True):
+- Free — no entry fee charged, entry_cost_paid stays 0. Lets someone use
+  the drafting tool (pick players, watch live points) without staking
+  coins or competing for a payout.
+- Fully separate universe from paid drafts: own leaderboard, own
+  exclusivity groups (see _assign_group) — a practice group's picks never
+  collide with a paid group's, and a practice draft can NEVER appear in
+  the paid leaderboard used for prize payout (score_tournament/score_series
+  filter is_practice=False explicitly, not just "bank > 0", since a
+  practice draft mixed into a paid group's leaderboard could otherwise
+  rank into a payout slot for free).
+- A user may hold one paid AND one practice draft for the same
+  tournament/series at once (the "one draft per user" uniqueness is keyed
+  on (user, tournament, series, is_practice) — see the model).
 """
 from __future__ import annotations
 
@@ -134,11 +149,13 @@ class FantasyService:
     @staticmethod
     def create_draft(
         user: User, tournament_id: int, tournament_series_id: Optional[int] = None,
+        is_practice: bool = False,
     ) -> FantasyResult:
         """
-        Create an OPEN draft for the user, charging the Fantasy entry fee.
+        Create an OPEN draft for the user, charging the Fantasy entry fee
+        (skipped entirely when is_practice=True — see module docstring).
         Validates: tournament active/pending, user not a participant, no
-        existing draft, linked player with sufficient balance.
+        existing draft, linked player (balance check skipped for practice).
 
         tournament_series_id (optional) scopes the draft to one series
         (game evening) inside a series-tournament instead of the whole
@@ -174,14 +191,18 @@ class FantasyService:
                     "По этой серии уже записаны игры — драфт больше нельзя создать."
                 )
 
-        # Anti-abuse: one draft per (tournament, series) per user
+        # Anti-abuse: one draft per (tournament, series, is_practice) per
+        # user — a paid and a practice draft for the same tournament/series
+        # can coexist (see model's unique constraint).
         existing = db.session.query(FantasyDraft).filter_by(
             user_id=user.id, tournament_id=tournament_id,
-            tournament_series_id=tournament_series_id,
+            tournament_series_id=tournament_series_id, is_practice=is_practice,
         ).first()
         if existing:
             return FantasyResult.fail(
-                "У вас уже есть драфт для этой серии." if series
+                "У вас уже есть тренировочный драфт для этой серии." if (series and is_practice)
+                else "У вас уже есть драфт для этой серии." if series
+                else "У вас уже есть тренировочный драфт для этого турнира." if is_practice
                 else "У вас уже есть драфт для этого турнира."
             )
 
@@ -208,24 +229,28 @@ class FantasyService:
                     "в котором участвуете как игрок."
                 )
 
-        # Entry fee requires a linked player (coin balance lives on Player)
+        # Entry fee requires a linked player (coin balance lives on Player);
+        # practice drafts are free, so skip both the balance check and the
+        # actual charge entirely.
         if not user.is_player or not user.player:
             return FantasyResult.fail(
                 "Для участия в Fantasy нужен привязанный профиль игрока."
             )
 
         label = f"{t.name} — {series.name}" if series else t.name
-        entry_cost = EconomyService.get_settings().fantasy_entry_cost
-        spend = EconomyService.spend_coins(
-            user.player,
-            entry_cost,
-            f"Fantasy: вступительный взнос «{label}»",
-            commit=False,
-        )
-        if not spend.ok:
-            return FantasyResult.fail(spend.message)
+        entry_cost = 0.0
+        if not is_practice:
+            entry_cost = EconomyService.get_settings().fantasy_entry_cost
+            spend = EconomyService.spend_coins(
+                user.player,
+                entry_cost,
+                f"Fantasy: вступительный взнос «{label}»",
+                commit=False,
+            )
+            if not spend.ok:
+                return FantasyResult.fail(spend.message)
 
-        group_number = FantasyService._assign_group(series) if series else None
+        group_number = FantasyService._assign_group(series, is_practice=is_practice) if series else None
 
         draft = FantasyDraft(
             user_id=user.id,
@@ -234,17 +259,23 @@ class FantasyService:
             status=FantasyDraftStatus.OPEN,
             entry_cost_paid=entry_cost,
             group_number=group_number,
+            is_practice=is_practice,
         )
         db.session.add(draft)
         db.session.commit()
         group_note = f" Группа {group_number}." if group_number else ""
+        if is_practice:
+            return FantasyResult.success(
+                f"Тренировочный драфт для «{label}» создан — бесплатно, без права на приз.{group_note} Выберите игроков.",
+                data=draft,
+            )
         return FantasyResult.success(
             f"Драфт для «{label}» создан, списано {entry_cost:.0f} монет.{group_note} Выберите игроков.",
             data=draft,
         )
 
     @staticmethod
-    def _assign_group(series: TournamentSeries) -> int:
+    def _assign_group(series: TournamentSeries, is_practice: bool = False) -> int:
         """
         Группа эксклюзивности пиков внутри серии — фиксированного размера
         (SERIES_GROUP_SIZE драфтеров по SERIES_PICKS_PER_DRAFTER пиков
@@ -252,11 +283,15 @@ class FantasyService:
         открывается, когда текущая набрала SERIES_GROUP_SIZE драфтов.
         Уже назначенные драфты никогда не переезжают в другую группу
         задним числом, даже если позже открылась более свободная.
+
+        Считается ОТДЕЛЬНО для платных и тренировочных (is_practice)
+        драфтов — у них разная нумерация групп 1,2,3.., не пересекаются.
         """
         counts = dict(
             db.session.query(FantasyDraft.group_number, func.count(FantasyDraft.id))
             .filter(
                 FantasyDraft.tournament_series_id == series.id,
+                FantasyDraft.is_practice == is_practice,
                 FantasyDraft.group_number.isnot(None),
             )
             .group_by(FantasyDraft.group_number)
@@ -364,6 +399,7 @@ class FantasyService:
                 .filter(
                     FantasyDraft.tournament_series_id == draft.tournament_series_id,
                     FantasyDraft.group_number == draft.group_number,
+                    FantasyDraft.is_practice == draft.is_practice,
                     FantasyDraft.id != draft.id,
                     FantasyDraftPick.player_id == player_id,
                 )
@@ -426,6 +462,7 @@ class FantasyService:
         refund = draft.entry_cost_paid
         tournament_id = draft.tournament_id
         tournament_series_id = draft.tournament_series_id
+        was_practice = draft.is_practice
 
         db.session.delete(draft)
         if refund > 0 and owner and owner.player:
@@ -438,8 +475,12 @@ class FantasyService:
                 commit=False,
             )
         db.session.commit()
+        message = (
+            "Тренировочный драфт отменён." if was_practice
+            else f"Драфт отменён, возвращено {refund:.0f} монет."
+        )
         return FantasyResult.success(
-            f"Драфт отменён, возвращено {refund:.0f} монет.",
+            message,
             data={"tournament_id": tournament_id, "tournament_series_id": tournament_series_id},
         )
 
@@ -614,11 +655,15 @@ class FantasyService:
                     {"tournament_name": t.name, "points": draft.total_points},
                 )
 
-        # ── Prize pool payout ────────────────────────────────────────────
-        bank = round(sum(d.entry_cost_paid for d in all_drafts), 2)
+        # ── Prize pool payout — paid drafts only. Practice drafts (see
+        # module docstring) are scored above like any other draft, but
+        # must never be able to rank into a payout slot, so the bank and
+        # leaderboard here are both explicitly restricted to is_practice=False.
+        paid_drafts = [d for d in all_drafts if not d.is_practice]
+        bank = round(sum(d.entry_cost_paid for d in paid_drafts), 2)
         if bank > 0:
             settings = EconomyService.get_settings()
-            leaderboard = FantasyService.get_leaderboard(tournament_id)
+            leaderboard = FantasyService.get_leaderboard(tournament_id, is_practice=False)
             for place, share in (
                 (1, settings.fantasy_first_place_share),
                 (2, settings.fantasy_second_place_share),
@@ -715,16 +760,21 @@ class FantasyService:
         # self-contained mini-competition with its own entry fees/payout).
         # group_number is None for drafts created before this feature
         # shipped — treated as a single implicit group, same as the old
-        # whole-series behavior.
+        # whole-series behavior. Practice drafts (see module docstring) are
+        # excluded entirely here — group numbering is scoped separately per
+        # is_practice (see _assign_group), so filtering paid_drafts also
+        # keeps a practice group's group_number from colliding with a paid
+        # one of the same number.
         settings = EconomyService.get_settings()
-        groups = sorted({d.group_number for d in all_drafts}, key=lambda g: (g is None, g))
+        paid_drafts = [d for d in all_drafts if not d.is_practice]
+        groups = sorted({d.group_number for d in paid_drafts}, key=lambda g: (g is None, g))
         for group_number in groups:
-            group_drafts = [d for d in all_drafts if d.group_number == group_number]
+            group_drafts = [d for d in paid_drafts if d.group_number == group_number]
             bank = round(sum(d.entry_cost_paid for d in group_drafts), 2)
             if bank <= 0:
                 continue
             leaderboard = FantasyService.get_leaderboard(
-                t.id, tournament_series_id, group_number=group_number,
+                t.id, tournament_series_id, group_number=group_number, is_practice=False,
             )
             group_label = f"{label} (группа {group_number})" if group_number else label
             for place, share in (
@@ -760,7 +810,7 @@ class FantasyService:
     @staticmethod
     def get_pool_info(
         tournament_id: int, tournament_series_id: Optional[int] = None,
-        group_number: Optional[int] = None,
+        group_number: Optional[int] = None, is_practice: bool = False,
     ) -> dict:
         """
         Entry cost, participant count, current bank and projected payouts
@@ -768,12 +818,17 @@ class FantasyService:
         within a series') Fantasy page. Bank is the sum of what was
         actually charged to each draft (entry_cost_paid), so it stays
         correct even if the admin changes the entry cost mid-way.
+
+        is_practice=True always returns entry_cost/bank/payouts of 0 —
+        practice drafts never charge or pay out (see module docstring);
+        participant_count is still meaningful (how many are training).
         """
         from app.services.economy_service import EconomyService
 
         settings = EconomyService.get_settings()
         query = db.session.query(FantasyDraft).filter_by(
             tournament_id=tournament_id, tournament_series_id=tournament_series_id,
+            is_practice=is_practice,
         )
         if group_number is not None:
             query = query.filter(FantasyDraft.group_number == group_number)
@@ -781,7 +836,7 @@ class FantasyService:
 
         bank = round(sum(d.entry_cost_paid for d in drafts), 2)
         return {
-            "entry_cost": settings.fantasy_entry_cost,
+            "entry_cost": 0 if is_practice else settings.fantasy_entry_cost,
             "participant_count": len(drafts),
             "bank": bank,
             "payout_1st": round(bank * settings.fantasy_first_place_share, 2),
@@ -793,7 +848,7 @@ class FantasyService:
     @staticmethod
     def get_leaderboard(
         tournament_id: int, tournament_series_id: Optional[int] = None,
-        group_number: Optional[int] = None,
+        group_number: Optional[int] = None, is_practice: bool = False,
     ) -> List[FantasyLeaderboardEntry]:
         """
         group_number=None (default) with a series that DOES use exclusivity
@@ -801,6 +856,11 @@ class FantasyService:
         tagged with its own group_number (see FantasyLeaderboardEntry) —
         callers that need one group's standalone ranking/payout (score_series)
         pass group_number explicitly.
+
+        is_practice filters to just paid (False, default) or just practice
+        (True) drafts — the two are always separate leaderboards, never
+        mixed (a practice draft must never be able to rank into a paid
+        payout slot, see score_tournament/score_series).
         """
         # Self-heal BEFORE the query, once for the whole series — not per
         # draft in the loop below, and not after ORDER BY has already run
@@ -811,6 +871,7 @@ class FantasyService:
 
         query = db.session.query(FantasyDraft).filter_by(
             tournament_id=tournament_id, tournament_series_id=tournament_series_id,
+            is_practice=is_practice,
         )
         if group_number is not None:
             query = query.filter(FantasyDraft.group_number == group_number)
@@ -846,12 +907,13 @@ class FantasyService:
     @staticmethod
     def get_user_draft(
         user_id: int, tournament_id: int, tournament_series_id: Optional[int] = None,
+        is_practice: bool = False,
     ) -> Optional[FantasyDraft]:
         if tournament_series_id:
             FantasyService._self_heal_series(tournament_series_id)
         return db.session.query(FantasyDraft).filter_by(
             user_id=user_id, tournament_id=tournament_id,
-            tournament_series_id=tournament_series_id,
+            tournament_series_id=tournament_series_id, is_practice=is_practice,
         ).first()
 
     @staticmethod
@@ -912,6 +974,7 @@ class FantasyService:
     @staticmethod
     def get_available_picks(
         user: User, tournament_id: int, tournament_series_id: Optional[int] = None,
+        is_practice: bool = False,
     ) -> List[Player]:
         """
         Players available for the user to pick — in tournament, not self,
@@ -932,9 +995,11 @@ class FantasyService:
 
         If the draft belongs to an exclusivity group (series-scoped, see
         _assign_group), also excludes players already picked by ANY OTHER
-        draft in that same (series, group) — not just this user's own draft.
+        draft in that same (series, group, is_practice) — not just this
+        user's own draft. is_practice selects which of the user's two
+        possible drafts (paid vs. practice) this is about.
         """
-        draft = FantasyService.get_user_draft(user.id, tournament_id, tournament_series_id)
+        draft = FantasyService.get_user_draft(user.id, tournament_id, tournament_series_id, is_practice=is_practice)
         already_picked = {p.player_id for p in draft.picks} if draft else set()
 
         confirmed_ids = None
@@ -950,6 +1015,7 @@ class FantasyService:
                 .filter(
                     FantasyDraft.tournament_series_id == draft.tournament_series_id,
                     FantasyDraft.group_number == draft.group_number,
+                    FantasyDraft.is_practice == draft.is_practice,
                     FantasyDraft.id != draft.id,
                 )
                 .all()

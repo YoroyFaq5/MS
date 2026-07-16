@@ -772,6 +772,16 @@ class FantasyDraft(db.Model):
     # и призовым банком (см. get_leaderboard/score_series). NULL для
     # обычных turnирный-wide драфтов (там пики остаются общими, как раньше).
     group_number  = Column(Integer, nullable=True)
+    # Practice/training draft — free (no entry fee charged, entry_cost_paid
+    # stays 0), scored the same as a real draft (own total_points, still
+    # shows live/final points), but kept out of the paid leaderboard and
+    # prize payout entirely (see get_leaderboard/get_pool_info/score_series
+    # is_practice filters) so it can't be used to sneak a free payout.
+    # Exclusivity groups (group_number) are scoped separately per
+    # is_practice too — a practice group's picks never collide with a paid
+    # group's picks, and vice versa. Added via
+    # migrate_fantasy_practice_mode.py for existing DBs.
+    is_practice   = Column(Boolean, default=False, nullable=False, server_default="0")
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -791,7 +801,7 @@ class FantasyDraft(db.Model):
 
     __table_args__ = (
         UniqueConstraint(
-            "user_id", "tournament_id", "tournament_series_id",
+            "user_id", "tournament_id", "tournament_series_id", "is_practice",
             name="uq_fantasy_user_tournament_series",
         ),
     )
@@ -807,6 +817,7 @@ class FantasyDraft(db.Model):
             "tournament_id": self.tournament_id,
             "tournament_series_id": self.tournament_series_id,
             "group_number":  self.group_number,
+            "is_practice":   self.is_practice,
             "total_points":  self.total_points,
             "entry_cost_paid": self.entry_cost_paid,
             "status":        self.status.value,

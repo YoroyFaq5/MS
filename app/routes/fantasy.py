@@ -2,6 +2,8 @@
 Fantasy Blueprint  /fantasy/*
 Web UI for fantasy draft system.
 """
+from typing import Optional
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
 from flask_login import current_user, login_required
 
@@ -19,14 +21,100 @@ def _draft_redirect_url(draft: FantasyDraft) -> str:
     pages and the admin drafts-management page (same routes, keyed off
     draft_id) — sends the user back to whichever page they came from.
     An admin acting on someone ELSE's draft goes back to the admin list
-    (they're managing multiple drafts there, not their own)."""
+    (they're managing multiple drafts there, not their own). A practice
+    draft (see FantasyService module docstring) sends the viewer back to
+    the practice tab specifically, via ?tab=practice (see the small tab-
+    activation script in fantasy/tournament.html) — otherwise a redirect
+    after e.g. cancelling a practice draft would silently land back on
+    the paid tab."""
     if current_user.is_authenticated and current_user.is_admin and draft.user_id != current_user.id:
         if draft.tournament_series_id:
             return url_for("fantasy.admin_series_drafts", series_id=draft.tournament_series_id)
         return url_for("fantasy.admin_tournament_drafts", tournament_id=draft.tournament_id)
+    tab = {"tab": "practice"} if draft.is_practice else {}
     if draft.tournament_series_id:
-        return url_for("fantasy.series_fantasy", series_id=draft.tournament_series_id)
-    return url_for("fantasy.tournament_fantasy", tournament_id=draft.tournament_id)
+        return url_for("fantasy.series_fantasy", series_id=draft.tournament_series_id, **tab)
+    return url_for("fantasy.tournament_fantasy", tournament_id=draft.tournament_id, **tab)
+
+
+def _build_fantasy_mode(tournament: Tournament, series: Optional[TournamentSeries], is_practice: bool) -> dict:
+    """
+    One tab's worth of data (paid or practice — see FantasyService module
+    docstring) for the tournament/series fantasy page: the viewer's own
+    draft + available picks, and either one leaderboard/pool (tournament-
+    wide) or one card per exclusivity group (series-scoped). The paid and
+    practice modes never share a leaderboard, pool, or exclusivity group
+    — see FantasyService.get_leaderboard/get_pool_info/_assign_group.
+    """
+    tournament_id = tournament.id
+    series_id = series.id if series else None
+
+    my_draft = None
+    available = []
+    if current_user.is_authenticated:
+        my_draft = FantasyService.get_user_draft(
+            current_user.id, tournament_id, series_id, is_practice=is_practice,
+        )
+        if my_draft and my_draft.status.value == "open":
+            available = FantasyService.get_available_picks(
+                current_user, tournament_id, series_id, is_practice=is_practice,
+            )
+    my_group = my_draft.group_number if my_draft else None
+
+    groups = None
+    leaderboard = None
+    pool_info = None
+    if series:
+        FantasyService._self_heal_series(series_id)
+        group_rows = db.session.query(FantasyDraft.group_number).filter(
+            FantasyDraft.tournament_series_id == series_id,
+            FantasyDraft.is_practice == is_practice,
+        ).distinct().all()
+        group_numbers = sorted({g for (g,) in group_rows if g is not None})
+        # Legacy drafts predating groups have group_number=None — treat as
+        # their own single implicit group so they still show up.
+        if any(g is None for (g,) in group_rows):
+            group_numbers.append(None)
+        groups = [
+            {
+                "group_number": g,
+                "is_mine": g == my_group,
+                "leaderboard": FantasyService.get_leaderboard(
+                    tournament_id, series_id, group_number=g, is_practice=is_practice,
+                ),
+                "pool_info": FantasyService.get_pool_info(
+                    tournament_id, series_id, group_number=g, is_practice=is_practice,
+                ),
+            }
+            for g in group_numbers
+        ]
+        groups.sort(key=lambda row: (not row["is_mine"], row["group_number"] is None, row["group_number"]))
+    else:
+        leaderboard = FantasyService.get_leaderboard(tournament_id, is_practice=is_practice)
+        pool_info = FantasyService.get_pool_info(tournament_id, is_practice=is_practice)
+
+    return {
+        "is_practice": is_practice,
+        "my_draft": my_draft,
+        "my_group": my_group,
+        "available": available,
+        "groups": groups,
+        "leaderboard": leaderboard,
+        "pool_info": pool_info,
+    }
+
+
+def _mode_pick_player_ids(ctx: dict) -> set:
+    ids = set()
+    if ctx["my_draft"]:
+        ids.update(p.player_id for p in ctx["my_draft"].picks)
+    entry_lists = [ctx["leaderboard"]] if ctx["leaderboard"] is not None else [
+        grp["leaderboard"] for grp in (ctx["groups"] or [])
+    ]
+    for entries in entry_lists:
+        for e in entries:
+            ids.update(pk["player_id"] for pk in e.picks)
+    return ids
 
 
 @fantasy_bp.route("/")
@@ -116,14 +204,10 @@ def index():
 @fantasy_bp.route("/tournament/<int:tournament_id>")
 def tournament_fantasy(tournament_id: int):
     t = db.session.get(Tournament, tournament_id) or abort(404)
-    leaderboard = FantasyService.get_leaderboard(tournament_id)
-    pool_info = FantasyService.get_pool_info(tournament_id)
-    my_draft = None
-    available = []
-    if current_user.is_authenticated:
-        my_draft = FantasyService.get_user_draft(current_user.id, tournament_id)
-        if my_draft and my_draft.status.value == "open":
-            available = FantasyService.get_available_picks(current_user, tournament_id)
+
+    ctx_paid = _build_fantasy_mode(t, None, is_practice=False)
+    ctx_practice = _build_fantasy_mode(t, None, is_practice=True)
+
     from app.models import TournamentParticipant
     participant_count = db.session.query(TournamentParticipant).filter_by(
         tournament_id=tournament_id
@@ -132,21 +216,18 @@ def tournament_fantasy(tournament_id: int):
     max_picks = _allowed_picks(participant_count)
 
     # Персонализация ников для пиков — своих и всех показанных в лидерборде
-    # (детализация "кто кого выбрал", см. FantasyLeaderboardEntry.picks).
-    pick_player_ids = {p.player_id for p in my_draft.picks} if my_draft else set()
-    for e in leaderboard:
-        pick_player_ids.update(pk["player_id"] for pk in e.picks)
+    # (детализация "кто кого выбрал", см. FantasyLeaderboardEntry.picks) —
+    # для обоих режимов сразу, чтобы вкладку можно было переключать без
+    # перезагрузки страницы.
+    pick_player_ids = _mode_pick_player_ids(ctx_paid) | _mode_pick_player_ids(ctx_practice)
     equipped_bulk = ShopService.get_equipped_bulk(list(pick_player_ids))
 
     return render_template(
         "fantasy/tournament.html",
         tournament=t,
         series=None,
-        leaderboard=leaderboard,
-        pool_info=pool_info,
-        entry_cost=pool_info["entry_cost"],
-        my_draft=my_draft,
-        available_players=available,
+        modes={"paid": ctx_paid, "practice": ctx_practice},
+        entry_cost=ctx_paid["pool_info"]["entry_cost"],
         max_picks=max_picks,
         equipped_bulk=equipped_bulk,
         create_draft_url=url_for("fantasy.create_draft", tournament_id=tournament_id),
@@ -157,9 +238,11 @@ def tournament_fantasy(tournament_id: int):
 @fantasy_bp.route("/tournament/<int:tournament_id>/create", methods=["POST"])
 @requires_permission(Permission.CREATE_FANTASY_DRAFT)
 def create_draft(tournament_id: int):
-    result = FantasyService.create_draft(current_user, tournament_id)
+    is_practice = request.form.get("is_practice") == "1"
+    result = FantasyService.create_draft(current_user, tournament_id, is_practice=is_practice)
     flash(result.message, "success" if result.ok else "danger")
-    return redirect(url_for("fantasy.tournament_fantasy", tournament_id=tournament_id))
+    tab = {"tab": "practice"} if is_practice else {}
+    return redirect(url_for("fantasy.tournament_fantasy", tournament_id=tournament_id, **tab))
 
 
 @fantasy_bp.route("/series/<int:series_id>")
@@ -177,43 +260,13 @@ def series_fantasy(series_id: int):
     series = db.session.get(TournamentSeries, series_id) or abort(404)
     tournament = series.series_tournament.tournament
 
-    my_draft = None
-    available = []
-    if current_user.is_authenticated:
-        my_draft = FantasyService.get_user_draft(current_user.id, tournament.id, series_id)
-        if my_draft and my_draft.status.value == "open":
-            available = FantasyService.get_available_picks(current_user, tournament.id, series_id)
-
-    my_group = my_draft.group_number if my_draft else None
-
-    FantasyService._self_heal_series(series_id)
-    group_rows = db.session.query(FantasyDraft.group_number).filter(
-        FantasyDraft.tournament_series_id == series_id,
-    ).distinct().all()
-    group_numbers = sorted({g for (g,) in group_rows if g is not None})
-    # Legacy drafts predating this feature have group_number=None — treat
-    # them as their own single implicit group so they still show up.
-    if any(g is None for (g,) in group_rows):
-        group_numbers.append(None)
-
-    groups = [
-        {
-            "group_number": g,
-            "is_mine": g == my_group,
-            "leaderboard": FantasyService.get_leaderboard(tournament.id, series_id, group_number=g),
-            "pool_info": FantasyService.get_pool_info(tournament.id, series_id, group_number=g),
-        }
-        for g in group_numbers
-    ]
-    groups.sort(key=lambda row: (not row["is_mine"], row["group_number"] is None, row["group_number"]))
+    ctx_paid = _build_fantasy_mode(tournament, series, is_practice=False)
+    ctx_practice = _build_fantasy_mode(tournament, series, is_practice=True)
 
     from app.services.fantasy_service import SERIES_PICKS_PER_DRAFTER
     max_picks = SERIES_PICKS_PER_DRAFTER
 
-    pick_player_ids = {p.player_id for p in my_draft.picks} if my_draft else set()
-    for grp in groups:
-        for e in grp["leaderboard"]:
-            pick_player_ids.update(pk["player_id"] for pk in e.picks)
+    pick_player_ids = _mode_pick_player_ids(ctx_paid) | _mode_pick_player_ids(ctx_practice)
     equipped_bulk = ShopService.get_equipped_bulk(list(pick_player_ids))
 
     from app.services.economy_service import EconomyService
@@ -223,11 +276,8 @@ def series_fantasy(series_id: int):
         "fantasy/tournament.html",
         tournament=tournament,
         series=series,
-        groups=groups,
+        modes={"paid": ctx_paid, "practice": ctx_practice},
         entry_cost=entry_cost,
-        my_draft=my_draft,
-        my_group=my_group,
-        available_players=available,
         max_picks=max_picks,
         equipped_bulk=equipped_bulk,
         create_draft_url=url_for("fantasy.create_series_draft", series_id=series_id),
@@ -243,9 +293,11 @@ def series_fantasy(series_id: int):
 def create_series_draft(series_id: int):
     series = db.session.get(TournamentSeries, series_id) or abort(404)
     tournament_id = series.series_tournament.tournament_id
-    result = FantasyService.create_draft(current_user, tournament_id, series_id)
+    is_practice = request.form.get("is_practice") == "1"
+    result = FantasyService.create_draft(current_user, tournament_id, series_id, is_practice=is_practice)
     flash(result.message, "success" if result.ok else "danger")
-    return redirect(url_for("fantasy.series_fantasy", series_id=series_id))
+    tab = {"tab": "practice"} if is_practice else {}
+    return redirect(url_for("fantasy.series_fantasy", series_id=series_id, **tab))
 
 
 @fantasy_bp.route("/draft/<int:draft_id>/pick", methods=["POST"])
@@ -298,7 +350,7 @@ def _admin_draft_rows(drafts, tournament_id, series_id):
     rows = []
     for d in drafts:
         available = (
-            FantasyService.get_available_picks(d.user, tournament_id, series_id)
+            FantasyService.get_available_picks(d.user, tournament_id, series_id, is_practice=d.is_practice)
             if d.status.value == "open" and d.user else []
         )
         rows.append({"draft": d, "available": available})
@@ -319,9 +371,13 @@ def _eligible_admin_draft_users(tournament_id, tournament_series_id):
     from app.models import TournamentParticipant
     from app.models.user import User
 
+    # is_practice=False — this dropdown only ever creates PAID drafts (see
+    # admin_create_tournament_draft/admin_create_series_draft below), so a
+    # user who already has a practice-only draft here must stay eligible.
     existing_user_ids = {
         row[0] for row in db.session.query(FantasyDraft.user_id).filter_by(
             tournament_id=tournament_id, tournament_series_id=tournament_series_id,
+            is_practice=False,
         ).all()
     }
 
@@ -423,7 +479,11 @@ def admin_series_drafts(series_id: int):
     drafts = (
         db.session.query(FantasyDraft)
         .filter_by(tournament_series_id=series_id)
-        .order_by(FantasyDraft.group_number.is_(None), FantasyDraft.group_number, FantasyDraft.created_at)
+        .order_by(
+            FantasyDraft.is_practice,
+            FantasyDraft.group_number.is_(None), FantasyDraft.group_number,
+            FantasyDraft.created_at,
+        )
         .all()
     )
     from app.services.fantasy_service import SERIES_PICKS_PER_DRAFTER
