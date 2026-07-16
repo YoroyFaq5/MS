@@ -278,6 +278,37 @@ def _admin_draft_rows(drafts, tournament_id, series_id):
     return rows
 
 
+def _eligible_admin_draft_users(tournament_id, tournament_series_id):
+    """Users the admin can open a new draft FOR — same eligibility
+    FantasyService.create_draft would itself enforce (not a tournament
+    participant, no existing draft for this tournament/series, has a
+    linked player for the entry-fee balance), computed upfront just to
+    keep the dropdown free of choices that would only fail on submit."""
+    from app.models import TournamentParticipant
+    from app.models.user import User
+
+    existing_user_ids = {
+        row[0] for row in db.session.query(FantasyDraft.user_id).filter_by(
+            tournament_id=tournament_id, tournament_series_id=tournament_series_id,
+        ).all()
+    }
+    participant_player_ids = {
+        row[0] for row in db.session.query(TournamentParticipant.player_id).filter_by(
+            tournament_id=tournament_id
+        ).all()
+    }
+    users = (
+        db.session.query(User)
+        .filter(User.player_id.isnot(None))
+        .order_by(User.username)
+        .all()
+    )
+    return [
+        u for u in users
+        if u.id not in existing_user_ids and u.player_id not in participant_player_ids
+    ]
+
+
 @fantasy_bp.route("/tournament/<int:tournament_id>/admin")
 @admin_required
 def admin_tournament_drafts(tournament_id: int):
@@ -305,6 +336,9 @@ def admin_tournament_drafts(tournament_id: int):
     equipped_bulk = ShopService.get_equipped_bulk(
         [pick.player_id for row in draft_rows for pick in row["draft"].picks]
     )
+    eligible_users = _eligible_admin_draft_users(tournament_id, None)
+    from app.services.economy_service import EconomyService
+    entry_cost = EconomyService.get_settings().fantasy_entry_cost
 
     return render_template(
         "fantasy/admin_drafts.html",
@@ -313,8 +347,26 @@ def admin_tournament_drafts(tournament_id: int):
         draft_rows=draft_rows,
         max_picks=max_picks,
         equipped_bulk=equipped_bulk,
+        eligible_users=eligible_users,
+        entry_cost=entry_cost,
+        create_url=url_for("fantasy.admin_create_tournament_draft", tournament_id=tournament_id),
         back_url=url_for("fantasy.tournament_fantasy", tournament_id=tournament_id),
     )
+
+
+@fantasy_bp.route("/tournament/<int:tournament_id>/admin/create", methods=["POST"])
+@admin_required
+def admin_create_tournament_draft(tournament_id: int):
+    from app.models.user import User
+
+    user_id = request.form.get("user_id", type=int)
+    target = db.session.get(User, user_id) if user_id else None
+    if not target:
+        flash("Пользователь не найден.", "danger")
+    else:
+        result = FantasyService.create_draft(target, tournament_id)
+        flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("fantasy.admin_tournament_drafts", tournament_id=tournament_id))
 
 
 @fantasy_bp.route("/series/<int:series_id>/admin")
@@ -341,6 +393,9 @@ def admin_series_drafts(series_id: int):
     equipped_bulk = ShopService.get_equipped_bulk(
         [pick.player_id for row in draft_rows for pick in row["draft"].picks]
     )
+    eligible_users = _eligible_admin_draft_users(tournament.id, series_id)
+    from app.services.economy_service import EconomyService
+    entry_cost = EconomyService.get_settings().fantasy_entry_cost
 
     return render_template(
         "fantasy/admin_drafts.html",
@@ -349,5 +404,25 @@ def admin_series_drafts(series_id: int):
         draft_rows=draft_rows,
         max_picks=max_picks,
         equipped_bulk=equipped_bulk,
+        eligible_users=eligible_users,
+        entry_cost=entry_cost,
+        create_url=url_for("fantasy.admin_create_series_draft", series_id=series_id),
         back_url=url_for("fantasy.series_fantasy", series_id=series_id),
     )
+
+
+@fantasy_bp.route("/series/<int:series_id>/admin/create", methods=["POST"])
+@admin_required
+def admin_create_series_draft(series_id: int):
+    from app.models.user import User
+
+    series = db.session.get(TournamentSeries, series_id) or abort(404)
+    tournament_id = series.series_tournament.tournament_id
+    user_id = request.form.get("user_id", type=int)
+    target = db.session.get(User, user_id) if user_id else None
+    if not target:
+        flash("Пользователь не найден.", "danger")
+    else:
+        result = FantasyService.create_draft(target, tournament_id, series_id)
+        flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("fantasy.admin_series_drafts", series_id=series_id))
