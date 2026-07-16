@@ -28,6 +28,12 @@
     <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-danger ms-3">Войти</a>
   </div>
 </div>
+{% else %}
+<div class="d-flex justify-content-end mb-3">
+  <a href="{{ url_for('fantasy.draft_history') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-clock-history me-1"></i>Мои драфты
+  </a>
+</div>
 {% endif %}
 
 <!-- ── Как это работает ────────────────────────────────────────────────── -->

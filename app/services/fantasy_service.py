@@ -917,6 +917,25 @@ class FantasyService:
         ).first()
 
     @staticmethod
+    def get_user_draft_history(user_id: int) -> List[FantasyDraft]:
+        """
+        Every draft (paid and practice, any tournament/series, any status)
+        this user has ever created, newest first — for a personal "Мои
+        драфты" history page. Cancelled drafts don't appear (cancel_draft
+        deletes the row entirely, see its docstring) — this only shows
+        drafts that ran their course. Bounded by one user's own draft
+        count, not a club-wide scan, so no pagination/perf concern here
+        (see the /titles/nominations incident for why that distinction
+        matters — this is nothing like that unbounded case).
+        """
+        return (
+            db.session.query(FantasyDraft)
+            .filter_by(user_id=user_id)
+            .order_by(FantasyDraft.created_at.desc())
+            .all()
+        )
+
+    @staticmethod
     def get_top_picks(
         tournament_id: int, tournament_series_id: Optional[int] = None, limit: int = 3,
     ) -> List[dict]:

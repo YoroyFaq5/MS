@@ -201,6 +201,42 @@ def index():
     )
 
 
+@fantasy_bp.route("/history")
+@login_required
+def draft_history():
+    """Personal history of every draft (paid + practice, any tournament or
+    series, any status) the current user has ever created — 'Мои драфты'.
+    Cancelled drafts are gone (cancel_draft deletes them), so this only
+    ever shows drafts that ran their course."""
+    drafts = FantasyService.get_user_draft_history(current_user.id)
+
+    rows = []
+    pick_player_ids = set()
+    for d in drafts:
+        rank = None
+        field_size = None
+        if d.status.value == "scored":
+            board = FantasyService.get_leaderboard(
+                d.tournament_id, d.tournament_series_id,
+                group_number=d.group_number, is_practice=d.is_practice,
+            )
+            field_size = len(board)
+            for e in board:
+                if e.draft_id == d.id:
+                    rank = e.rank
+                    break
+        pick_player_ids.update(p.player_id for p in d.picks)
+        rows.append({"draft": d, "rank": rank, "field_size": field_size})
+
+    equipped_bulk = ShopService.get_equipped_bulk(list(pick_player_ids))
+
+    return render_template(
+        "fantasy/history.html",
+        rows=rows,
+        equipped_bulk=equipped_bulk,
+    )
+
+
 @fantasy_bp.route("/tournament/<int:tournament_id>")
 def tournament_fantasy(tournament_id: int):
     t = db.session.get(Tournament, tournament_id) or abort(404)
