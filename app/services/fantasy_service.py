@@ -4,12 +4,23 @@ FantasyService
 Fantasy draft system — entry-fee pool game (not FPL-style placement points).
 
 Rules:
-- User picks 2–5 players from a tournament they are NOT participating in.
-  Pick count: ≤40 participants → 2, >40 → 5.
+- User picks players from a tournament they are NOT participating in.
+  Pick count: ≤40 participants → 2, >40 → 5. Series-scoped drafts (one
+  evening) instead use a fixed SERIES_PICKS_PER_DRAFTER (3), independent
+  of tournament size — see the exclusivity-group rules below.
 - Cannot pick yourself (if user.player_id is a tournament participant).
 - Cannot change picks after tournament starts (LOCKED status).
 - One draft per user per tournament.
 - Anti-abuse: cannot create draft after tournament is finished.
+
+Series exclusivity groups (see FantasyService._assign_group):
+- Series drafts are split into groups of SERIES_GROUP_SIZE (3) drafters,
+  filled in join order; a new group opens once the current one is full.
+- Within a group, a player can only be picked by ONE drafter — enforced
+  in add_pick and reflected in get_available_picks. The same player is
+  freely pickable by a drafter in a different group.
+- Each group has its own leaderboard and prize bank (drawn only from its
+  own drafters' entry fees) — see score_series.
 
 Entry fee:
 - Creating a draft costs EconomySettings.fantasy_entry_cost coins, charged
@@ -49,8 +60,17 @@ from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
+# Серийные (по вечеру) драфты используют фиксированный формат вместо
+# масштабирования по числу участников турнира — группа эксклюзивности
+# всегда SERIES_GROUP_SIZE драфтеров, каждый берёт SERIES_PICKS_PER_DRAFTER
+# игроков (см. FantasyService._assign_group).
+SERIES_GROUP_SIZE = 3
+SERIES_PICKS_PER_DRAFTER = 3
 
-def _allowed_picks(participant_count: int) -> int:
+
+def _allowed_picks(participant_count: int, is_series: bool = False) -> int:
+    if is_series:
+        return SERIES_PICKS_PER_DRAFTER
     if participant_count <= 40:
         return 2
     return 5
@@ -191,7 +211,7 @@ class FantasyService:
         if not spend.ok:
             return FantasyResult.fail(spend.message)
 
-        group_number = FantasyService._assign_group(series, tournament_id) if series else None
+        group_number = FantasyService._assign_group(series) if series else None
 
         draft = FantasyDraft(
             user_id=user.id,
@@ -210,28 +230,15 @@ class FantasyService:
         )
 
     @staticmethod
-    def _assign_group(series: TournamentSeries, tournament_id: int) -> int:
+    def _assign_group(series: TournamentSeries) -> int:
         """
-        Группа эксклюзивности пиков внутри серии — заполняются по порядку
-        присоединения; следующая открывается, когда текущая достигает
-        вместимости (эксклюзивный пул доступных игроков ÷ лимит пиков на
-        драфтера — обычно confirmed_player_ids серии, иначе весь состав
-        турнира). Уже назначенные драфты никогда не переезжают в другую
-        группу задним числом, даже если позже открылась более свободная.
+        Группа эксклюзивности пиков внутри серии — фиксированного размера
+        (SERIES_GROUP_SIZE драфтеров по SERIES_PICKS_PER_DRAFTER пиков
+        каждый), заполняются по порядку присоединения; следующая
+        открывается, когда текущая набрала SERIES_GROUP_SIZE драфтов.
+        Уже назначенные драфты никогда не переезжают в другую группу
+        задним числом, даже если позже открылась более свободная.
         """
-        if series.confirmed_player_ids:
-            pool_size = len(series.confirmed_player_ids)
-        else:
-            pool_size = db.session.query(TournamentParticipant).filter_by(
-                tournament_id=tournament_id
-            ).count()
-
-        participant_count = db.session.query(TournamentParticipant).filter_by(
-            tournament_id=tournament_id
-        ).count()
-        max_picks = _allowed_picks(participant_count)
-        capacity = max(1, pool_size // max_picks) if pool_size > 0 else 1
-
         counts = dict(
             db.session.query(FantasyDraft.group_number, func.count(FantasyDraft.id))
             .filter(
@@ -242,7 +249,7 @@ class FantasyService:
             .all()
         )
         group = 1
-        while counts.get(group, 0) >= capacity:
+        while counts.get(group, 0) >= SERIES_GROUP_SIZE:
             group += 1
         return group
 
@@ -302,7 +309,7 @@ class FantasyService:
         participant_count = db.session.query(TournamentParticipant).filter_by(
             tournament_id=draft.tournament_id
         ).count()
-        max_picks = _allowed_picks(participant_count)
+        max_picks = _allowed_picks(participant_count, is_series=bool(draft.tournament_series_id))
         if len(draft.picks) >= max_picks:
             return FantasyResult.fail(
                 f"Достигнут лимит выборов ({max_picks} для {participant_count} участников)."

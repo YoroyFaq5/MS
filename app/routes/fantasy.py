@@ -179,12 +179,8 @@ def series_fantasy(series_id: int):
     leaderboard = FantasyService.get_leaderboard(tournament.id, series_id, group_number=my_group)
     pool_info = FantasyService.get_pool_info(tournament.id, series_id, group_number=my_group)
 
-    from app.models import TournamentParticipant
-    participant_count = db.session.query(TournamentParticipant).filter_by(
-        tournament_id=tournament.id
-    ).count()
-    from app.services.fantasy_service import _allowed_picks
-    max_picks = _allowed_picks(participant_count)
+    from app.services.fantasy_service import SERIES_PICKS_PER_DRAFTER
+    max_picks = SERIES_PICKS_PER_DRAFTER
 
     equipped_bulk = ShopService.get_equipped_bulk(
         [p.player_id for p in my_draft.picks] if my_draft else []
