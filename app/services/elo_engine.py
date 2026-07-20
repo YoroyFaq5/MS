@@ -9,13 +9,7 @@ Match-level rating engine. Computes per-player ELO deltas using:
 
 Where:
     Rᵢ  — actual result (win/loss + contribution component)
-    Eᵢ  — expected result: logistic function of THIS PLAYER's own current
-          ELO vs. the opposing team's average — pits the individual
-          against the opposing side directly, rather than diluting their
-          personal skill signal into their own team's average (a
-          standout player carried by weaker teammates would otherwise
-          look "average" to the formula; this keeps their own rating
-          driving their own expectation)
+    Eᵢ  — expected result (logistic function of average team ELO gap)
     kᵢ  — role multiplier (Sheriff/Don carry more signal than rank-and-file)
     uᵢ  — uncertainty factor (new players move faster, "placement matches")
     sᵢ  — quality score in [-1, +1], admin/judge assessed performance
@@ -66,15 +60,10 @@ ROLE_MULTIPLIERS: dict[Role, float] = {
 # Uncertainty (u_i): new players have higher uncertainty → faster convergence
 PLACEMENT_MATCHES = 15      # below this games count, uncertainty boost applies
 PLACEMENT_UNCERTAINTY = 1.6  # multiplier during placement
-# Raised from 100→150 and softened 0.65→0.8: the old settings throttled
-# exactly the most active/skilled players hardest, permanently capping their
-# rating movement at 65% of base after their 100th game — see the ~1400-game
-# analysis this was tuned against (top player's ELO couldn't hold above
-# ~1200-1300 despite a 60% career win rate).
 VETERAN_GAMES_THRESHOLD_1 = 50
-VETERAN_GAMES_THRESHOLD_2 = 150
+VETERAN_GAMES_THRESHOLD_2 = 100
 VETERAN_DAMPENING_1 = 0.85
-VETERAN_DAMPENING_2 = 0.8
+VETERAN_DAMPENING_2 = 0.65
 
 # PU event bonus per occurrence (b_i contribution unit)
 PU_BONUS_PER_EVENT = 4.0
@@ -87,16 +76,13 @@ PU_BONUS_CAP = 20.0   # cap total b_i contribution per slot — anti-abuse
 
 @dataclass
 class EloInputs:
-    """Everything EloEngine needs for one player's delta — no ORM objects.
-
-    Note there's no separate "team_avg_elo" field — E_i pits this
-    player's own current_elo directly against opponent_avg_elo (see
-    compute_match_delta), not their team's average."""
+    """Everything EloEngine needs for one player's delta — no ORM objects."""
     player_id: int
     current_elo: float
     games_played: int
     role: Role
     won: bool
+    team_avg_elo: float
     opponent_avg_elo: float
     quality_score: float | None   # s_i, may be None → treated as 0
     pu_count: int                 # raw special-event count this match
@@ -134,16 +120,12 @@ class EloEngine:
     # ── Expected result Eᵢ ────────────────────────────────────────────────────
 
     @staticmethod
-    def compute_expected_result(own_elo: float, opponent_avg_elo: float) -> float:
+    def compute_expected_result(team_avg_elo: float, opponent_avg_elo: float) -> float:
         """
-        Standard logistic expectation, same shape as classic ELO — but the
-        "own" side is this ONE player's current ELO, not a team average,
-        so a strong player isn't diluted by weaker teammates (and a weak
-        player isn't propped up by strong ones) when computing what THEY
-        personally were expected to do against the opposing team.
+        Standard logistic expectation, same shape as classic ELO.
         Returns value in (0, 1).
         """
-        return 1.0 / (1.0 + 10 ** ((opponent_avg_elo - own_elo) / 400.0))
+        return 1.0 / (1.0 + 10 ** ((opponent_avg_elo - team_avg_elo) / 400.0))
 
     # ── Role multiplier kᵢ ────────────────────────────────────────────────────
 
@@ -199,7 +181,7 @@ class EloEngine:
         Δμᵢ = α·(Rᵢ−Eᵢ)·kᵢ·uᵢ  +  α·sᵢ·K  +  λ·bᵢ
         """
         e_i = EloEngine.compute_expected_result(
-            inputs.current_elo, inputs.opponent_avg_elo
+            inputs.team_avg_elo, inputs.opponent_avg_elo
         )
         r_i = EloEngine.compute_actual_result(inputs.won, inputs.quality_score)
         k_i = EloEngine.apply_role_multiplier(inputs.role)
@@ -271,6 +253,7 @@ class EloEngine:
                 games_played=slot.player.game_slots.count(),
                 role=slot.role,
                 won=mafia_won,
+                team_avg_elo=mafia_avg,
                 opponent_avg_elo=city_avg,
                 quality_score=getattr(slot, "quality_score", None),
                 pu_count=effective_pu_count(slot),
@@ -290,6 +273,7 @@ class EloEngine:
                 games_played=slot.player.game_slots.count(),
                 role=slot.role,
                 won=(not mafia_won),
+                team_avg_elo=city_avg,
                 opponent_avg_elo=mafia_avg,
                 quality_score=getattr(slot, "quality_score", None),
                 pu_count=effective_pu_count(slot),
