@@ -228,6 +228,34 @@ class EloEngine:
             elos = [s.player.elo for s in slot_list if s.player]
             return sum(elos) / len(elos) if elos else 1000.0
 
+        def games_played_as_of(player_id: int) -> int:
+            """
+            Chronologically-scoped count (inclusive of THIS game) — not a
+            live .count() of all of the player's slots, which returns their
+            CURRENT career total regardless of replay position. That's
+            harmless when apply_match runs live right after a new game
+            (no future games exist yet, so the count IS correct as-of-now),
+            but silently corrupts placement/veteran dampening during any
+            bulk replay (recompute_chain_from, recompute_all_elo.py) —
+            every future game already exists in the DB by the time those
+            run, so even a player's very first replayed game would see
+            their FINAL career count instead of 1.
+            """
+            return (
+                db.session.query(GameSlot)
+                .join(Game)
+                .filter(
+                    GameSlot.player_id == player_id,
+                    Game.is_finished == True,
+                    Game.is_ranked == True,
+                    or_(
+                        Game.played_at < game.played_at,
+                        and_(Game.played_at == game.played_at, Game.id <= game.id),
+                    ),
+                )
+                .count()
+            )
+
         mafia_avg = avg_elo(mafia_slots)
         city_avg  = avg_elo(city_slots)
         mafia_won = game.win_side == WinSide.MAFIA
@@ -250,7 +278,7 @@ class EloEngine:
             inputs = EloInputs(
                 player_id=slot.player_id,
                 current_elo=slot.player.elo,
-                games_played=slot.player.game_slots.count(),
+                games_played=games_played_as_of(slot.player_id),
                 role=slot.role,
                 won=mafia_won,
                 team_avg_elo=mafia_avg,
@@ -270,7 +298,7 @@ class EloEngine:
             inputs = EloInputs(
                 player_id=slot.player_id,
                 current_elo=slot.player.elo,
-                games_played=slot.player.game_slots.count(),
+                games_played=games_played_as_of(slot.player_id),
                 role=slot.role,
                 won=(not mafia_won),
                 team_avg_elo=city_avg,
