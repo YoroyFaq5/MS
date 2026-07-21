@@ -4,6 +4,7 @@ from flask import (
     Blueprint, render_template, request, redirect,
     url_for, flash, abort, jsonify
 )
+from sqlalchemy import or_
 from app import db
 from app.models import Game, GameSlot, Player, Role, WinSide, Tournament, TournamentStage, StageType, Team, TeamPlayer, TournamentParticipant
 from app.services import RatingService
@@ -145,6 +146,100 @@ def _new_game_form_context(tournaments, preselect_tournament=None, preselect_sta
 
 GAMES_PER_PAGE = 12
 
+ROLE_LABELS = {
+    "civilian": "Мирный",
+    "sheriff": "Шериф",
+    "don": "Дон",
+    "mafia": "Мафия",
+}
+
+WIN_SIDE_LABELS = {
+    "city": "Победа города",
+    "mafia": "Победа мафии",
+    "none": "Ничья",
+}
+
+
+def _tournaments_with_finished_games():
+    """Turnирный фильтр в панели поиска — только турниры, за которыми
+    реально числится хотя бы одна завершённая игра (не весь справочник
+    турниров, среди которых были бы вечно пустые опции)."""
+    return (
+        db.session.query(Tournament)
+        .join(Game, Game.tournament_id == Tournament.id)
+        .filter(Game.is_finished == True)
+        .distinct()
+        .order_by(Tournament.name)
+        .all()
+    )
+
+
+def _build_finished_games_query(
+    month=None, tournament_id=None, player_id=None, role=None, q=None,
+    win_side=None, ranked_only=False,
+):
+    """
+    Shared filter-building for both list_games() (SSR page, so a
+    bookmarked/shared URL with filters reproduces the same view) and
+    games_feed() (the AJAX/infinite-scroll JSON endpoint) — one place so
+    the two can never silently drift apart.
+    """
+    from datetime import datetime as dt
+
+    query = db.session.query(Game).filter(Game.is_finished == True)
+
+    if month:
+        try:
+            start = dt.strptime(month, "%Y-%m")
+        except ValueError:
+            start = None
+        if start:
+            end = dt(start.year + 1, 1, 1) if start.month == 12 else dt(start.year, start.month + 1, 1)
+            query = query.filter(Game.played_at >= start, Game.played_at < end)
+
+    if tournament_id:
+        query = query.filter(Game.tournament_id == tournament_id)
+
+    # Player + role combine on the SAME slot when both given ("this player
+    # played this role"); role alone is a no-op (every finished 10-player
+    # game already has all 4 roles by construction) but still applied for
+    # a consistent/composable filter API.
+    if player_id or role:
+        slot_filters = [GameSlot.game_id == Game.id]
+        if player_id:
+            slot_filters.append(GameSlot.player_id == player_id)
+        if role:
+            try:
+                slot_filters.append(GameSlot.role == Role(role))
+            except ValueError:
+                pass
+        query = query.filter(
+            db.session.query(GameSlot).filter(*slot_filters).exists()
+        )
+
+    if win_side:
+        try:
+            query = query.filter(Game.win_side == WinSide(win_side))
+        except ValueError:
+            pass
+
+    if ranked_only:
+        query = query.filter(Game.is_ranked == True)
+
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                Game.tournament.has(Tournament.name.ilike(like)),
+                db.session.query(GameSlot).join(Player).filter(
+                    GameSlot.game_id == Game.id,
+                    or_(Player.nickname.ilike(like), Player.name.ilike(like)),
+                ).exists(),
+            )
+        )
+
+    return query.order_by(Game.played_at.desc())
+
 
 def _trend_sparkline_points(values: list, width: int = 64, height: int = 22, pad: float = 3) -> str:
     """
@@ -167,9 +262,6 @@ def _trend_sparkline_points(values: list, width: int = 64, height: int = 22, pad
 
 @games_bp.route("/")
 def list_games():
-    from sqlalchemy import select
-    from datetime import datetime as dt
-
     # Незавершённые игры — отдельно, простым списком сверху (их обычно 0-1,
     # это рабочий инструмент админа "доиграть/завершить", а не архив).
     pending_games = (
@@ -186,16 +278,18 @@ def list_games():
     available_months = sorted({d.strftime("%Y-%m") for d in finished_dates}, reverse=True)
 
     month = request.args.get("month")
-    query = db.session.query(Game).filter(Game.is_finished == True)
-    if month:
-        try:
-            start = dt.strptime(month, "%Y-%m")
-        except ValueError:
-            start = None
-        if start:
-            end = dt(start.year + 1, 1, 1) if start.month == 12 else dt(start.year, start.month + 1, 1)
-            query = query.filter(Game.played_at >= start, Game.played_at < end)
-    query = query.order_by(Game.played_at.desc())
+    tournament_id = request.args.get("tournament_id", type=int)
+    player_id = request.args.get("player_id", type=int)
+    role = request.args.get("role")
+    q = request.args.get("q")
+    win_side = request.args.get("win_side")
+    ranked_only = request.args.get("ranked_only") == "1"
+
+    query = _build_finished_games_query(
+        month=month, tournament_id=tournament_id, player_id=player_id, role=role, q=q,
+        win_side=win_side, ranked_only=ranked_only,
+    )
+    total_matching = query.order_by(None).count()
 
     page = request.args.get("page", 1, type=int)
     pagination = db.paginate(query, page=page, per_page=GAMES_PER_PAGE, error_out=False)
@@ -207,6 +301,28 @@ def list_games():
     }
     player_ids = {s.player_id for slots in slots_by_game.values() for s in slots}
     equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+
+    # Ярлыки для чипов активных фильтров — вычисляются один раз здесь,
+    # чтобы бэкенд и фронтенд не могли разойтись в подписи (например,
+    # если название турнира сменится, чип на перезагруженной странице
+    # сразу покажет актуальное имя, а не то, что JS запомнил в URL).
+    filter_labels = {}
+    if tournament_id:
+        t = db.session.get(Tournament, tournament_id)
+        if t:
+            filter_labels["tournament"] = t.name
+    if player_id:
+        p = db.session.get(Player, player_id)
+        if p:
+            filter_labels["player"] = p.display_name
+    if role:
+        filter_labels["role"] = ROLE_LABELS.get(role, role)
+    if win_side:
+        filter_labels["win_side"] = WIN_SIDE_LABELS.get(win_side, win_side)
+    if ranked_only:
+        filter_labels["ranked_only"] = "Только рейтинговые"
+
+    tournaments_for_filter = _tournaments_with_finished_games()
 
     # ── История клуба — общая статистика по ВСЕМ завершённым играм, не
     # зависит от фильтра по месяцу (это архив клуба целиком, а не текущая
@@ -249,6 +365,19 @@ def list_games():
         equipped_bulk=equipped_bulk,
         available_months=available_months,
         current_month=month,
+        current_tournament_id=tournament_id,
+        current_player_id=player_id,
+        current_role=role,
+        current_q=q,
+        current_win_side=win_side,
+        current_ranked_only=ranked_only,
+        filter_labels=filter_labels,
+        tournaments_for_filter=tournaments_for_filter,
+        role_labels=ROLE_LABELS,
+        win_side_labels=WIN_SIDE_LABELS,
+        total_matching=total_matching,
+        has_next=pagination.has_next,
+        next_page=pagination.next_num,
         total_finished_games=total_finished_games,
         city_games=city_games,
         mafia_games=mafia_games,
@@ -257,6 +386,56 @@ def list_games():
         city_trend_points=city_trend_points,
         mafia_trend_points=mafia_trend_points,
     )
+
+
+@games_bp.route("/feed")
+def games_feed():
+    """
+    JSON feed for the filter bar + infinite scroll — same filters/ordering
+    as list_games(), returned as a rendered HTML fragment (one card per
+    game, via the shared _match_card.html macro) so the JS never has to
+    reimplement the card markup (MVP/sheriff/don computation, cosmetics,
+    etc. all stay server-side, single source of truth).
+    """
+    from flask_login import current_user
+
+    month = request.args.get("month")
+    tournament_id = request.args.get("tournament_id", type=int)
+    player_id = request.args.get("player_id", type=int)
+    role = request.args.get("role")
+    q = request.args.get("q")
+    win_side = request.args.get("win_side")
+    ranked_only = request.args.get("ranked_only") == "1"
+    page = request.args.get("page", 1, type=int)
+
+    query = _build_finished_games_query(
+        month=month, tournament_id=tournament_id, player_id=player_id, role=role, q=q,
+        win_side=win_side, ranked_only=ranked_only,
+    )
+    total_matching = query.order_by(None).count()
+    pagination = db.paginate(query, page=page, per_page=GAMES_PER_PAGE, error_out=False)
+    games = pagination.items
+
+    slots_by_game = {g.id: sorted(g.slots, key=lambda s: s.seat_number) for g in games}
+    player_ids = {s.player_id for slots in slots_by_game.values() for s in slots}
+    equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
+
+    html = render_template(
+        "games/_feed_fragment.html",
+        games=games,
+        slots_by_game=slots_by_game,
+        equipped_bulk=equipped_bulk,
+        is_admin=current_user.is_authenticated and current_user.is_admin,
+    )
+
+    return jsonify({
+        "html": html,
+        "game_ids": [g.id for g in games],
+        "has_next": pagination.has_next,
+        "next_page": pagination.next_num,
+        "total": total_matching,
+        "page": page,
+    })
 
 
 @games_bp.route("/<int:game_id>")

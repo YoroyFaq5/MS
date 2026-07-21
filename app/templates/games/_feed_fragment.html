@@ -1,0 +1,4 @@
+{% from "games/_match_card.html" import render_match_card %}
+{% for game in games %}
+{{ render_match_card(game, slots_by_game.get(game.id, []), equipped_bulk, delay_ms=(loop.index0 % 8) * 35, is_admin=is_admin) }}
+{% endfor %}

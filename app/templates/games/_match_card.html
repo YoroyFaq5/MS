@@ -1,0 +1,129 @@
+{% from "_macros.html" import player_name %}
+
+{% macro render_match_card(game, slots, equipped_bulk, delay_ms=0, is_admin=false) %}
+{% set mvp = (slots | sort(attribute='total_score', reverse=true) | list | first) if slots else none %}
+{% set has_mvp = mvp and mvp.total_score > 0 %}
+{% set sheriff_slot = (slots | selectattr('role.value', 'equalto', 'sheriff') | list | first) if slots else none %}
+{% set don_slot = (slots | selectattr('role.value', 'equalto', 'don') | list | first) if slots else none %}
+{% set elos = (slots | map(attribute='elo_after') | reject('none') | list) if slots else [] %}
+{% set win = game.win_side.value %}
+<div class="match-card fade-in-up" style="--d:{{ delay_ms }}ms" tabindex="0" data-game-id="{{ game.id }}">
+
+  <!-- Match header -->
+  <div class="match-card__header match-card__header--{{ win }}">
+    <div class="match-card__result">
+      <span class="match-card__side-icon">
+        {% if win == 'city' %}<i class="bi bi-shield-fill"></i>
+        {% elif win == 'mafia' %}<i class="bi bi-mask"></i>
+        {% else %}<i class="bi bi-dash-circle"></i>{% endif %}
+      </span>
+      <span class="match-card__result-text">
+        {% if win == 'city' %}Победа города
+        {% elif win == 'mafia' %}Победа мафии
+        {% else %}Ничья{% endif %}
+      </span>
+    </div>
+    <span class="match-card__id">Матч №{{ game.id }}</span>
+  </div>
+
+  <!-- Sub-header: date + "type" context -->
+  <div class="match-card__subheader">
+    <span class="match-card__datetime">
+      <i class="bi bi-calendar3"></i>{{ game.played_at.day }} {{ ['', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'][game.played_at.month] }} {{ game.played_at.year }}
+      <span class="match-card__time">{{ game.played_at.strftime('%H:%M') }}</span>
+    </span>
+    {% if game.tournament %}
+    <span class="match-card__chip"><i class="bi bi-trophy"></i>{{ game.tournament.name }}</span>
+    {% endif %}
+    {% if game.round_number %}
+    <span class="match-card__chip match-card__chip--muted">Раунд {{ game.round_number }}</span>
+    {% endif %}
+    {% if not game.is_ranked %}
+    <span class="match-card__chip match-card__chip--muted">Не в рейтинг</span>
+    {% endif %}
+  </div>
+
+  <!-- Summary strip — gracefully collapses per-item when data is missing -->
+  {% if has_mvp or sheriff_slot or don_slot or elos %}
+  <div class="match-summary">
+    {% if has_mvp %}
+    <div class="match-summary__item">
+      <span class="match-summary__label"><i class="bi bi-star-fill"></i>MVP</span>
+      <span class="match-summary__value">{{ player_name(mvp.player, equipped_bulk.get(mvp.player_id, {})) if mvp.player else '?' }}</span>
+      <span class="match-summary__sub">{{ mvp.total_score|round(2) }} балл.</span>
+    </div>
+    {% endif %}
+    {% if sheriff_slot %}
+    <div class="match-summary__item">
+      <span class="match-summary__label"><i class="bi bi-search"></i>Шериф</span>
+      <span class="match-summary__value">{{ player_name(sheriff_slot.player, equipped_bulk.get(sheriff_slot.player_id, {})) if sheriff_slot.player else '?' }}</span>
+    </div>
+    {% endif %}
+    {% if don_slot %}
+    <div class="match-summary__item">
+      <span class="match-summary__label"><i class="bi bi-gem"></i>Дон</span>
+      <span class="match-summary__value">{{ player_name(don_slot.player, equipped_bulk.get(don_slot.player_id, {})) if don_slot.player else '?' }}</span>
+    </div>
+    {% endif %}
+    {% if elos %}
+    <div class="match-summary__item">
+      <span class="match-summary__label"><i class="bi bi-activity"></i>Ø ELO</span>
+      <span class="match-summary__value">{{ (elos|sum / elos|length)|round|int }}</span>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Player table -->
+  <table class="match-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Игрок</th>
+        <th>Роль</th>
+        <th class="text-end">Балл</th>
+        <th class="text-end">ELO</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for slot in slots %}
+      <tr class="{% if slot.is_pu %}match-table__row--pu{% endif %} {% if has_mvp and slot.id == mvp.id %}match-table__row--mvp{% endif %}">
+        <td class="text-muted">{{ slot.seat_number }}</td>
+        <td class="match-table__player">
+          {% if slot.is_pu %}<span class="match-table__pu-mark" title="Первый убиенный">☠</span>{% endif %}
+          {% if has_mvp and slot.id == mvp.id %}<i class="bi bi-star-fill match-table__mvp-star" title="MVP матча"></i>{% endif %}
+          {{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}
+        </td>
+        <td>
+          <span class="match-role match-role--{{ slot.role.value }}">
+            {% if slot.role.value == 'civilian' %}Мирный
+            {% elif slot.role.value == 'sheriff' %}Шериф
+            {% elif slot.role.value == 'don' %}Дон
+            {% elif slot.role.value == 'mafia' %}Мафия
+            {% endif %}
+          </span>
+        </td>
+        <td class="text-end tabular-nums fw-semibold">{{ slot.total_score|round(2) }}</td>
+        <td class="text-end tabular-nums {% if slot.elo_after and slot.elo_after > 1000 %}match-elo-up{% elif slot.elo_after and slot.elo_after < 1000 %}match-elo-down{% else %}match-elo-flat{% endif %}">
+          {{ slot.elo_after|round|int if slot.elo_after is not none else '—' }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if is_admin %}
+  <div class="match-card__actions">
+    <a href="{{ url_for('games.game_detail', game_id=game.id) }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-eye"></i>
+    </a>
+    <form method="POST" action="{{ url_for('games.delete_game', game_id=game.id) }}"
+          class="d-inline" onsubmit="return confirm('Удалить игру #{{ game.id }}?')">
+      <button type="submit" class="btn btn-outline-danger btn-sm">
+        <i class="bi bi-trash"></i>
+      </button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}

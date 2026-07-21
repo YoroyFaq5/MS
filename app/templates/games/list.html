@@ -1,9 +1,17 @@
 {% extends "base.html" %}
 {% from "_macros.html" import player_name %}
+{% from "games/_match_card.html" import render_match_card %}
 {% block title %}Игры{% endblock %}
 
 {% macro pretty_date(d) -%}
 {{ d.day }} {{ ['', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'][d.month] }} {{ d.year }}
+{%- endmacro %}
+
+{% macro plural_games(n) -%}
+{%- if n % 10 == 1 and n % 100 != 11 -%}игра
+{%- elif n % 10 in (2,3,4) and n % 100 not in (12,13,14) -%}игры
+{%- else -%}игр
+{%- endif -%}
 {%- endmacro %}
 
 {% block head %}
@@ -477,6 +485,277 @@
     padding-left: .7rem; padding-right: .7rem;
   }
 }
+
+/* ============================================================
+   Filter bar — search + popover filters + chips
+   ============================================================ */
+
+.games-filterbar { margin-bottom: 1.25rem; }
+
+.games-filterbar__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .6rem;
+  margin-bottom: .65rem;
+}
+
+.games-search {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 180px;
+  max-width: 340px;
+}
+.games-search i {
+  position: absolute;
+  left: .85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ms-muted);
+  font-size: .85rem;
+  pointer-events: none;
+}
+.games-search input {
+  width: 100%;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: 99px;
+  color: var(--ms-text);
+  padding: .5rem .9rem .5rem 2.2rem;
+  font-size: .84rem;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.games-search input:focus {
+  outline: none;
+  border-color: var(--ms-gold);
+  box-shadow: 0 0 0 3px var(--ms-gold-glow);
+}
+.games-search input::placeholder { color: var(--ms-muted); }
+
+.games-filter-group { position: relative; }
+
+.games-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: 99px;
+  color: var(--ms-text-dim);
+  padding: .5rem .95rem;
+  font-size: .82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease, background .15s ease;
+}
+.games-filter-btn i { color: var(--ms-gold-light); font-size: .82rem; }
+.games-filter-btn:hover { border-color: rgba(199,165,82,.35); color: var(--ms-text); }
+.games-filter-btn.is-active {
+  background: rgba(199,165,82,.12);
+  border-color: var(--ms-gold);
+  color: var(--ms-text);
+}
+.games-filter-btn.has-value {
+  background: var(--ms-gold);
+  border-color: var(--ms-gold);
+  color: #0D0D0D;
+}
+.games-filter-btn.has-value i { color: #0D0D0D; }
+
+/* Popover panel — opacity/translateY/scale, ~200ms, per spec */
+.games-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  min-width: 240px;
+  max-width: 320px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--ms-surface-raised);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  box-shadow: 0 20px 48px rgba(0,0,0,.45);
+  padding: .5rem;
+  transform-origin: top left;
+  opacity: 0;
+  transform: translateY(-6px) scale(.96);
+  pointer-events: none;
+  transition: opacity .2s cubic-bezier(.2,.7,.3,1), transform .2s cubic-bezier(.2,.7,.3,1);
+}
+.games-popover.is-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.games-popover__search {
+  width: 100%;
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: 8px;
+  color: var(--ms-text);
+  padding: .4rem .6rem;
+  font-size: .8rem;
+  margin-bottom: .4rem;
+}
+.games-popover__search:focus { outline: none; border-color: var(--ms-gold); }
+
+.games-popover__list { display: flex; flex-direction: column; gap: .1rem; }
+.games-popover__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--ms-text-dim);
+  padding: .45rem .6rem;
+  font-size: .82rem;
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+}
+.games-popover__item:hover { background: rgba(199,165,82,.1); color: var(--ms-text); }
+.games-popover__item.is-selected { color: var(--ms-gold-light); font-weight: 600; }
+.games-popover__empty { padding: .6rem; font-size: .78rem; color: var(--ms-muted); }
+
+.games-popover__section {
+  font-size: .64rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+  padding: .5rem .6rem .2rem;
+}
+.games-popover__check {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .45rem .6rem;
+  font-size: .82rem;
+  color: var(--ms-text-dim);
+  cursor: pointer;
+}
+.games-popover__check input { accent-color: var(--ms-gold); }
+
+/* Active-filter chips */
+.games-filterbar__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .45rem;
+  margin-bottom: .5rem;
+}
+.games-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  background: rgba(199,165,82,.14);
+  border: 1px solid rgba(199,165,82,.35);
+  border-radius: 99px;
+  color: var(--ms-gold-light);
+  padding: .3rem .5rem .3rem .75rem;
+  font-size: .76rem;
+  font-weight: 600;
+  animation: chip-in .2s cubic-bezier(.2,.7,.3,1) both;
+}
+.games-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: rgba(199,165,82,.25);
+  border: none;
+  color: var(--ms-gold-light);
+  font-size: .62rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .12s ease;
+}
+.games-chip__remove:hover { background: rgba(199,165,82,.45); }
+
+.games-chip--reset {
+  background: transparent;
+  border: 1px dashed var(--ms-border);
+  color: var(--ms-muted);
+  padding: .3rem .7rem;
+  cursor: pointer;
+}
+.games-chip--reset:hover { color: var(--ms-text); border-color: var(--ms-muted); }
+
+@keyframes chip-in {
+  from { opacity: 0; transform: scale(.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes chip-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(.8); }
+}
+.games-chip.is-leaving { animation: chip-out .15s ease both; }
+
+.games-filterbar__count {
+  font-size: .82rem;
+  color: var(--ms-muted);
+}
+.games-filterbar__count strong {
+  color: var(--ms-gold-light);
+  font-variant-numeric: tabular-nums;
+  display: inline-block;
+  transition: opacity .15s ease, transform .15s ease;
+}
+.games-filterbar__count strong.is-updating { opacity: 0; transform: translateY(-4px); }
+
+/* ============================================================
+   Skeleton loading cards
+   ============================================================ */
+.match-card--skeleton { pointer-events: none; }
+.skeleton-bar {
+  border-radius: 5px;
+  background: linear-gradient(
+    90deg,
+    var(--ms-surface-raised) 25%,
+    rgba(199,165,82,.09) 50%,
+    var(--ms-surface-raised) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton-card__header { height: 52px; border-bottom: 1px solid var(--ms-border); padding: .85rem 1rem; }
+.skeleton-card__header .skeleton-bar { height: 18px; width: 55%; }
+.skeleton-card__subheader { padding: .6rem 1rem; border-bottom: 1px solid var(--ms-border); }
+.skeleton-card__subheader .skeleton-bar { height: 12px; width: 40%; }
+.skeleton-card__row { display: flex; gap: .6rem; padding: .55rem 1rem; }
+.skeleton-card__row .skeleton-bar { height: 12px; flex: 1; }
+.skeleton-card__row .skeleton-bar:nth-child(1) { flex: 0 0 20px; }
+.skeleton-card__row .skeleton-bar:nth-child(3) { flex: 0 0 60px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-bar { animation: none; background-position: 0 0; }
+  .games-chip, .games-popover { transition: none; animation: none; }
+}
+
+/* ============================================================
+   Card removal (Telegram-style dissolve) — lightweight CSS fallback,
+   used for large batches or when Canvas particles are skipped (see
+   games-filters.js). Canvas variant hides the DOM node immediately and
+   draws particles on an overlay <canvas>, so no CSS is needed for that path.
+   ============================================================ */
+.match-card--dissolving-fallback {
+  transition: transform .32s cubic-bezier(.4,0,.2,1), opacity .32s ease, filter .32s ease;
+  transform: scale(.9);
+  opacity: 0;
+  filter: blur(4px);
+}
+
+.games-sentinel { height: 1px; }
+
+.games-empty-state { grid-column: 1 / -1; }
 </style>
 {% endblock %}
 
@@ -577,184 +856,141 @@
 </div>
 {% endif %}
 
-<div class="games-toolbar">
-  {% if available_months %}
-  <form method="GET" class="d-flex align-items-center gap-2">
-    <label class="text-muted small">Месяц:</label>
-    <select name="month" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()">
-      <option value="">Все</option>
-      {% for m in available_months %}
-      <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ m }}</option>
-      {% endfor %}
-    </select>
-  </form>
-  {% else %}
-  <span></span>
-  {% endif %}
-  {% if current_user.is_admin %}
-  <a href="{{ url_for('games.new_game') }}" class="btn btn-danger">
-    <i class="bi bi-plus-lg me-1"></i>Новая игра
-  </a>
-  {% endif %}
-</div>
+<div class="games-filterbar"
+     id="games-filterbar"
+     data-total="{{ total_matching }}"
+     data-has-next="{{ 'true' if has_next else 'false' }}"
+     data-next-page="{{ next_page or '' }}"
+     data-q="{{ current_q or '' }}"
+     data-tournament-id="{{ current_tournament_id or '' }}"
+     data-tournament-label="{{ filter_labels.tournament or '' }}"
+     data-month="{{ current_month or '' }}"
+     data-player-id="{{ current_player_id or '' }}"
+     data-player-label="{{ filter_labels.player or '' }}"
+     data-role="{{ current_role or '' }}"
+     data-win-side="{{ current_win_side or '' }}"
+     data-ranked-only="{{ '1' if current_ranked_only else '' }}">
 
-{% if finished_games %}
-<div class="matches-grid">
-  {% for game in finished_games %}
-  {% set slots = slots_by_game.get(game.id, []) %}
-  {% set mvp = (slots | sort(attribute='total_score', reverse=true) | list | first) if slots else none %}
-  {% set has_mvp = mvp and mvp.total_score > 0 %}
-  {% set sheriff_slot = (slots | selectattr('role.value', 'equalto', 'sheriff') | list | first) if slots else none %}
-  {% set don_slot = (slots | selectattr('role.value', 'equalto', 'don') | list | first) if slots else none %}
-  {% set elos = (slots | map(attribute='elo_after') | reject('none') | list) if slots else [] %}
-  {% set win = game.win_side.value %}
-  <div class="match-card fade-in-up" style="--d:{{ (loop.index0 % 8) * 35 }}ms" tabindex="0">
-
-    <!-- Match header -->
-    <div class="match-card__header match-card__header--{{ win }}">
-      <div class="match-card__result">
-        <span class="match-card__side-icon">
-          {% if win == 'city' %}<i class="bi bi-shield-fill"></i>
-          {% elif win == 'mafia' %}<i class="bi bi-mask"></i>
-          {% else %}<i class="bi bi-dash-circle"></i>{% endif %}
-        </span>
-        <span class="match-card__result-text">
-          {% if win == 'city' %}Победа города
-          {% elif win == 'mafia' %}Победа мафии
-          {% else %}Ничья{% endif %}
-        </span>
-      </div>
-      <span class="match-card__id">Матч №{{ game.id }}</span>
+  <div class="games-filterbar__row">
+    <div class="games-search">
+      <i class="bi bi-search"></i>
+      <input type="text" id="games-search-input" placeholder="Поиск игр..." value="{{ current_q or '' }}" autocomplete="off">
     </div>
 
-    <!-- Sub-header: date + "type" context -->
-    <div class="match-card__subheader">
-      <span class="match-card__datetime">
-        <i class="bi bi-calendar3"></i>{{ pretty_date(game.played_at) }}
-        <span class="match-card__time">{{ game.played_at.strftime('%H:%M') }}</span>
-      </span>
-      {% if game.tournament %}
-      <span class="match-card__chip"><i class="bi bi-trophy"></i>{{ game.tournament.name }}</span>
-      {% endif %}
-      {% if game.round_number %}
-      <span class="match-card__chip match-card__chip--muted">Раунд {{ game.round_number }}</span>
-      {% endif %}
-      {% if not game.is_ranked %}
-      <span class="match-card__chip match-card__chip--muted">Не в рейтинг</span>
-      {% endif %}
+    <div class="games-filter-group">
+      <button type="button" class="games-filter-btn" data-filter-btn="tournament">
+        <i class="bi bi-trophy"></i><span>Турнир</span>
+      </button>
+      <div class="games-popover" data-filter-popover="tournament">
+        <div class="games-popover__list">
+          {% for t in tournaments_for_filter %}
+          <button type="button" class="games-popover__item" data-value="{{ t.id }}" data-label="{{ t.name }}">{{ t.name }}</button>
+          {% endfor %}
+          {% if not tournaments_for_filter %}
+          <div class="games-popover__empty">Нет турниров</div>
+          {% endif %}
+        </div>
+      </div>
     </div>
 
-    <!-- Summary strip — gracefully collapses per-item when data is missing -->
-    {% if has_mvp or sheriff_slot or don_slot or elos %}
-    <div class="match-summary">
-      {% if has_mvp %}
-      <div class="match-summary__item">
-        <span class="match-summary__label"><i class="bi bi-star-fill"></i>MVP</span>
-        <span class="match-summary__value">{{ player_name(mvp.player, equipped_bulk.get(mvp.player_id, {})) if mvp.player else '?' }}</span>
-        <span class="match-summary__sub">{{ mvp.total_score|round(2) }} балл.</span>
+    <div class="games-filter-group">
+      <button type="button" class="games-filter-btn" data-filter-btn="month">
+        <i class="bi bi-calendar3"></i><span>Дата</span>
+      </button>
+      <div class="games-popover" data-filter-popover="month">
+        <div class="games-popover__list">
+          {% for m in available_months %}
+          <button type="button" class="games-popover__item" data-value="{{ m }}" data-label="{{ m }}">{{ m }}</button>
+          {% endfor %}
+          {% if not available_months %}
+          <div class="games-popover__empty">Нет игр</div>
+          {% endif %}
+        </div>
       </div>
-      {% endif %}
-      {% if sheriff_slot %}
-      <div class="match-summary__item">
-        <span class="match-summary__label"><i class="bi bi-search"></i>Шериф</span>
-        <span class="match-summary__value">{{ player_name(sheriff_slot.player, equipped_bulk.get(sheriff_slot.player_id, {})) if sheriff_slot.player else '?' }}</span>
-      </div>
-      {% endif %}
-      {% if don_slot %}
-      <div class="match-summary__item">
-        <span class="match-summary__label"><i class="bi bi-gem"></i>Дон</span>
-        <span class="match-summary__value">{{ player_name(don_slot.player, equipped_bulk.get(don_slot.player_id, {})) if don_slot.player else '?' }}</span>
-      </div>
-      {% endif %}
-      {% if elos %}
-      <div class="match-summary__item">
-        <span class="match-summary__label"><i class="bi bi-activity"></i>Ø ELO</span>
-        <span class="match-summary__value">{{ (elos|sum / elos|length)|round|int }}</span>
-      </div>
-      {% endif %}
     </div>
-    {% endif %}
 
-    <!-- Player table -->
-    <table class="match-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Игрок</th>
-          <th>Роль</th>
-          <th class="text-end">Балл</th>
-          <th class="text-end">ELO</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for slot in slots %}
-        <tr class="{% if slot.is_pu %}match-table__row--pu{% endif %} {% if has_mvp and slot.id == mvp.id %}match-table__row--mvp{% endif %}">
-          <td class="text-muted">{{ slot.seat_number }}</td>
-          <td class="match-table__player">
-            {% if slot.is_pu %}<span class="match-table__pu-mark" title="Первый убиенный">☠</span>{% endif %}
-            {% if has_mvp and slot.id == mvp.id %}<i class="bi bi-star-fill match-table__mvp-star" title="MVP матча"></i>{% endif %}
-            {{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}
-          </td>
-          <td>
-            <span class="match-role match-role--{{ slot.role.value }}">
-              {% if slot.role.value == 'civilian' %}Мирный
-              {% elif slot.role.value == 'sheriff' %}Шериф
-              {% elif slot.role.value == 'don' %}Дон
-              {% elif slot.role.value == 'mafia' %}Мафия
-              {% endif %}
-            </span>
-          </td>
-          <td class="text-end tabular-nums fw-semibold">{{ slot.total_score|round(2) }}</td>
-          <td class="text-end tabular-nums {% if slot.elo_after and slot.elo_after > 1000 %}match-elo-up{% elif slot.elo_after and slot.elo_after < 1000 %}match-elo-down{% else %}match-elo-flat{% endif %}">
-            {{ slot.elo_after|round|int if slot.elo_after is not none else '—' }}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="games-filter-group">
+      <button type="button" class="games-filter-btn" data-filter-btn="player">
+        <i class="bi bi-person"></i><span>Игрок</span>
+      </button>
+      <div class="games-popover" data-filter-popover="player">
+        <input type="text" class="games-popover__search" id="games-player-search" placeholder="Ник игрока..." autocomplete="off">
+        <div class="games-popover__list" id="games-player-results"></div>
+      </div>
+    </div>
+
+    <div class="games-filter-group">
+      <button type="button" class="games-filter-btn" data-filter-btn="role">
+        <i class="bi bi-mask"></i><span>Роль</span>
+      </button>
+      <div class="games-popover" data-filter-popover="role">
+        <div class="games-popover__list">
+          {% for value, label in role_labels.items() %}
+          <button type="button" class="games-popover__item" data-value="{{ value }}" data-label="{{ label }}">{{ label }}</button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="games-filter-group">
+      <button type="button" class="games-filter-btn" data-filter-btn="more">
+        <i class="bi bi-sliders"></i><span>Ещё</span>
+      </button>
+      <div class="games-popover" data-filter-popover="more">
+        <div class="games-popover__section">Победитель</div>
+        <div class="games-popover__list">
+          {% for value, label in win_side_labels.items() %}
+          <button type="button" class="games-popover__item" data-value="{{ value }}" data-label="{{ label }}">{{ label }}</button>
+          {% endfor %}
+        </div>
+        <div class="games-popover__section">Прочее</div>
+        <label class="games-popover__check">
+          <input type="checkbox" id="games-ranked-only" {% if current_ranked_only %}checked{% endif %}>
+          Только рейтинговые
+        </label>
+      </div>
+    </div>
 
     {% if current_user.is_admin %}
-    <div class="match-card__actions">
-      <a href="{{ url_for('games.game_detail', game_id=game.id) }}" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-eye"></i>
-      </a>
-      <form method="POST" action="{{ url_for('games.delete_game', game_id=game.id) }}"
-            class="d-inline" onsubmit="return confirm('Удалить игру #{{ game.id }}?')">
-        <button type="submit" class="btn btn-outline-danger btn-sm">
-          <i class="bi bi-trash"></i>
-        </button>
-      </form>
-    </div>
+    <a href="{{ url_for('games.new_game') }}" class="btn btn-danger ms-auto">
+      <i class="bi bi-plus-lg me-1"></i>Новая игра
+    </a>
     {% endif %}
   </div>
-  {% endfor %}
+
+  <div class="games-filterbar__chips" id="games-chips"></div>
+
+  <div class="games-filterbar__count">
+    Найдено: <strong id="games-count-value">{{ total_matching }}</strong>
+    <span id="games-count-label">{{ plural_games(total_matching) }}</span>
+  </div>
 </div>
 
-{% if pagination.pages > 1 %}
-<nav class="mt-4">
-  <ul class="pagination justify-content-center">
-    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-      <a class="page-link" href="{{ url_for('games.list_games', page=pagination.prev_num, month=current_month) }}">←</a>
-    </li>
-    <li class="page-item disabled">
-      <span class="page-link">{{ pagination.page }} / {{ pagination.pages }}</span>
-    </li>
-    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-      <a class="page-link" href="{{ url_for('games.list_games', page=pagination.next_num, month=current_month) }}">→</a>
-    </li>
-  </ul>
-</nav>
-{% endif %}
-
-{% else %}
-<div class="text-center text-muted py-5">
-  <i class="bi bi-controller fs-1 d-block mb-3 opacity-25"></i>
-  <p class="mb-3">{% if current_month %}Нет завершённых игр за этот месяц{% else %}Игр пока нет{% endif %}</p>
-  {% if current_user.is_admin and not current_month %}
-  <a href="{{ url_for('games.new_game') }}" class="btn btn-danger">Начать первую игру</a>
+<div class="matches-grid" id="matches-grid">
+  {% if finished_games %}
+    {% for game in finished_games %}
+    {{ render_match_card(game, slots_by_game.get(game.id, []), equipped_bulk, delay_ms=(loop.index0 % 8) * 35, is_admin=current_user.is_admin) }}
+    {% endfor %}
+  {% else %}
+  <div class="text-center text-muted py-5 games-empty-state" id="games-empty-state">
+    <i class="bi bi-controller fs-1 d-block mb-3 opacity-25"></i>
+    <p class="mb-3">Ничего не найдено по этим фильтрам</p>
+  </div>
   {% endif %}
 </div>
-{% endif %}
+
+<div class="games-sentinel" id="games-sentinel"></div>
+
+<template id="games-skeleton-template">
+  <div class="match-card match-card--skeleton" aria-hidden="true">
+    <div class="skeleton-card__header"><div class="skeleton-bar"></div></div>
+    <div class="skeleton-card__subheader"><div class="skeleton-bar"></div></div>
+    <div class="skeleton-card__row"><div class="skeleton-bar"></div><div class="skeleton-bar"></div><div class="skeleton-bar"></div></div>
+    <div class="skeleton-card__row"><div class="skeleton-bar"></div><div class="skeleton-bar"></div><div class="skeleton-bar"></div></div>
+    <div class="skeleton-card__row"><div class="skeleton-bar"></div><div class="skeleton-bar"></div><div class="skeleton-bar"></div></div>
+    <div class="skeleton-card__row"><div class="skeleton-bar"></div><div class="skeleton-bar"></div><div class="skeleton-bar"></div></div>
+  </div>
+</template>
 {% endblock %}
 
 {% block scripts %}
@@ -807,5 +1043,9 @@
     });
   }
 })();
+</script>
+<script src="{{ url_for('static', filename='js/games-filters.js') }}"></script>
+<script>
+  initGamesFilters(document.getElementById('games-filterbar'));
 </script>
 {% endblock %}
