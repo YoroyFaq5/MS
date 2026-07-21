@@ -121,6 +121,22 @@ function initGamesFilters(root) {
     setActiveButton('more', !!(state.win_side || state.ranked_only));
   }
 
+  // "Роль" only means anything paired with a specific player (every
+  // finished game already has all 4 roles, so role alone never filters
+  // anything) — stay hidden until a player is chosen, and drop any role
+  // value the moment the player filter is cleared so it can't linger as
+  // an invisible, silently-applied filter.
+  const roleFilterGroup = document.getElementById('games-filter-group-role');
+  function syncRoleVisibility() {
+    if (!roleFilterGroup) return;
+    const hasPlayer = !!state.player_id;
+    roleFilterGroup.hidden = !hasPlayer;
+    if (!hasPlayer && state.role) {
+      state.role = '';
+      setActiveButton('role', false);
+    }
+  }
+
   // ── active-filter chips ──────────────────────────────────────────────
 
   function renderChips() {
@@ -172,6 +188,7 @@ function initGamesFilters(root) {
       if (cb) cb.checked = false;
       syncMoreButtonState();
     }
+    syncRoleVisibility();
     applyFilters();
   }
 
@@ -188,6 +205,7 @@ function initGamesFilters(root) {
     if (cb) cb.checked = false;
     ['tournament', 'month', 'player', 'role'].forEach(k => setActiveButton(k, false));
     syncMoreButtonState();
+    syncRoleVisibility();
     applyFilters();
   }
 
@@ -299,6 +317,7 @@ function initGamesFilters(root) {
           state.player_id = String(p.id);
           state.player_label = p.display_name;
           setActiveButton('player', true);
+          syncRoleVisibility();
           closeAllPopovers();
           applyFilters();
         });
@@ -330,6 +349,7 @@ function initGamesFilters(root) {
   if (state.player_id) setActiveButton('player', true);
   if (state.role) setActiveButton('role', true);
   syncMoreButtonState();
+  syncRoleVisibility();
   renderChips();
 
   // ── core: apply filters (reset to page 1, diff, reconcile DOM) ──────

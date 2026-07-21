@@ -919,7 +919,7 @@
       </div>
     </div>
 
-    <div class="games-filter-group">
+    <div class="games-filter-group" id="games-filter-group-role" {% if not current_player_id %}hidden{% endif %}>
       <button type="button" class="games-filter-btn" data-filter-btn="role">
         <i class="bi bi-mask"></i><span>Роль</span>
       </button>
