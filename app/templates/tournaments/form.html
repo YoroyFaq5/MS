@@ -1,72 +1,413 @@
 {% extends "base.html" %}
 {% block title %}Новый турнир{% endblock %}
 
+{% block head %}
+<style>
+  /* ── Layout ──────────────────────────────────────────────────────── */
+  .tform-page { max-width: 980px; margin: 0 auto; }
+
+  .tform-eyebrow {
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--ms-muted); font-weight: 600; margin-bottom: .25rem;
+  }
+
+  .tform-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1.75rem;
+    align-items: start;
+  }
+  @media (max-width: 991px) {
+    .tform-grid { grid-template-columns: 1fr; }
+    .tform-preview { position: static !important; }
+  }
+
+  /* ── Section cards ───────────────────────────────────────────────── */
+  .tform-section {
+    background: var(--ms-surface);
+    border: 1px solid var(--ms-border);
+    border-radius: calc(var(--ms-radius) + 4px);
+    padding: 1.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .tform-section__title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.1rem;
+    margin-bottom: .3rem;
+  }
+  .tform-section__hint {
+    color: var(--ms-muted);
+    font-size: .82rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .tform-field { margin-bottom: 1.25rem; }
+  .tform-field:last-child { margin-bottom: 0; }
+
+  .tform-label {
+    display: block;
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--ms-text-dim);
+    margin-bottom: .45rem;
+  }
+
+  .tform-input {
+    width: 100%;
+    background: var(--ms-surface-raised);
+    border: 1px solid var(--ms-border);
+    border-radius: var(--ms-radius);
+    color: var(--ms-text);
+    padding: .65rem .85rem;
+    font-size: .95rem;
+    transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+  }
+  .tform-input::placeholder { color: var(--ms-muted); opacity: .75; }
+  .tform-input:focus {
+    outline: none;
+    border-color: var(--ms-gold);
+    background: var(--ms-surface-alt);
+    box-shadow: 0 0 0 3px var(--ms-gold-glow);
+  }
+  .tform-input--lg { font-size: 1.15rem; padding: .8rem 1rem; }
+  textarea.tform-input { resize: vertical; min-height: 108px; line-height: 1.5; }
+
+  /* ── Tournament type cards ───────────────────────────────────────── */
+  .tform-type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .75rem;
+  }
+  @media (max-width: 480px) { .tform-type-grid { grid-template-columns: 1fr; } }
+
+  .tform-type-card { position: relative; }
+  .tform-type-card input {
+    position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer;
+  }
+  .tform-type-card label {
+    display: block;
+    cursor: pointer;
+    border: 1px solid var(--ms-border);
+    border-radius: var(--ms-radius);
+    background: var(--ms-surface-raised);
+    padding: 1rem 1.1rem;
+    transition: border-color .18s ease, background .18s ease, transform .18s ease, box-shadow .18s ease;
+  }
+  .tform-type-card label:hover {
+    border-color: color-mix(in srgb, var(--ms-gold) 45%, var(--ms-border));
+    transform: translateY(-1px);
+  }
+  .tform-type-card input:checked + label {
+    border-color: var(--ms-gold);
+    background: color-mix(in srgb, var(--ms-gold) 9%, var(--ms-surface-raised));
+    box-shadow: 0 0 0 1px var(--ms-gold) inset, 0 10px 24px rgba(0,0,0,.35);
+  }
+  .tform-type-card input:focus-visible + label {
+    box-shadow: 0 0 0 3px var(--ms-gold-glow);
+  }
+  .tform-type-card__icon { font-size: 1.5rem; line-height: 1; }
+  .tform-type-card__name { font-weight: 600; margin-top: .5rem; font-size: .95rem; }
+  .tform-type-card__desc { font-size: .78rem; color: var(--ms-muted); margin-top: .2rem; }
+
+  /* ── Switch rows ─────────────────────────────────────────────────── */
+  .tform-switch-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.25rem;
+    padding: 1.1rem 0;
+  }
+  .tform-switch-row:first-of-type { padding-top: 1.4rem; margin-top: .15rem; border-top: 1px solid var(--ms-border); }
+  .tform-switch-row + .tform-switch-row { border-top: 1px solid var(--ms-border); }
+
+  .tform-switch-copy__title {
+    font-weight: 600; font-size: .92rem;
+    display: flex; align-items: center; gap: .4rem;
+  }
+  .tform-switch-copy__hint {
+    font-size: .8rem; color: var(--ms-muted); margin-top: .25rem; max-width: 40ch; line-height: 1.4;
+  }
+
+  .tform-switch { position: relative; width: 44px; height: 26px; flex: 0 0 auto; margin-top: .1rem; }
+  .tform-switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .tform-switch__track {
+    position: absolute; inset: 0; border-radius: 999px;
+    background: var(--ms-surface-alt); border: 1px solid var(--ms-border);
+    transition: background .2s ease, border-color .2s ease;
+  }
+  .tform-switch__thumb {
+    position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--ms-muted);
+    transition: transform .22s cubic-bezier(.4,0,.2,1), background .2s ease;
+  }
+  .tform-switch input:checked ~ .tform-switch__track {
+    background: color-mix(in srgb, var(--ms-gold) 35%, var(--ms-surface-alt));
+    border-color: var(--ms-gold);
+  }
+  .tform-switch input:checked ~ .tform-switch__thumb {
+    transform: translateX(18px);
+    background: var(--ms-gold);
+  }
+  .tform-switch input:focus-visible ~ .tform-switch__track {
+    box-shadow: 0 0 0 3px var(--ms-gold-glow);
+  }
+
+  /* ── Collapsible cutoff section (CSS-grid trick, no JS height calc) ── */
+  .tform-collapse {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows .32s cubic-bezier(.4,0,.2,1), opacity .22s ease;
+  }
+  .tform-collapse.is-open { grid-template-rows: 1fr; opacity: 1; }
+  .tform-collapse > div { overflow: hidden; }
+  .tform-collapse .tform-section { margin-bottom: 1.5rem; }
+
+  /* ── Actions ─────────────────────────────────────────────────────── */
+  .tform-actions { display: flex; align-items: center; gap: .85rem; }
+  .tform-actions .btn-danger {
+    font-size: 1rem;
+    padding: .8rem 2.1rem;
+    box-shadow: 0 10px 26px rgba(199,165,82,.16);
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+  .tform-actions .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 14px 30px rgba(199,165,82,.26); }
+  .tform-actions .btn-outline-secondary { border-color: transparent; }
+  .tform-actions .btn-outline-secondary:hover { border-color: var(--ms-border); }
+
+  /* ── Live preview card ───────────────────────────────────────────── */
+  .tform-preview {
+    position: sticky;
+    top: 1.25rem;
+    background: var(--ms-surface);
+    border: 1px solid var(--ms-border);
+    border-radius: calc(var(--ms-radius) + 4px);
+    padding: 1.6rem;
+  }
+  .tform-preview__eyebrow {
+    font-size: .68rem; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--ms-muted); font-weight: 600;
+  }
+  .tform-preview__name {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.3rem;
+    margin: .45rem 0 1.1rem;
+    color: var(--ms-gold-light);
+    word-break: break-word;
+    transition: color .2s ease;
+  }
+  .tform-preview__row {
+    display: flex; align-items: center; gap: .55rem;
+    font-size: .87rem; padding: .55rem 0; color: var(--ms-text-dim);
+    transition: opacity .18s ease;
+  }
+  .tform-preview__row + .tform-preview__row { border-top: 1px dashed var(--ms-border); }
+  .tform-preview__final {
+    margin-top: .3rem; font-size: .82rem; color: var(--ms-gold);
+    font-weight: 600;
+  }
+  .tform-preview__desc {
+    margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1px solid var(--ms-border);
+    font-size: .84rem; color: var(--ms-muted); line-height: 1.55; white-space: pre-line;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tform-collapse, .tform-switch__thumb, .tform-type-card label, .tform-actions .btn-danger,
+    .tform-input { transition: none; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-lg-6">
-    <div class="mb-4">
-      <h2 class="fw-bold mb-0">🏆 Новый турнир</h2>
-      <p class="text-muted small">Настройте параметры турнира</p>
-    </div>
+<div class="tform-page">
+  <div class="mb-4">
+    <div class="tform-eyebrow">Турниры</div>
+    <h2 class="fw-bold mb-1">🏆 Новый турнир</h2>
+    <p class="text-muted mb-0">Настройте параметры — предпросмотр справа обновляется сразу</p>
+  </div>
 
-    <div class="card">
-      <div class="card-body p-4">
-        <form method="POST">
+  <form method="POST" id="tournamentForm" novalidate>
+    <div class="tform-grid">
+      <div>
 
-          <div class="mb-3">
-            <label class="form-label fw-medium">Название <span class="text-danger">*</span></label>
-            <input type="text" name="name" class="form-control form-control-lg"
+        <!-- 1. Основная информация -->
+        <div class="tform-section">
+          <div class="tform-section__title">🏆 Основная информация</div>
+          <div class="tform-section__hint">Название и краткое описание турнира</div>
+
+          <div class="tform-field">
+            <label class="tform-label" for="tfName">Название <span class="text-danger">*</span></label>
+            <input type="text" name="name" id="tfName" class="tform-input tform-input--lg"
                    placeholder="Весенний чемпионат" required autofocus>
           </div>
 
-          <div class="mb-3">
-            <label class="form-label fw-medium">Описание</label>
-            <textarea name="description" class="form-control" rows="2"
-                      placeholder="Описание турнира (необязательно)"></textarea>
+          <div class="tform-field mb-0">
+            <label class="tform-label" for="tfDesc">Описание</label>
+            <textarea name="description" id="tfDesc" class="tform-input" rows="4"
+                      placeholder="Например: закрытый турнир для игроков клуба, играем по вторникам в 19:00…"></textarea>
           </div>
+        </div>
 
-          <div class="row g-3 mb-3">
-            <div class="col-md-6">
-              <label class="form-label fw-medium">Тип турнира</label>
-              <select name="type" class="form-select" id="typeSelect">
-                <option value="individual">👤 Индивидуальный</option>
-                <option value="team">👥 Командный</option>
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-medium">Размер cutoff (финал)</label>
-              <input type="number" name="cutoff_size" class="form-control"
-                     value="10" min="2" max="50">
-              <div class="form-text">Сколько игроков проходят в финал</div>
-            </div>
-          </div>
+        <!-- 2. Настройки -->
+        <div class="tform-section">
+          <div class="tform-section__title">⚙️ Настройки</div>
+          <div class="tform-section__hint">Тип турнира и правила начисления рейтинга</div>
 
-          <div class="mb-4">
-            <div class="form-check form-switch mb-2">
-              <input class="form-check-input" type="checkbox" name="is_ranked"
-                     id="isRanked" checked value="1">
-              <label class="form-check-label" for="isRanked">
-                📈 <strong>Рейтинговый</strong> — игры влияют на глобальный рейтинг
-              </label>
-            </div>
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" name="has_stages"
-                     id="hasStages" value="1">
-              <label class="form-check-label" for="hasStages">
-                📋 <strong>Многоэтапный</strong> — автосоздать Основной + Финальный этапы
-              </label>
+          <div class="tform-field mb-0">
+            <label class="tform-label">Тип турнира</label>
+            <div class="tform-type-grid">
+              <div class="tform-type-card">
+                <input type="radio" name="type" value="individual" id="typeIndividual" checked>
+                <label for="typeIndividual">
+                  <div class="tform-type-card__icon">👤</div>
+                  <div class="tform-type-card__name">Индивидуальный</div>
+                  <div class="tform-type-card__desc">Личный рейтинг игроков</div>
+                </label>
+              </div>
+              <div class="tform-type-card">
+                <input type="radio" name="type" value="team" id="typeTeam">
+                <label for="typeTeam">
+                  <div class="tform-type-card__icon">👥</div>
+                  <div class="tform-type-card__name">Командный</div>
+                  <div class="tform-type-card__desc">Игроки объединены в команды</div>
+                </label>
+              </div>
             </div>
           </div>
 
-          <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-danger px-4">
-              <i class="bi bi-check-lg me-1"></i>Создать
-            </button>
-            <a href="{{ url_for('tournaments.list_tournaments') }}" class="btn btn-outline-secondary">Отмена</a>
+          <div class="tform-switch-row">
+            <div class="tform-switch-copy">
+              <div class="tform-switch-copy__title">⭐ Рейтинговый</div>
+              <div class="tform-switch-copy__hint">Игры этого турнира изменяют глобальный рейтинг игроков (ELO)</div>
+            </div>
+            <label class="tform-switch">
+              <input type="checkbox" name="is_ranked" id="isRanked" value="1" checked>
+              <span class="tform-switch__track"></span>
+              <span class="tform-switch__thumb"></span>
+            </label>
           </div>
-        </form>
+
+          <div class="tform-switch-row">
+            <div class="tform-switch-copy">
+              <div class="tform-switch-copy__title">🏆 Многоэтапный</div>
+              <div class="tform-switch-copy__hint">Автоматически создаются Основной этап и Финал</div>
+            </div>
+            <label class="tform-switch">
+              <input type="checkbox" name="has_stages" id="hasStages" value="1">
+              <span class="tform-switch__track"></span>
+              <span class="tform-switch__thumb"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 3. Финал (появляется только если «Многоэтапный» включён) -->
+        <div class="tform-collapse" id="cutoffCollapse">
+          <div>
+            <div class="tform-section">
+              <div class="tform-section__title">🏁 Финал</div>
+              <div class="tform-section__hint">Сколько игроков проходят из основного этапа в финал</div>
+              <div class="tform-field mb-0">
+                <label class="tform-label" for="tfCutoff">Размер cutoff</label>
+                <input type="number" name="cutoff_size" id="tfCutoff" class="tform-input"
+                       value="10" min="2" max="50" style="max-width: 160px">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tform-actions">
+          <button type="submit" class="btn btn-danger btn-lg">
+            Создать турнир <i class="bi bi-arrow-right ms-1"></i>
+          </button>
+          <a href="{{ url_for('tournaments.list_tournaments') }}" class="btn btn-outline-secondary">Отмена</a>
+        </div>
+      </div>
+
+      <!-- Правая колонка: живой предпросмотр -->
+      <div>
+        <div class="tform-preview">
+          <div class="tform-preview__eyebrow">Предпросмотр</div>
+          <div class="tform-preview__name" id="pvName">Новый турнир</div>
+
+          <div class="tform-preview__row"><span id="pvTypeIcon">👤</span><span id="pvTypeName">Индивидуальный</span></div>
+          <div class="tform-preview__row" id="pvRankedRow"><span>⭐</span><span>Рейтинговый</span></div>
+          <div class="tform-preview__row" id="pvStagesRow" hidden><span>🏆</span><span>Многоэтапный</span></div>
+
+          <div class="tform-preview__final" id="pvFinal" hidden></div>
+          <div class="tform-preview__desc" id="pvDesc" hidden></div>
+        </div>
       </div>
     </div>
-  </div>
+  </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const form = document.getElementById('tournamentForm');
+  const cutoffCollapse = document.getElementById('cutoffCollapse');
+  const hasStages = document.getElementById('hasStages');
+  const isRanked = document.getElementById('isRanked');
+  const nameInput = document.getElementById('tfName');
+  const descInput = document.getElementById('tfDesc');
+  const cutoffInput = document.getElementById('tfCutoff');
+
+  const pvName = document.getElementById('pvName');
+  const pvTypeIcon = document.getElementById('pvTypeIcon');
+  const pvTypeName = document.getElementById('pvTypeName');
+  const pvRankedRow = document.getElementById('pvRankedRow');
+  const pvStagesRow = document.getElementById('pvStagesRow');
+  const pvFinal = document.getElementById('pvFinal');
+  const pvDesc = document.getElementById('pvDesc');
+
+  const TYPE_META = {
+    individual: { icon: '👤', name: 'Индивидуальный' },
+    team: { icon: '👥', name: 'Командный' },
+  };
+
+  function pluralPlayers(n) {
+    const mod100 = Math.abs(n) % 100;
+    const mod10 = mod100 % 10;
+    if (mod100 > 10 && mod100 < 20) return 'игроков';
+    if (mod10 > 1 && mod10 < 5) return 'игрока';
+    if (mod10 === 1) return 'игрок';
+    return 'игроков';
+  }
+
+  function syncCutoffVisibility() {
+    cutoffCollapse.classList.toggle('is-open', hasStages.checked);
+  }
+
+  function syncPreview() {
+    pvName.textContent = nameInput.value.trim() || 'Новый турнир';
+
+    const checkedType = form.querySelector('input[name="type"]:checked');
+    const meta = TYPE_META[checkedType ? checkedType.value : 'individual'] || TYPE_META.individual;
+    pvTypeIcon.textContent = meta.icon;
+    pvTypeName.textContent = meta.name;
+
+    pvRankedRow.hidden = !isRanked.checked;
+    pvStagesRow.hidden = !hasStages.checked;
+
+    if (hasStages.checked) {
+      const n = parseInt(cutoffInput.value, 10) || 10;
+      pvFinal.hidden = false;
+      pvFinal.textContent = `Финал: ${n} ${pluralPlayers(n)}`;
+    } else {
+      pvFinal.hidden = true;
+    }
+
+    const desc = descInput.value.trim();
+    pvDesc.hidden = !desc;
+    if (desc) pvDesc.textContent = desc;
+  }
+
+  form.addEventListener('input', syncPreview);
+  form.addEventListener('change', () => { syncCutoffVisibility(); syncPreview(); });
+
+  syncCutoffVisibility();
+  syncPreview();
+})();
+</script>
 {% endblock %}
