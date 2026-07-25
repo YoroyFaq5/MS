@@ -8,6 +8,7 @@ No rating recalculation — delegates to RatingService.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
@@ -16,6 +17,12 @@ from app import db
 from app.models import Player, Game, GameSlot, Role, WinSide, Season, CoinTransaction, PlayerAchievement
 
 logger = logging.getLogger(__name__)
+
+# Win-rate-based superlatives (best/worst teammate or opponent BY RATE) need a
+# higher games-together floor than count-based ones (most-frequent-ally,
+# most-wins-together): a rate is only meaningful once the sample is large
+# enough that a lucky streak can't dominate it outright — see _wilson_bounds.
+MIN_GAMES_FOR_WR_RANKING = 6
 
 
 # ---------------------------------------------------------------------------
@@ -797,6 +804,35 @@ class ProfileService:
         return agg, players
 
     @staticmethod
+    def _wilson_bounds(wins: int, n: int, z: float = 1.96) -> tuple[float, float]:
+        """
+        95% Wilson score interval for a win/n proportion. Used instead of the
+        naive win_rate as a RANKING key wherever we pick a "best/worst by
+        rate" superlative — naive win_rate lets a 4-game 100% streak beat a
+        22-game 63.6% partnership, which is noise, not a better partnership.
+        The interval shrinks toward 0.5 as n gets small, so a perfect-but-thin
+        sample no longer trivially outranks a large, merely-good one.
+        Displayed win_rate numbers are untouched — only sort order changes.
+        """
+        if n == 0:
+            return 0.0, 0.0
+        p = wins / n
+        denom = 1 + z * z / n
+        center = p + z * z / (2 * n)
+        margin = z * math.sqrt((p * (1 - p) + z * z / (4 * n)) / n)
+        return (center - margin) / denom, (center + margin) / denom
+
+    @staticmethod
+    def _wilson_lower(wins: int, n: int) -> float:
+        """Conservative 'at least this good' estimate — key for ranking BEST by rate."""
+        return ProfileService._wilson_bounds(wins, n)[0]
+
+    @staticmethod
+    def _wilson_upper(wins: int, n: int) -> float:
+        """Conservative 'at most this bad' estimate — key for ranking WORST by rate."""
+        return ProfileService._wilson_bounds(wins, n)[1]
+
+    @staticmethod
     def get_partner_statistics(player_id: int, min_shared_games: int = 3) -> dict:
         empty = {
             "best_partner": None, "worst_partner": None,
@@ -840,8 +876,17 @@ class ProfileService:
         most_frequent_ally = max(eligible_allies, key=lambda e: e["times_ally"], default=None)
         most_frequent_opponent = max(eligible_opponents, key=lambda e: e["times_opponent"], default=None)
 
-        best_wr_opponent = max(eligible_opponents, key=lambda e: e["win_rate_vs"], default=None)
-        worst_wr_opponent = min(eligible_opponents, key=lambda e: e["win_rate_vs"], default=None)
+        eligible_opponents_wr = [e for e in eligible_opponents if e["times_opponent"] >= MIN_GAMES_FOR_WR_RANKING]
+        best_wr_opponent = max(
+            eligible_opponents_wr,
+            key=lambda e: ProfileService._wilson_lower(e["wins_vs"], e["times_opponent"]),
+            default=None,
+        )
+        worst_wr_opponent = min(
+            eligible_opponents_wr,
+            key=lambda e: ProfileService._wilson_upper(e["wins_vs"], e["times_opponent"]),
+            default=None,
+        )
 
         return {
             "best_partner": best_partner,
@@ -885,12 +930,30 @@ class ProfileService:
             entries.append({"player_id": pid, "display_name": name(pid), **d, "win_rate_vs": wr_vs, "win_rate_ally": wr_ally})
 
         eligible_opponents = [e for e in entries if e["times_opponent"] >= min_shared_games]
-        nemesis = min(eligible_opponents, key=lambda e: e["win_rate_vs"], default=None)
-        favorite_victim = max(eligible_opponents, key=lambda e: e["win_rate_vs"], default=None)
+        eligible_opponents_wr = [e for e in eligible_opponents if e["times_opponent"] >= MIN_GAMES_FOR_WR_RANKING]
+        nemesis = min(
+            eligible_opponents_wr,
+            key=lambda e: ProfileService._wilson_upper(e["wins_vs"], e["times_opponent"]),
+            default=None,
+        )
+        favorite_victim = max(
+            eligible_opponents_wr,
+            key=lambda e: ProfileService._wilson_lower(e["wins_vs"], e["times_opponent"]),
+            default=None,
+        )
 
         eligible_allies = [e for e in entries if e["times_ally"] >= min_shared_games]
-        best_teammate_wr = max(eligible_allies, key=lambda e: e["win_rate_ally"], default=None)
-        worst_teammate_wr = min(eligible_allies, key=lambda e: e["win_rate_ally"], default=None)
+        eligible_allies_wr = [e for e in eligible_allies if e["times_ally"] >= MIN_GAMES_FOR_WR_RANKING]
+        best_teammate_wr = max(
+            eligible_allies_wr,
+            key=lambda e: ProfileService._wilson_lower(e["wins_as_ally"], e["times_ally"]),
+            default=None,
+        )
+        worst_teammate_wr = min(
+            eligible_allies_wr,
+            key=lambda e: ProfileService._wilson_upper(e["wins_as_ally"], e["times_ally"]),
+            default=None,
+        )
 
         most_played_against = max(eligible_opponents, key=lambda e: e["times_opponent"], default=None)
 
