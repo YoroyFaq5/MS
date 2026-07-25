@@ -81,17 +81,17 @@
       {% endif %}
       {% if stage.status == 'active' %}
         <form method="POST" action="{{ url_for('tournaments.generate_next_round', stage_id=stage.id) }}"
-              onsubmit="return confirm('Сгенерировать следующий раунд рассадки для этапа «{{ stage.name }}»?')">
+              data-confirm="Сгенерировать следующий раунд рассадки для этапа «{{ stage.name }}»?">
           <button class="btn btn-sm btn-outline-primary">🎲 Следующий раунд</button>
         </form>
         {% if stage.type != 'final' %}
         <form method="POST" action="{{ url_for('tournaments.run_cutoff', stage_id=stage.id) }}"
-              onsubmit="return confirm('Запустить cutoff? Топ-{{ tournament.cutoff_size }} игроков пройдут в финал.')">
+              data-confirm="Запустить cutoff? Топ-{{ tournament.cutoff_size }} игроков пройдут в финал.">
           <button class="btn btn-sm btn-warning text-dark">✂ Cutoff → Финал</button>
         </form>
         {% endif %}
         <form method="POST" action="{{ url_for('tournaments.finish_stage', stage_id=stage.id) }}"
-              onsubmit="return confirm('Завершить этап «{{ stage.name }}»?')">
+              data-confirm="Завершить этап «{{ stage.name }}»?">
           <button class="btn btn-sm btn-outline-danger">⬛ Завершить</button>
         </form>
       {% endif %}

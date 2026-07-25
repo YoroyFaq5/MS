@@ -51,7 +51,7 @@
           </div>
 
           <button type="submit" class="btn btn-danger w-100"
-                  onclick="return confirm('Применить корректировку баланса?')">
+                  data-confirm="Применить корректировку баланса?">
             <i class="bi bi-pencil-square me-1"></i>Применить
           </button>
         </form>
@@ -67,7 +67,7 @@
           удаляет <strong>всю историю транзакций</strong>. Отменить нельзя.
         </p>
         <form method="POST" action="{{ url_for('auth.admin_economy_reset_all') }}"
-              onsubmit="return confirm('Точно сбросить баланс ВСЕХ игроков до 75 и удалить ВСЮ историю транзакций? Это необратимо.');">
+              data-confirm="Точно сбросить баланс ВСЕХ игроков до 75 и удалить ВСЮ историю транзакций? Это необратимо." data-confirm-tone="danger">
           <div class="mb-3">
             <label class="form-label small fw-medium">
               Для подтверждения введите <code>СБРОСИТЬ</code>
@@ -226,8 +226,7 @@
 <div class="card mt-4">
   <div class="card-header fw-semibold">🧮 Массовая корректировка балансов</div>
   <div class="card-body">
-    <form method="POST" action="{{ url_for('auth.admin_economy_bulk_adjust') }}"
-          onsubmit="return bulkAdjustConfirm()">
+    <form method="POST" action="{{ url_for('auth.admin_economy_bulk_adjust') }}" id="bulkAdjustForm">
       <div class="row g-3 align-items-end mb-3">
         <div class="col-sm-4 col-md-3">
           <label class="form-label fw-medium">Сумма</label>
@@ -310,13 +309,19 @@ bulkRows.addEventListener('change', function(e) {
     updateBulkCount();
   }
 });
-function bulkAdjustConfirm() {
+const bulkAdjustForm = document.getElementById('bulkAdjustForm');
+bulkAdjustForm.addEventListener('submit', async function (e) {
+  if (bulkAdjustForm.dataset.mscBypass === '1') { delete bulkAdjustForm.dataset.mscBypass; return; }
+  e.preventDefault();
   const selected = bulkRows.querySelectorAll('.bulk-player-checkbox:checked').length;
   if (selected === 0) {
     alert('Выберите хотя бы одного игрока.');
-    return false;
+    return;
   }
-  return confirm(`Применить корректировку баланса к ${selected} игрокам?`);
-}
+  const ok = await window.msConfirm(`Применить корректировку баланса к ${selected} игрокам?`);
+  if (!ok) return;
+  bulkAdjustForm.dataset.mscBypass = '1';
+  bulkAdjustForm.requestSubmit ? bulkAdjustForm.requestSubmit() : bulkAdjustForm.submit();
+});
 </script>
 {% endblock %}

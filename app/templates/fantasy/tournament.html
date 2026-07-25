@@ -194,7 +194,7 @@
         {% if my_draft.status.value == 'open' %}
         <div class="card-footer">
           <form method="POST" action="{{ url_for('fantasy.cancel_draft', draft_id=my_draft.id) }}"
-                onsubmit="return confirm('{% if is_practice %}Отменить тренировочный драфт?{% else %}Отменить драфт? Взнос ({{ my_draft.entry_cost_paid | int }} монет) будет возвращён.{% endif %}');">
+                data-confirm="{% if is_practice %}Отменить тренировочный драфт?{% else %}Отменить драфт? Взнос ({{ my_draft.entry_cost_paid | int }} монет) будет возвращён.{% endif %}" data-confirm-tone="danger">
             <button type="submit" class="btn btn-sm btn-outline-danger w-100">
               <i class="bi bi-x-circle me-1"></i>Отменить драфт
             </button>

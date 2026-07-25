@@ -141,7 +141,7 @@
       <button class="btn btn-outline-secondary w-100" disabled>Уже у вас</button>
       {% elif is_unique and owner_inv %}
       <form method="POST" action="{{ url_for('shop.buyout_item', item_id=item.id) }}"
-            onsubmit="return confirm('Перекупить «{{ item.name }}» у {{ owner_inv.player.display_name }}?')">
+            data-confirm="Перекупить «{{ item.name }}» у {{ owner_inv.player.display_name }}?">
         <div class="input-group mb-2">
           <span class="input-group-text">🪙</span>
           <input type="number" name="offer_price" class="form-control"
@@ -155,7 +155,7 @@
       </form>
       {% elif validation and validation.ok %}
       <form method="POST" action="{{ url_for('shop.purchase_item', item_id=item.id) }}"
-            onsubmit="return confirm('Купить «{{ item.name }}» за {{ item.price | int }} монет?')">
+            data-confirm="Купить «{{ item.name }}» за {{ item.price | int }} монет?">
         <button type="submit" class="btn btn-danger w-100">
           <i class="bi bi-bag-check me-1"></i>Купить
         </button>

@@ -129,7 +129,7 @@
       </a>
       {% if telegram_linked %}
       <form method="POST" action="{{ url_for('auth.telegram_unlink') }}" class="d-inline"
-            onsubmit="return confirm('Отвязать Telegram-аккаунт?')">
+            data-confirm="Отвязать Telegram-аккаунт?" data-confirm-tone="danger">
         <button type="submit" class="btn btn-outline-secondary btn-sm">
           <i class="bi bi-telegram me-1"></i>Telegram привязан · отвязать
         </button>
@@ -405,7 +405,7 @@
   });
 
   removeBtn.addEventListener('click', async () => {
-    if (!confirm('Удалить аватар?')) return;
+    if (!(await window.msConfirm('Удалить аватар?', { tone: 'danger' }))) return;
     removeBtn.disabled = true;
     try {
       const resp = await fetch('{{ url_for("profile.remove_avatar") }}', { method: 'POST' });

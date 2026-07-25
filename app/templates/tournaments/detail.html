@@ -34,7 +34,7 @@
       {% if current_user.is_authenticated and current_user.is_admin %}
         <form method="POST" action="{{ url_for('tournaments.toggle_ranked', tournament_id=tournament.id) }}"
               class="d-inline"
-              onsubmit="return confirm('{{ 'Сделать турнир нерейтинговым?' if tournament.is_ranked else 'Сделать турнир рейтинговым?' }} Уже завершённые игры сохранят прежнее значение.')">
+              data-confirm="{{ 'Сделать турнир нерейтинговым?' if tournament.is_ranked else 'Сделать турнир рейтинговым?' }} Уже завершённые игры сохранят прежнее значение.">
           <button type="submit" class="badge border-0
             {% if tournament.is_ranked %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}"
             title="Нажмите, чтобы переключить">
@@ -57,13 +57,13 @@
     {% if current_user.is_authenticated and current_user.is_admin %}
     {% if tournament.status == 'pending' and not series_tournament_id %}
     <form method="POST" action="{{ url_for('tournaments.activate_tournament', tournament_id=tournament.id) }}">
-      <button class="btn btn-success" onclick="return confirm('Запустить турнир?')">
+      <button class="btn btn-success" data-confirm="Запустить турнир?">
         <i class="bi bi-play-fill me-1"></i>Запустить
       </button>
     </form>
     {% elif tournament.status == 'active' %}
     <form method="POST" action="{{ url_for('tournaments.finish_tournament', tournament_id=tournament.id) }}">
-      <button class="btn btn-warning text-dark" onclick="return confirm('Завершить турнир?')">
+      <button class="btn btn-warning text-dark" data-confirm="Завершить турнир?">
         <i class="bi bi-flag-fill me-1"></i>Завершить
       </button>
     </form>
@@ -77,7 +77,7 @@
     {% endif %}
     {% if current_user.is_authenticated and current_user.is_admin %}
     <form method="POST" action="{{ url_for('tournaments.delete_tournament', tournament_id=tournament.id) }}"
-          class="d-inline" onsubmit="return confirm('Удалить турнир?')">
+          class="d-inline" data-confirm="Удалить турнир?" data-confirm-tone="danger">
       <button class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
     </form>
     {% endif %}
@@ -235,7 +235,7 @@
                     class="d-inline m-0 p-0">
                 <button type="submit" class="btn p-0 border-0 bg-transparent text-muted lh-1"
                         style="font-size:.65rem" title="Убрать из команды"
-                        onclick="return confirm('Убрать игрока из команды?')">✕</button>
+                        data-confirm="Убрать игрока из команды?" data-confirm-tone="danger">✕</button>
               </form>
               {% endif %}
             </span>
@@ -386,7 +386,7 @@
         {% endif %}
         <div class="col-md-auto">
           <button type="submit" class="btn btn-warning text-dark"
-                  onclick="return confirm('Создать игры с авто-рассадкой?')">
+                  data-confirm="Создать игры с авто-рассадкой?">
             <i class="bi bi-play-fill me-1"></i>Создать
           </button>
         </div>

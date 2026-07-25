@@ -282,12 +282,12 @@
   <div class="d-flex gap-2 flex-wrap">
     <form method="POST" action="{{ url_for('seasons.close_expired') }}">
       <button class="btn btn-sm btn-outline-warning"
-              onclick="return confirm('Закрыть все завершившиеся сезоны?')">
+              data-confirm="Закрыть все завершившиеся сезоны?">
         <i class="bi bi-lock me-1"></i>Закрыть истёкшие
       </button>
     </form>
     <form method="POST" action="{{ url_for('seasons.create_year_tournament') }}"
-          onsubmit="return confirm('Создать «Стол года {{ year }}»?')">
+          data-confirm="Создать «Стол года {{ year }}»?">
       <input type="hidden" name="year" value="{{ year }}">
       <button class="btn btn-sm btn-outline-warning">
         <i class="bi bi-trophy me-1"></i>Стол года {{ year }}

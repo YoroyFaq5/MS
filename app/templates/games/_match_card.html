@@ -118,7 +118,7 @@
       <i class="bi bi-eye"></i>
     </a>
     <form method="POST" action="{{ url_for('games.delete_game', game_id=game.id) }}"
-          class="d-inline" onsubmit="return confirm('Удалить игру #{{ game.id }}?')">
+          class="d-inline" data-confirm="Удалить игру #{{ game.id }}?" data-confirm-tone="danger">
       <button type="submit" class="btn btn-outline-danger btn-sm">
         <i class="bi bi-trash"></i>
       </button>

@@ -31,7 +31,7 @@
       <span class="badge bg-warning text-dark fs-6 px-3 py-2">⏳ В процессе</span>
       {% if current_user.is_authenticated and current_user.is_admin %}
       <form method="POST" action="{{ url_for('games.delete_game', game_id=game.id) }}"
-            onsubmit="return confirm('Удалить незавершённую игру #{{ game.id }}?')">
+            data-confirm="Удалить незавершённую игру #{{ game.id }}?" data-confirm-tone="danger">
         <button type="submit" class="btn btn-outline-danger btn-sm">
           <i class="bi bi-trash me-1"></i>Удалить
         </button>
@@ -277,12 +277,12 @@
       <div class="col-md-auto">
         {% if edit_mode %}
         <button type="submit" class="btn btn-warning px-4"
-                onclick="return confirm('Сохранить изменения? ELO и монеты будут пересчитаны заново.')">
+                data-confirm="Сохранить изменения? ELO и монеты будут пересчитаны заново.">
           <i class="bi bi-check-lg me-1"></i>Сохранить изменения
         </button>
         {% else %}
         <button type="submit" class="btn btn-danger px-4"
-                onclick="return confirm('Завершить игру? Это изменит рейтинг.')">
+                data-confirm="Завершить игру? Это изменит рейтинг.">
           <i class="bi bi-flag-fill me-1"></i>Завершить игру
         </button>
         {% endif %}

@@ -183,7 +183,7 @@
 
     {% if current_user.is_authenticated and current_user.is_admin %}
     <form method="POST" action="{{ url_for('seasons.resolve_tiebreak', season_id=season.id) }}"
-          onsubmit="return confirm('Назначить этого игрока победителем сезона? Действие необратимо.')">
+          data-confirm="Назначить этого игрока победителем сезона? Действие необратимо." data-confirm-tone="danger">
       <div class="row g-2 align-items-end">
         <div class="col-auto">
           <label class="form-label small fw-medium">Выбрать победителя:</label>
@@ -394,7 +394,7 @@
           <td class="pe-3 text-end">
             {% if not gg.revoked %}
             <form method="POST" action="{{ url_for('seasons.revoke_gg', gg_id=gg.id) }}"
-                  onsubmit="return confirm('Отозвать GG-бонус?')">
+                  data-confirm="Отозвать GG-бонус?" data-confirm-tone="danger">
               <button class="btn btn-outline-danger btn-sm py-0 px-2">✕</button>
             </form>
             {% else %}

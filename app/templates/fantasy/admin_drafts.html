@@ -135,7 +135,7 @@
         {% endif %}
         <div class="card-footer">
           <form method="POST" action="{{ url_for('fantasy.cancel_draft', draft_id=d.id) }}"
-                onsubmit="return confirm('Отменить драфт {{ d.user.display_name if d.user else '' }}? Взнос ({{ d.entry_cost_paid | int }} монет) будет возвращён.');">
+                data-confirm="Отменить драфт {{ d.user.display_name if d.user else '' }}? Взнос ({{ d.entry_cost_paid | int }} монет) будет возвращён." data-confirm-tone="danger">
             <button type="submit" class="btn btn-sm btn-outline-danger w-100">
               <i class="bi bi-x-circle me-1"></i>Отменить драфт
             </button>

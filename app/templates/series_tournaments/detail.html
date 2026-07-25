@@ -27,7 +27,7 @@
        class="btn btn-outline-warning"><i class="bi bi-trophy me-1"></i>Общий рейтинг</a>
     {% if tournament.status != 'finished' and current_user.is_authenticated and current_user.is_admin %}
     <form method="POST" action="{{ url_for('tournaments.finish_tournament', tournament_id=tournament.id) }}"
-          onsubmit="return confirm('Завершить весь серийный турнир? Начислятся монеты/fantasy-очки и достижения.')">
+          data-confirm="Завершить весь серийный турнир? Начислятся монеты/fantasy-очки и достижения.">
       <button class="btn btn-warning text-dark"><i class="bi bi-flag-fill me-1"></i>Завершить турнир</button>
     </form>
     {% endif %}

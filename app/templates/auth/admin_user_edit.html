@@ -37,7 +37,7 @@
           Можно только задать новый.
         </p>
         <form method="POST" action="{{ url_for('auth.admin_reset_password', user_id=target.id) }}"
-              onsubmit="return confirm('Сбросить пароль пользователя «{{ target.username }}»?')">
+              data-confirm="Сбросить пароль пользователя «{{ target.username }}»?" data-confirm-tone="danger">
           <div class="mb-3">
             <label class="form-label small text-muted">Новый пароль</label>
             <input type="password" name="new_password" class="form-control" minlength="6" required autocomplete="new-password">

@@ -246,7 +246,7 @@ tr.player-row--inactive { opacity: .55; }
                   <i class="bi bi-pencil"></i>
                 </a>
                 <form method="POST" action="{{ url_for('players.delete_player', player_id=player.id) }}"
-                      class="d-inline" onsubmit="return confirm('Деактивировать игрока?')">
+                      class="d-inline" data-confirm="Деактивировать игрока?" data-confirm-tone="danger">
                   <button type="submit" class="btn btn-outline-danger" title="Деактивировать">
                     <i class="bi bi-person-dash"></i>
                   </button>

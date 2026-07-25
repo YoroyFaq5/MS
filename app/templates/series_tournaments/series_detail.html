@@ -45,11 +45,11 @@
     </button>
     {% endif %}
     <form method="POST" action="{{ url_for('series_tournaments.finish_series', series_id=series.id) }}"
-          onsubmit="return confirm('Завершить серию?')">
+          data-confirm="Завершить серию?">
       <button class="btn btn-outline-secondary"><i class="bi bi-flag-fill me-1"></i>Завершить</button>
     </form>
     <form method="POST" action="{{ url_for('series_tournaments.cancel_series', series_id=series.id) }}"
-          onsubmit="return confirm('Отменить серию? Она будет исключена из общего рейтинга.')">
+          data-confirm="Отменить серию? Она будет исключена из общего рейтинга." data-confirm-tone="danger">
       <button class="btn btn-outline-danger"><i class="bi bi-x-lg me-1"></i>Отменить</button>
     </form>
     {% endif %}

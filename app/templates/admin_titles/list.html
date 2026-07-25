@@ -56,7 +56,7 @@
               <a href="{{ url_for('profile.view_profile', player_id=holder.player_id) }}">{{ holder.player.display_name }}</a>
               <form method="POST" action="{{ url_for('admin_titles.revoke', player_title_id=holder.id) }}" class="d-inline">
                 <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-1"
-                        onclick="return confirm('Отозвать титул у ' + '{{ holder.player.display_name }}' + '?')">отозвать</button>
+                        data-confirm="Отозвать титул у {{ holder.player.display_name }}?" data-confirm-tone="danger">отозвать</button>
               </form>
               {% else %}
               <span class="text-muted">—</span>
