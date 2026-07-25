@@ -373,7 +373,7 @@ class NominationService:
 
     @staticmethod
     def _season_sharpshooter(season_id: int) -> Optional[int]:
-        """Меткий стрелок сезона: больше всего идеальных ПУ-звонков (все 3
+        """Меткий стрелок сезона: больше всего идеальных «Лучших ходов» (все 3
         мафии угаданы) за сезон."""
         row = (
             db.session.query(GameSlot.player_id, func.count(GameSlot.id))
@@ -705,7 +705,7 @@ class NominationService:
 
     @staticmethod
     def _club_sniper_ranking(limit: int = 3) -> List[tuple]:
-        """Снайпер клуба: лучшая точность ПУ-звонка за карьеру (доля угаданных
+        """Снайпер клуба: лучшая точность «Лучшего хода» за карьеру (доля угаданных
         мафий из 3 возможных за игру, где игрок был ПУ), мин. MIN_PU_GAMES_FOR_SNIPER
         ПУ-игр. Значение — % точности."""
         rows = (
