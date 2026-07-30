@@ -10,9 +10,14 @@ Design rules:
     считается нашим RatingService из роли+результата+ПУ, как для любой
     другой игры на сайте. Это единственный способ не рассинхронизировать
     компенсацию/ELO/рейтинг между локальными и импортированными играми.
-  - Игрок сопоставляется только через явную ExternalPlayerLink — никогда
-    не угадывается по нику молча. Несопоставленные игроки уходят в
-    очередь на подтверждение админом (ExternalGameImport.status=
+  - Игрок сопоставляется через ExternalPlayerLink, а если её ещё нет —
+    автоматически по нику, но ТОЛЬКО когда это однозначно: используем
+    PlayerSearchService.normalize_for_match() (тот же транслит+регистр
+    normalize, что уже защищает от дублей "Virus"/"Вирус" при создании
+    игрока) и авто-привязываем, если находится РОВНО один такой игрок
+    клуба — и сразу создаём ExternalPlayerLink, чтобы больше не искать
+    по нику вообще. Ноль или больше одного совпадения — не угадываем,
+    уходит в очередь на подтверждение админом (ExternalGameImport.status=
     "pending_review"), настоящая Game не создаётся, пока все не решены.
   - external_id — ключ идемпотентности: повторный вебхук с тем же
     external_id не создаёт вторую игру и не трогает уже импортированную
@@ -75,8 +80,9 @@ class ExternalGameImportService:
     def match_players(players_payload: List[dict]) -> tuple[Dict[int, Player], List[dict]]:
         """
         Returns (matched: {seat: Player}, unmatched: [player_payload, ...]).
-        Only ever matches via an existing ExternalPlayerLink — never guesses
-        by nickname text, since two different real people can share a nick.
+        Pure ExternalPlayerLink lookup only — no nickname guessing here (see
+        auto_link_by_nickname for that), so this stays safe to call read-only
+        from the admin queue page just to render current status.
         """
         matched: Dict[int, Player] = {}
         unmatched: List[dict] = []
@@ -91,6 +97,39 @@ class ExternalGameImportService:
             else:
                 unmatched.append(p)
         return matched, unmatched
+
+    @staticmethod
+    def auto_link_by_nickname(unmatched: List[dict]) -> tuple[Dict[int, Player], List[dict]]:
+        """
+        Second pass over whatever match_players() couldn't resolve via an
+        existing link: try an exact, transliteration/case-normalized nickname
+        match (same normalize_for_match() that already guards against
+        "Virus"/"Вирус"-style duplicate players on manual creation).
+        Auto-links ONLY when exactly one club player matches — zero matches
+        (genuinely new person) or 2+ matches (ambiguous nickname, e.g. two
+        different people both going by "Тень") still fall through to the
+        manual review queue rather than guessing. A successful auto-match
+        immediately persists an ExternalPlayerLink, so this only ever runs
+        once per external player.
+        """
+        from app.services.player_search_service import PlayerSearchService
+
+        newly_matched: Dict[int, Player] = {}
+        still_unmatched: List[dict] = []
+        for p in unmatched:
+            candidates = PlayerSearchService.find_exact_duplicates(p["nickname"])
+            if len(candidates) == 1:
+                player = candidates[0]
+                db.session.add(ExternalPlayerLink(
+                    source=SOURCE, external_id=p["external_id"],
+                    nickname_hint=p["nickname"], player_id=player.id,
+                ))
+                newly_matched[p["seat"]] = player
+            else:
+                still_unmatched.append(p)
+        if newly_matched:
+            db.session.flush()
+        return newly_matched, still_unmatched
 
     # ── Core game construction (shared by webhook + admin resolver) ─────────
 
@@ -208,6 +247,9 @@ class ExternalGameImportService:
             return ImportOutcome(ok=True, message="Уже обработано ранее.", import_row=existing, game=existing.game)
 
         matched, unmatched = ExternalGameImportService.match_players(players_payload)
+        if unmatched:
+            auto_matched, unmatched = ExternalGameImportService.auto_link_by_nickname(unmatched)
+            matched.update(auto_matched)
 
         if unmatched:
             import_row = ExternalGameImport(
