@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>VPS console — {{ user }}@{{ host }}</title>
+<style>
+  :root {
+    --bg: #0d0d0d; --surface: #17181a; --border: #2a2c30;
+    --text: #e7e7e7; --muted: #8a8f98; --accent: #4f9dff; --danger: #e5484d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif; padding: 1.5rem;
+  }
+  h1 { font-size: 1.1rem; margin: 0 0 .25rem; font-weight: 600; }
+  .sub { color: var(--muted); font-size: .82rem; margin-bottom: 1.25rem; }
+  .layout { display: grid; grid-template-columns: 260px 1fr; gap: 1.25rem; align-items: start; }
+  @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+
+  .presets { display: flex; flex-direction: column; gap: .5rem; }
+  .preset-btn {
+    text-align: left; background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: .6rem .75rem;
+    font-size: .85rem; cursor: pointer; transition: border-color .15s ease, background .15s ease;
+  }
+  .preset-btn:hover { border-color: var(--accent); background: #1c1e22; }
+  .preset-btn:active { transform: translateY(1px); }
+  .preset-btn.danger:hover { border-color: var(--danger); }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
+  .cmd-row { display: flex; gap: .5rem; margin-bottom: .75rem; }
+  #cmdInput {
+    flex: 1; background: #0f1012; color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: .55rem .7rem; font-family: 'Cascadia Code', Consolas, monospace; font-size: .85rem;
+  }
+  #cmdInput:focus { outline: none; border-color: var(--accent); }
+  .run-btn {
+    background: var(--accent); color: #08131f; border: none; border-radius: 8px;
+    padding: .55rem 1.1rem; font-weight: 600; cursor: pointer; font-size: .85rem;
+  }
+  .run-btn:disabled { opacity: .5; cursor: default; }
+
+  .cwd-hint { color: var(--muted); font-size: .75rem; margin: -.4rem 0 .75rem; }
+  .cwd-hint code { color: var(--text); }
+
+  #output {
+    background: #0a0b0c; border: 1px solid var(--border); border-radius: 8px;
+    padding: .85rem; font-family: 'Cascadia Code', Consolas, monospace; font-size: .8rem;
+    white-space: pre-wrap; word-break: break-word; max-height: 60vh; overflow-y: auto;
+    min-height: 120px;
+  }
+  .entry { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed var(--border); }
+  .entry:last-child { border-bottom: none; }
+  .entry .cmd { color: var(--accent); margin-bottom: .3rem; }
+  .entry .cmd::before { content: "$ "; color: var(--muted); }
+  .entry .meta { color: var(--muted); font-size: .72rem; margin-top: .3rem; }
+  .entry .err { color: var(--danger); }
+  .status-ok { color: #4bd08b; }
+  .status-fail { color: var(--danger); }
+</style>
+</head>
+<body>
+  <h1>🖥 VPS console</h1>
+  <div class="sub">{{ user }}@{{ host }} · выполняется только локально, наружу не открывать</div>
+
+  <div class="layout">
+    <div class="presets">
+      {% for p in presets %}
+      <button class="preset-btn{% if p.key in ('site_restart','deploy') %} danger{% endif %}"
+              data-command="{{ p.command }}">{{ p.label }}</button>
+      {% endfor %}
+    </div>
+
+    <div class="panel">
+      <div class="cmd-row">
+        <input type="text" id="cmdInput" placeholder="произвольная команда…" autocomplete="off">
+        <button class="run-btn" id="runBtn">Выполнить</button>
+      </div>
+      <div class="cwd-hint">Подсказка: для команд в репозитории на сервере начните с <code>cd /root/MS &amp;&amp;</code></div>
+      <div id="output"></div>
+    </div>
+  </div>
+
+<script>
+const output = document.getElementById('output');
+const cmdInput = document.getElementById('cmdInput');
+const runBtn = document.getElementById('runBtn');
+
+function addEntry(command) {
+  const entry = document.createElement('div');
+  entry.className = 'entry';
+  entry.innerHTML = `<div class="cmd"></div><div class="body">выполняется…</div>`;
+  entry.querySelector('.cmd').textContent = command;
+  output.prepend(entry);
+  return entry;
+}
+
+async function run(command) {
+  if (!command) return;
+  const entry = addEntry(command);
+  runBtn.disabled = true;
+  try {
+    const resp = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command }),
+    });
+    const data = await resp.json();
+    const body = entry.querySelector('.body');
+    if (!data.ok) {
+      body.innerHTML = `<span class="err">${escapeHtml(data.error || 'Ошибка')}</span>`;
+    } else {
+      const statusClass = data.exit_code === 0 ? 'status-ok' : 'status-fail';
+      body.innerHTML =
+        (data.stdout ? escapeHtml(data.stdout) : '') +
+        (data.stderr ? `<span class="err">${escapeHtml(data.stderr)}</span>` : '') +
+        `<div class="meta"><span class="${statusClass}">exit code: ${data.exit_code}</span></div>`;
+    }
+  } catch (e) {
+    entry.querySelector('.body').innerHTML = `<span class="err">${escapeHtml(String(e))}</span>`;
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+document.querySelectorAll('.preset-btn').forEach((btn) => {
+  btn.addEventListener('click', () => run(btn.dataset.command));
+});
+
+runBtn.addEventListener('click', () => run(cmdInput.value.trim()));
+cmdInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') run(cmdInput.value.trim());
+});
+</script>
+</body>
+</html>
