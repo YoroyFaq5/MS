@@ -161,6 +161,26 @@ class ExternalGameImportService:
         slot.pu_mafia_count = max(0, min(3, correct))
 
     @staticmethod
+    def _apply_bonus_from_points(slots_by_seat: Dict[int, GameSlot], players_payload: List[dict], win_side: WinSide) -> None:
+        """
+        Их per-player "points" — это наш base_score (0/1 по роли+результату)
+        ПЛЮС судейский бонус, слитые в одно число (см. переписку с Глебом:
+        на реальном примере 9 из 10 points совпали с нашей базой 1-в-1,
+        а у шерифа было 1.2 вместо 1.0 — то есть +0.2 бонуса). Извлекаем
+        только эту надбавку, а не доверяем их points как наш итоговый счёт —
+        base_score всё равно считает RatingService из роли+результата.
+        """
+        from app.services.rating_service import calculate_base_score
+
+        for p in players_payload:
+            slot = slots_by_seat.get(p["seat"])
+            points = p.get("points")
+            if not slot or points is None:
+                continue
+            expected_base = calculate_base_score(slot.role, win_side)
+            slot.bonus_score = round(float(points) - expected_base, 2)
+
+    @staticmethod
     def build_and_finish_game(payload: dict, player_by_seat: Dict[int, Player]) -> tuple[Optional[Game], Optional[str]]:
         """
         Builds a real, fully-scored Game from a MafiaSpace payload plus an
@@ -219,6 +239,7 @@ class ExternalGameImportService:
 
         winner = (payload.get("winner") or "none").lower()
         game.win_side = _WINNER_MAP.get(winner, WinSide.NONE)
+        ExternalGameImportService._apply_bonus_from_points(slots_by_seat, players_payload, game.win_side)
 
         game.is_finished = True
         db.session.flush()
@@ -267,6 +288,7 @@ class ExternalGameImportService:
 
         winner = (payload.get("winner") or "none").lower()
         game.win_side = _WINNER_MAP.get(winner, WinSide.NONE)
+        ExternalGameImportService._apply_bonus_from_points(slots_by_seat, players_payload, game.win_side)
 
         played_at = payload.get("played_at")
         if played_at:
