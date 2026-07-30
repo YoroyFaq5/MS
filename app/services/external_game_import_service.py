@@ -20,8 +20,11 @@ Design rules:
     уходит в очередь на подтверждение админом (ExternalGameImport.status=
     "pending_review"), настоящая Game не создаётся, пока все не решены.
   - external_id — ключ идемпотентности: повторный вебхук с тем же
-    external_id не создаёт вторую игру и не трогает уже импортированную
-    (см. docstring на find_or_create_import).
+    external_id никогда не создаёт вторую игру. Если игра уже была
+    импортирована — считаем это исправленным протоколом и обновляем её
+    на месте через EditGameOrchestrator (см. update_existing_game). Если
+    ещё висит в очереди на подтверждение — просто освежаем сохранённый
+    payload, ничего не создавая, пока админ не решит по игрокам.
 """
 from __future__ import annotations
 
@@ -223,6 +226,59 @@ class ExternalGameImportService:
         PostGameOrchestrator.run(game)
         return game, None
 
+    # ── Corrected re-send of an already-imported game ────────────────────────
+
+    @staticmethod
+    def update_existing_game(game: Game, payload: dict) -> tuple[Optional[Game], Optional[str]]:
+        """
+        A repeated webhook for an external_id that's already "imported" means
+        MafiaSpace corrected the protocol (e.g. a role/result mistake caught
+        after the fact) — updates the SAME Game in place via
+        EditGameOrchestrator (the same undo/redo-ELO pipeline the admin's own
+        "edit a finished game" form uses), rather than creating a duplicate.
+
+        Scope: only touches role/win_side/PU/played_at on the EXISTING slots
+        by seat number — does not reassign who's seated where. A correction
+        that changes the actual roster (not just judging particulars) isn't
+        expected from a "protocol fix" and would need a real re-import.
+        """
+        players_payload = payload.get("players") or []
+        slots_by_seat: Dict[int, GameSlot] = {s.seat_number: s for s in game.slots}
+
+        for p in players_payload:
+            slot = slots_by_seat.get(p["seat"])
+            if not slot:
+                continue
+            try:
+                slot.role = Role(p["role"])
+            except ValueError:
+                return None, f"Неизвестная роль «{p.get('role')}» на месте {p['seat']}."
+
+        role_values = [s.role.value for s in game.slots]
+        if all(v == "civilian" for v in role_values):
+            return None, "Все роли — мирный, протокол выглядит некорректным."
+        if role_values.count("mafia") + role_values.count("don") == 0:
+            return None, "В протоколе нет ни одной роли мафии/дона."
+
+        for s in game.slots:
+            s.is_pu = False
+            s.pu_mafia_count = 0
+        ExternalGameImportService._compute_pu(slots_by_seat, payload)
+
+        winner = (payload.get("winner") or "none").lower()
+        game.win_side = _WINNER_MAP.get(winner, WinSide.NONE)
+
+        played_at = payload.get("played_at")
+        if played_at:
+            game.played_at = _parse_played_at(played_at)
+
+        old_player_ids = [s.player_id for s in game.slots]
+        db.session.flush()
+
+        from app.services.orchestrator import EditGameOrchestrator
+        EditGameOrchestrator.run(game, old_player_ids, game.tournament_id, game.stage_id)
+        return game, None
+
     # ── Webhook entry point ──────────────────────────────────────────────────
 
     @staticmethod
@@ -241,9 +297,26 @@ class ExternalGameImportService:
 
         existing = ExternalGameImportService.get_existing_import(external_id)
         if existing:
-            # Идемпотентность: тот же external_id повторно не пересоздаёт и
-            # не обновляет игру (см. docstring модуля) — просто отдаём тот
-            # же результат, что и в первый раз.
+            if existing.status == "imported" and existing.game:
+                # Повторный вебхук с тем же external_id — это исправленный
+                # протокол той же игры. Обновляем её на месте вместо второй
+                # копии (EditGameOrchestrator корректно откатывает/переигрывает
+                # ELO — тот же механизм, что и ручное редактирование игры).
+                game, error = ExternalGameImportService.update_existing_game(existing.game, payload)
+                if error:
+                    return ImportOutcome(ok=False, message=error)
+                existing.raw_payload = json.dumps(payload, ensure_ascii=False)
+                existing.resolved_at = datetime.now(timezone.utc)
+                db.session.commit()
+                return ImportOutcome(ok=True, message="Игра обновлена по исправленному протоколу.", import_row=existing, game=game)
+
+            # pending_review (ещё не решено админом) или rejected (админ
+            # осознанно отклонил) — не пересоздаём и не трогаем, просто
+            # обновляем сохранённый пейлоад на случай, если админ ещё не
+            # успел рассмотреть исходный.
+            if existing.status == "pending_review":
+                existing.raw_payload = json.dumps(payload, ensure_ascii=False)
+                db.session.commit()
             return ImportOutcome(ok=True, message="Уже обработано ранее.", import_row=existing, game=existing.game)
 
         matched, unmatched = ExternalGameImportService.match_players(players_payload)
