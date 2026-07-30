@@ -8,9 +8,13 @@
   <p class="text-muted small mb-0">
     {{ row.source }} · внешний id {{ row.external_id }} ·
     {{ row.created_at.strftime('%d.%m.%Y %H:%M') }}
+    {% if row.status == 'imported' %}<span class="badge bg-success ms-2">Импортирован</span>
+    {% elif row.status == 'rejected' %}<span class="badge bg-secondary ms-2">Отклонён</span>
+    {% else %}<span class="badge bg-warning text-dark ms-2">На рассмотрении</span>{% endif %}
   </p>
 </div>
 
+{% if row.status == 'pending_review' %}
 <form method="POST" action="{{ url_for('admin_imports.resolve', import_id=row.id) }}">
   <div class="card">
     <div class="card-header fw-semibold">Состав игры</div>
@@ -55,4 +59,58 @@
       data-confirm="Отклонить этот импорт? Игра не будет создана." data-confirm-tone="danger">
   <button type="submit" class="btn btn-outline-danger btn-sm">Отклонить импорт</button>
 </form>
+
+{% else %}
+<div class="card">
+  <div class="card-header fw-semibold">Состав игры</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr><th>Место</th><th>Ник (MafiaSpace)</th><th>Роль</th><th>Игрок клуба</th></tr>
+      </thead>
+      <tbody>
+        {% for p in payload.players %}
+        <tr>
+          <td>{{ p.seat }}</td>
+          <td>{{ p.nickname }}</td>
+          <td>{{ p.role }}</td>
+          <td>
+            {% if p.seat in matched %}
+              <span class="text-success">✓ {{ matched[p.seat].display_name }}</span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if row.game_id %}
+  <div class="card-footer">
+    <a href="{{ url_for('games.game_detail', game_id=row.game_id) }}" class="btn btn-sm btn-outline-primary">
+      Открыть игру #{{ row.game_id }}
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if row.revisions|length > 1 %}
+<h5 class="fw-bold mt-4 mb-2">История изменений протокола</h5>
+<div class="table-responsive">
+  <table class="table table-hover table-sm align-middle small">
+    <thead><tr><th style="width:1%">#</th><th>Когда</th><th>Что изменилось</th></tr></thead>
+    <tbody>
+      {% for rev in row.revisions %}
+      <tr>
+        <td class="text-muted">{{ loop.index }}</td>
+        <td class="text-nowrap">{{ rev.received_at.strftime('%d.%m.%Y %H:%M') }}</td>
+        <td>{{ rev.summary }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
 {% endblock %}

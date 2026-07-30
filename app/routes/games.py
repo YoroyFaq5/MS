@@ -470,10 +470,17 @@ def game_detail(game_id: int):
             if own_tournament:
                 tournaments = [own_tournament] + tournaments
 
+    from app.models import ExternalGameImport
+    external_import = (
+        db.session.query(ExternalGameImport).filter_by(game_id=game.id).first()
+        if current_user.is_authenticated and current_user.is_admin else None
+    )
+
     return render_template("games/detail.html", game=game, slots=slots,
                            roles_editable=roles_editable, edit_mode=edit_mode,
                            tournaments=tournaments,
-                           equipped_bulk=equipped_bulk)
+                           equipped_bulk=equipped_bulk,
+                           external_import=external_import)
 
 
 @games_bp.route("/api/<int:game_id>")

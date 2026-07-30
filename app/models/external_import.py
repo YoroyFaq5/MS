@@ -62,6 +62,10 @@ class ExternalGameImport(db.Model):
     resolved_at = Column(DateTime(timezone=True), nullable=True)
 
     game = relationship("Game")
+    revisions = relationship(
+        "ExternalGameImportRevision", back_populates="import_row",
+        order_by="ExternalGameImportRevision.received_at", cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         UniqueConstraint("source", "external_id", name="uq_external_game_import"),
@@ -69,3 +73,30 @@ class ExternalGameImport(db.Model):
 
     def __repr__(self) -> str:
         return f"<ExternalGameImport {self.source}:{self.external_id} status={self.status}>"
+
+
+class ExternalGameImportRevision(db.Model):
+    """
+    Одна запись = один реально полученный вебхук по этому external_id —
+    и самый первый, и каждый последующий "исправленный протокол". В
+    отличие от ExternalGameImport.raw_payload (который всегда хранит
+    только ПОСЛЕДНЮЮ версию для удобства повторной обработки), это —
+    неизменяемый журнал: что именно и когда пришло, и что изменилось
+    по сравнению с предыдущей версией (см.
+    ExternalGameImportService._diff_summary).
+    """
+    __tablename__ = "external_game_import_revisions"
+    __allow_unmapped__ = True
+
+    id = Column(Integer, primary_key=True)
+    import_id = Column(Integer, ForeignKey("external_game_imports.id", ondelete="CASCADE"), nullable=False)
+    raw_payload = Column(Text, nullable=False)
+    summary = Column(String(500), nullable=True)  # человекочитаемый диф с предыдущей версией
+    received_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False,
+    )
+
+    import_row = relationship("ExternalGameImport", back_populates="revisions")
+
+    def __repr__(self) -> str:
+        return f"<ExternalGameImportRevision import#{self.import_id} at={self.received_at}>"

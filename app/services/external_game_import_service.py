@@ -36,7 +36,7 @@ from typing import Dict, List, Optional
 from app import db
 from app.models import (
     Game, GameSlot, Player, Role, WinSide,
-    ExternalPlayerLink, ExternalGameImport,
+    ExternalPlayerLink, ExternalGameImport, ExternalGameImportRevision,
 )
 from app.services.economy_service import EconomyService
 from app.services.orchestrator import PostGameOrchestrator
@@ -65,6 +65,36 @@ def _parse_played_at(value: Optional[str]) -> datetime:
         return datetime.now(timezone.utc)
 
 
+def _diff_summary(old_payload: Optional[dict], new_payload: dict) -> str:
+    """Человекочитаемый список того, что изменилось между двумя версиями протокола."""
+    if old_payload is None:
+        return "Первая версия протокола."
+
+    changes: List[str] = []
+
+    old_winner, new_winner = old_payload.get("winner"), new_payload.get("winner")
+    if old_winner != new_winner:
+        changes.append(f"победитель: {old_winner} → {new_winner}")
+
+    old_roles = {p["seat"]: p.get("role") for p in (old_payload.get("players") or [])}
+    new_roles = {p["seat"]: p.get("role") for p in (new_payload.get("players") or [])}
+    for seat in sorted(set(old_roles) | set(new_roles)):
+        if old_roles.get(seat) != new_roles.get(seat):
+            changes.append(f"роль места {seat}: {old_roles.get(seat)} → {new_roles.get(seat)}")
+
+    old_kf = (old_payload.get("killed_first") or {}).get("seat")
+    new_kf = (new_payload.get("killed_first") or {}).get("seat")
+    if old_kf != new_kf:
+        changes.append(f"первый убитый: место {old_kf} → место {new_kf}")
+
+    old_bm = (old_payload.get("best_move") or {}).get("called_seats")
+    new_bm = (new_payload.get("best_move") or {}).get("called_seats")
+    if old_bm != new_bm:
+        changes.append(f"лучший ход: {old_bm} → {new_bm}")
+
+    return "; ".join(changes) if changes else "Повторная отправка без изменений."
+
+
 class ExternalGameImportService:
 
     # ── Idempotency ──────────────────────────────────────────────────────────
@@ -76,6 +106,30 @@ class ExternalGameImportService:
             .filter_by(source=SOURCE, external_id=external_id)
             .first()
         )
+
+    @staticmethod
+    def record_revision(import_row: ExternalGameImport, payload: dict) -> ExternalGameImportRevision:
+        """
+        Appends an immutable log entry for a webhook actually received for
+        this import — called for every payload (first arrival AND every
+        later "corrected protocol" resend), so nothing is silently
+        overwritten even though ExternalGameImport.raw_payload itself only
+        ever holds the latest version for convenience elsewhere.
+        """
+        last = (
+            db.session.query(ExternalGameImportRevision)
+            .filter_by(import_id=import_row.id)
+            .order_by(ExternalGameImportRevision.received_at.desc())
+            .first()
+        )
+        old_payload = json.loads(last.raw_payload) if last else None
+        revision = ExternalGameImportRevision(
+            import_id=import_row.id,
+            raw_payload=json.dumps(payload, ensure_ascii=False),
+            summary=_diff_summary(old_payload, payload),
+        )
+        db.session.add(revision)
+        return revision
 
     # ── Player matching ──────────────────────────────────────────────────────
 
@@ -327,6 +381,7 @@ class ExternalGameImportService:
                 game, error = ExternalGameImportService.update_existing_game(existing.game, payload)
                 if error:
                     return ImportOutcome(ok=False, message=error)
+                ExternalGameImportService.record_revision(existing, payload)
                 existing.raw_payload = json.dumps(payload, ensure_ascii=False)
                 existing.resolved_at = datetime.now(timezone.utc)
                 db.session.commit()
@@ -337,6 +392,7 @@ class ExternalGameImportService:
             # обновляем сохранённый пейлоад на случай, если админ ещё не
             # успел рассмотреть исходный.
             if existing.status == "pending_review":
+                ExternalGameImportService.record_revision(existing, payload)
                 existing.raw_payload = json.dumps(payload, ensure_ascii=False)
                 db.session.commit()
             return ImportOutcome(ok=True, message="Уже обработано ранее.", import_row=existing, game=existing.game)
@@ -354,6 +410,8 @@ class ExternalGameImportService:
                 status="pending_review",
             )
             db.session.add(import_row)
+            db.session.flush()
+            ExternalGameImportService.record_revision(import_row, payload)
             db.session.commit()
             return ImportOutcome(
                 ok=True, message="Часть игроков не сопоставлена, отправлено на ручное подтверждение.",
@@ -373,6 +431,8 @@ class ExternalGameImportService:
             resolved_at=datetime.now(timezone.utc),
         )
         db.session.add(import_row)
+        db.session.flush()
+        ExternalGameImportService.record_revision(import_row, payload)
         db.session.commit()
         return ImportOutcome(ok=True, message="Игра импортирована.", import_row=import_row, game=game)
 

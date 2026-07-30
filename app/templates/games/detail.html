@@ -41,6 +41,13 @@
   </div>
 </div>
 
+{% if external_import %}
+<div class="alert alert-secondary small d-flex justify-content-between align-items-center py-2">
+  <span>🔌 Импортировано из {{ external_import.source }} · версий протокола: {{ external_import.revisions|length }}</span>
+  <a href="{{ url_for('admin_imports.detail', import_id=external_import.id) }}" class="btn btn-sm btn-outline-secondary">История</a>
+</div>
+{% endif %}
+
 {% if edit_mode %}
 <div class="alert alert-warning small">
   <i class="bi bi-exclamation-triangle me-1"></i>

@@ -1518,4 +1518,4 @@ from app.models.migration import LegacyImportMap  # noqa: E402,F401
 # ExternalPlayerLink / ExternalGameImport  (интеграции с внешними сервисами,
 # например MafiaSpace, — см. app/models/external_import.py)
 # ---------------------------------------------------------------------------
-from app.models.external_import import ExternalPlayerLink, ExternalGameImport  # noqa: E402,F401
+from app.models.external_import import ExternalPlayerLink, ExternalGameImport, ExternalGameImportRevision  # noqa: E402,F401
