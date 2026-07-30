@@ -127,7 +127,7 @@ class ExternalGameImportService:
         PostGameOrchestrator.run() — the same pipeline manual games use.
         Returns (game, None) on success or (None, error_message) on failure.
         """
-        players_payload = payload["players"]
+        players_payload = payload.get("players") or []
 
         seen_player_ids: Dict[int, int] = {}  # player_id -> first seat seen at
         for p in players_payload:
@@ -192,6 +192,14 @@ class ExternalGameImportService:
         if not external_id:
             return ImportOutcome(ok=False, message="external_id обязателен.")
 
+        players_payload = payload.get("players")
+        if not isinstance(players_payload, list) or len(players_payload) != 10:
+            return ImportOutcome(ok=False, message="players должен быть списком из 10 игроков.")
+        required_keys = ("seat", "external_id", "nickname", "role")
+        for p in players_payload:
+            if not isinstance(p, dict) or not all(k in p for k in required_keys):
+                return ImportOutcome(ok=False, message="Каждый игрок должен содержать seat/external_id/nickname/role.")
+
         existing = ExternalGameImportService.get_existing_import(external_id)
         if existing:
             # Идемпотентность: тот же external_id повторно не пересоздаёт и
@@ -199,7 +207,6 @@ class ExternalGameImportService:
             # же результат, что и в первый раз.
             return ImportOutcome(ok=True, message="Уже обработано ранее.", import_row=existing, game=existing.game)
 
-        players_payload = payload.get("players") or []
         matched, unmatched = ExternalGameImportService.match_players(players_payload)
 
         if unmatched:
