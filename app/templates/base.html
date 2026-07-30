@@ -29,7 +29,7 @@
     {% set nav_play_active    = ep.startswith('games.') or ep.startswith('tournaments.') or ep.startswith('series_tournaments.') %}
     {% set nav_ratings_active = ep.startswith('ratings.') or ep.startswith('seasons.') or ep.startswith('titles.') %}
     {% set nav_club_active    = ep.startswith('players.') or ep.startswith('fantasy.') or ep.startswith('shop.') %}
-    {% set nav_admin_active   = ep.startswith('admin_shop.') or ep.startswith('admin_titles.') or ep.startswith('admin_analytics.') or ep.startswith('auth.admin') %}
+    {% set nav_admin_active   = ep.startswith('admin_shop.') or ep.startswith('admin_titles.') or ep.startswith('admin_analytics.') or ep.startswith('admin_imports.') or ep.startswith('auth.admin') %}
 
     <div class="collapse navbar-collapse" id="navMenu">
       <ul class="navbar-nav me-auto gap-1">
@@ -158,6 +158,12 @@
                 <a class="nav-mega__item" href="{{ url_for('admin_analytics.social') }}">
                   <span class="nav-mega__icon"><i class="bi bi-graph-up"></i></span>
                   <span class="nav-mega__text"><span class="nav-mega__title">Аналитика</span><span class="nav-mega__desc">Соц. граф и подарки</span></span>
+                </a>
+              </li>
+              <li>
+                <a class="nav-mega__item" href="{{ url_for('admin_imports.list_imports') }}">
+                  <span class="nav-mega__icon"><i class="bi bi-plug-fill"></i></span>
+                  <span class="nav-mega__text"><span class="nav-mega__title">Импорт игр</span><span class="nav-mega__desc">Очередь из внешних сервисов</span></span>
                 </a>
               </li>
             </ul>

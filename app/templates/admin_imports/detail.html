@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Импорт игры — MafiaSpace{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="{{ url_for('admin_imports.list_imports') }}" class="btn btn-outline-secondary btn-sm mb-3">← Ко всем импортам</a>
+  <h2 class="fw-bold mb-1">🔌 Сопоставление игроков</h2>
+  <p class="text-muted small mb-0">
+    {{ row.source }} · внешний id {{ row.external_id }} ·
+    {{ row.created_at.strftime('%d.%m.%Y %H:%M') }}
+  </p>
+</div>
+
+<form method="POST" action="{{ url_for('admin_imports.resolve', import_id=row.id) }}">
+  <div class="card">
+    <div class="card-header fw-semibold">Состав игры</div>
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr><th>Место</th><th>Ник (MafiaSpace)</th><th>Роль</th><th>Игрок клуба</th></tr>
+        </thead>
+        <tbody>
+          {% for p in payload.players %}
+          <tr>
+            <td>{{ p.seat }}</td>
+            <td>{{ p.nickname }}</td>
+            <td>{{ p.role }}</td>
+            <td>
+              {% if p.seat in matched %}
+                <span class="text-success">✓ {{ matched[p.seat].display_name }}</span>
+              {% else %}
+                <select name="choice_{{ p.seat }}" class="form-select form-select-sm" required style="max-width:260px">
+                  <option value="">выберите игрока…</option>
+                  <option value="new">➕ Создать нового игрока «{{ p.nickname }}»</option>
+                  {% for pl in active_players %}
+                  <option value="{{ pl.id }}">{{ pl.display_name }}</option>
+                  {% endfor %}
+                </select>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer">
+      <button type="submit" class="btn btn-success">
+        <i class="bi bi-check-lg me-1"></i>Подтвердить и создать игру
+      </button>
+    </div>
+  </div>
+</form>
+
+<form method="POST" action="{{ url_for('admin_imports.reject', import_id=row.id) }}" class="mt-2"
+      data-confirm="Отклонить этот импорт? Игра не будет создана." data-confirm-tone="danger">
+  <button type="submit" class="btn btn-outline-danger btn-sm">Отклонить импорт</button>
+</form>
+{% endblock %}

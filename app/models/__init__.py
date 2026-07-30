@@ -1513,3 +1513,9 @@ class TournamentSeries(db.Model):
 # LegacyImportMap  (Migration API — импорт из старой версии приложения)
 # ---------------------------------------------------------------------------
 from app.models.migration import LegacyImportMap  # noqa: E402,F401
+
+# ---------------------------------------------------------------------------
+# ExternalPlayerLink / ExternalGameImport  (интеграции с внешними сервисами,
+# например MafiaSpace, — см. app/models/external_import.py)
+# ---------------------------------------------------------------------------
+from app.models.external_import import ExternalPlayerLink, ExternalGameImport  # noqa: E402,F401

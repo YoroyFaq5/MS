@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Импорт игр — MafiaSpace{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h2 class="fw-bold mb-1">🔌 Импорт игр из внешних сервисов</h2>
+  <p class="text-muted small mb-0">
+    Игры, где хотя бы один игрок не сопоставлен с игроком клуба, ждут ручного подтверждения.
+  </p>
+</div>
+
+{% if not cards %}
+<div class="alert alert-secondary small">Очередь пуста — все входящие игры сопоставлены автоматически.</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for c in cards %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
+        <span>Игра #{{ c.row.external_id[:12] }}…</span>
+        <span class="badge bg-warning text-dark">На рассмотрении</span>
+      </div>
+      <div class="card-body p-3 small">
+        <div class="text-muted mb-2">{{ c.row.source }} · {{ c.row.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+        <ul class="list-unstyled mb-0">
+          {% for p in c.payload.players %}
+          <li class="d-flex justify-content-between">
+            <span>#{{ p.seat }} {{ p.nickname }}</span>
+            {% if p.seat in c.matched %}
+              <span class="text-success">✓ {{ c.matched[p.seat].display_name }}</span>
+            {% else %}
+              <span class="text-danger">не сопоставлен</span>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="card-footer d-flex gap-2">
+        <a href="{{ url_for('admin_imports.detail', import_id=c.row.id) }}" class="btn btn-sm btn-primary flex-fill">
+          Рассмотреть
+        </a>
+        <form method="POST" action="{{ url_for('admin_imports.reject', import_id=c.row.id) }}"
+              data-confirm="Отклонить этот импорт? Игра не будет создана." data-confirm-tone="danger">
+          <button type="submit" class="btn btn-sm btn-outline-danger">✕</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if resolved %}
+<h5 class="fw-bold mt-4 mb-2">Недавно обработанные</h5>
+<div class="table-responsive">
+  <table class="table table-hover table-sm align-middle small">
+    <thead><tr><th>External ID</th><th>Статус</th><th>Игра</th><th>Когда</th></tr></thead>
+    <tbody>
+      {% for row in resolved %}
+      <tr>
+        <td class="text-muted">{{ row.external_id[:16] }}…</td>
+        <td>
+          {% if row.status == 'imported' %}<span class="badge bg-success">Импортирован</span>
+          {% else %}<span class="badge bg-secondary">Отклонён</span>{% endif %}
+        </td>
+        <td>{% if row.game_id %}<a href="{{ url_for('games.game_detail', game_id=row.game_id) }}">Игра #{{ row.game_id }}</a>{% else %}—{% endif %}</td>
+        <td class="text-muted">{{ (row.resolved_at or row.created_at).strftime('%d.%m.%Y %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

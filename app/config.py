@@ -46,6 +46,10 @@ class Config:
     # "неверный токен" — чтобы не путать при первом деплое).
     MAIN_API_SERVICE_TOKEN = os.environ.get("MAIN_API_SERVICE_TOKEN")
 
+    # Входящий вебхук от MafiaSpace (см. app/routes/mafiaspace.py) —
+    # тот же принцип: без токена весь блюпринт отвечает 503, а не 401.
+    MAFIASPACE_WEBHOOK_TOKEN = os.environ.get("MAFIASPACE_WEBHOOK_TOKEN")
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
