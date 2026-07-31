@@ -1,13 +1,22 @@
 {% from "_macros.html" import player_name %}
 
-{% macro avatar_circle(player, equipped, extra_class='') %}
+{# Broadcast-style portrait seat card — photo fills most of the card, a
+   dark info bar sits underneath (see ms-seat-card__* in overlay.css). The
+   equipped avatar "frame" cosmetic is the same data (equipped.get(
+   'profile_customization:frame')) that the profile page's circular avatar
+   uses, just re-expressed as a ring around a rectangular photo box instead
+   — full fx-frame-theme-* rendering is tuned for circles, so themed/
+   rainbow frames fall back to a simple glow ring here rather than
+   reproducing every theme's bespoke geometry. #}
+{% macro seat_card_photo(player, equipped) %}
 {% set frame = equipped.get('profile_customization:frame') %}
-<div class="avatar-circle {{ extra_class }} {% if frame %}profile-frame{% if frame.item.data.theme or frame.item.data.effect == 'rainbow' %} fx-frame-themed fx-frame-theme-{{ frame.item.data.theme or 'rainbow' }}{% elif frame.item.data.effect == 'glow' %} fx-frame-glow{% endif %}{% endif %}"
-     {% if frame and frame.item.data.color and not frame.item.data.theme and frame.item.data.effect != 'rainbow' %}style="border-color:{{ frame.item.data.color }};--fx-color:{{ frame.item.data.color }}"{% endif %}>
+{% set frame_color = frame.item.data.color if frame and frame.item.data.color else none %}
+<div class="ms-seat-card__photo {{ 'ms-seat-card__photo--framed' if frame else '' }}"
+     {% if frame_color %}style="--frame-color:{{ frame_color }}"{% endif %}>
   {% if player.avatar_url %}
-    <img src="{{ player.avatar_url }}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
+    <img src="{{ player.avatar_url }}" alt="" loading="lazy">
   {% else %}
-    <span>{{ player.display_name[0]|upper }}</span>
+    <div class="ms-seat-card__placeholder">{{ player.display_name[0]|upper }}</div>
   {% endif %}
 </div>
 {% endmacro %}
@@ -29,16 +38,14 @@
   <div class="overlay-seat-strip">
     {% for slot in current_slots %}
     {% set rating = ratings_by_pid.get(slot.player_id) %}
-    <div class="overlay-seat-tile fade-in-up" style="--d:{{ loop.index0 * 40 }}ms">
-      {{ avatar_circle(slot.player, equipped_bulk.get(slot.player_id, {}), 'overlay-seat-tile__avatar') }}
-      <div class="overlay-seat-tile__info">
-        <div class="overlay-seat-tile__name">
-          <span class="overlay-seat-tile__seat">#{{ slot.seat_number }}</span>
-          {{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}
-        </div>
-        <div class="overlay-seat-tile__stats">
-          <span title="ELO">⚡{{ slot.player.elo|round|int }}</span>
-          <span title="Очки в турнире">★{{ (rating.total_score if rating else 0)|round(2) }}</span>
+    <div class="ms-seat-card {{ 'dead' if slot.is_eliminated else '' }}" style="--d:{{ loop.index0 * 45 }}ms">
+      {{ seat_card_photo(slot.player, equipped_bulk.get(slot.player_id, {})) }}
+      <span class="ms-seat-card__slot">#{{ slot.seat_number }}</span>
+      <div class="ms-seat-card__info">
+        <div class="ms-seat-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}</div>
+        <div class="ms-seat-card__stats">
+          <span title="ELO"><i class="ms-stat-icon">⚡</i>{{ slot.player.elo|round|int }}</span>
+          <span title="Очки в турнире"><i class="ms-stat-icon">★</i>{{ (rating.total_score if rating else 0)|round(2) }}</span>
         </div>
       </div>
     </div>

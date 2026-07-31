@@ -24,16 +24,25 @@ html, body {
   inset: 0;
 }
 
-/* ── Section 1: seat strip ─────────────────────────────────────────────── */
+/* ── Section 1: seat strip — broadcast-style portrait player cards ───────
+   Modeled on modern esports overlays (BLAST/PGL/Valorant Champions-style
+   lower-third player cards): a tall photo with a dark nameplate underneath,
+   built entirely from the site's own tokens (ms-surface, ms-gold,
+   ms-text, ms-radius) — no new palette introduced. flex:1 1 0 +
+   aspect-ratio (not a fixed px height) is what makes 10 cards always fit
+   one row on any OBS canvas size without horizontal scrolling (a Browser
+   Source can't be scrolled, so anything that overflowed used to just get
+   silently clipped off-screen). */
 
 .overlay-seat-strip {
   position: fixed;
   left: 0; right: 0; bottom: 0;
   z-index: 1;
   display: flex;
-  gap: .4rem;
-  padding: .6rem .75rem;
-  background: linear-gradient(to top, rgba(13,13,13,.8), transparent);
+  align-items: flex-end;
+  gap: .55rem;
+  padding: 0 .85rem .85rem;
+  background: linear-gradient(to top, rgba(13,13,13,.85) 0%, rgba(13,13,13,.35) 60%, transparent 100%);
 }
 
 .overlay-seat-strip--empty {
@@ -45,54 +54,154 @@ html, body {
   text-shadow: 0 1px 4px rgba(0,0,0,.8);
 }
 
-/* flex:1 1 0 + min-width:0 lets tiles shrink proportionally so ALL seats
-   (up to 10) always fit in one row with no horizontal scrolling — an OBS
-   Browser Source can't be scrolled, so anything that overflowed used to
-   just get clipped off-screen. max-width caps growth when there are few
-   players so tiles don't stretch absurdly wide. */
-.overlay-seat-tile {
-  display: flex;
-  align-items: center;
-  gap: .35rem;
-  background: rgba(13,13,13,.55);
-  border: 1px solid var(--ms-gold, #C7A552);
-  border-radius: 10px;
-  padding: .3rem .5rem .3rem .3rem;
+.ms-seat-card {
+  position: relative;
+  /* #overlay-root disables pointer-events wholesale (there's no cursor in
+     an OBS Browser Source), but hover should still work if this page is
+     ever opened in a plain browser tab — re-enable just on the cards. */
+  pointer-events: auto;
   flex: 1 1 0;
   min-width: 0;
-  max-width: 190px;
-  backdrop-filter: blur(2px);
+  max-width: 150px;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--ms-radius, 10px);
+  overflow: hidden;
+  background: var(--ms-surface-raised, #242424);
+  border: 1px solid var(--ms-border, rgba(199,165,82,.14));
+  box-shadow: 0 10px 26px rgba(0,0,0,.45);
+  opacity: 0;
+  animation: ms-card-in .5s cubic-bezier(.34,1.56,.64,1) both;
+  animation-delay: var(--d, 0ms);
+  transition: transform .25s cubic-bezier(.2,.7,.3,1), box-shadow .25s ease, border-color .25s ease;
 }
 
-.overlay-seat-tile__avatar {
-  width: 36px; height: 36px;
-  flex-shrink: 0;
-  font-size: 1.05rem;
+/* Hover only ever fires when this page happens to be opened in a regular
+   browser (e.g. while setting up the OBS source) — harmless in OBS itself
+   since Browser Source never dispatches pointer events. Values match the
+   site's existing "premium card" hover (.achv-card.is-unlocked:hover). */
+.ms-seat-card:hover {
+  transform: translateY(-4px) scale(1.035);
+  box-shadow: 0 16px 36px rgba(0,0,0,.5), 0 0 22px color-mix(in srgb, var(--ms-gold, #C7A552) 35%, transparent);
+  border-color: var(--ms-gold-light, #D4B06A);
+  will-change: transform;
+  z-index: 2;
 }
 
-.overlay-seat-tile__info { min-width: 0; flex: 1 1 0; }
+@keyframes ms-card-in {
+  0%   { opacity: 0; transform: translateY(18px) scale(.9); }
+  65%  { opacity: 1; transform: translateY(-3px) scale(1.03); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
 
-.overlay-seat-tile__name {
+.ms-seat-card__photo {
+  position: relative;
+  width: 100%;
+  height: 72%;
+  overflow: hidden;
+  background: linear-gradient(160deg, var(--ms-surface-alt, #2B2B2B), var(--ms-surface, #1B1B1B));
+}
+
+.ms-seat-card__photo img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: filter .3s ease;
+}
+
+.ms-seat-card__placeholder {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 2.1rem;
+  font-weight: 700;
+  color: var(--ms-gold, #C7A552);
+  background: radial-gradient(circle at 50% 35%, rgba(199,165,82,.18), transparent 70%);
+  transition: filter .3s ease;
+}
+
+/* Equipped avatar-frame cosmetic, re-expressed as a ring around the
+   rectangular photo instead of avatar_circle()'s circular border — the
+   full fx-frame-theme-* animation set is geometrically tuned for circles,
+   so themed/rainbow frames get a simple gold glow ring here rather than
+   their bespoke per-theme effect. */
+.ms-seat-card__photo--framed {
+  box-shadow: inset 0 0 0 3px var(--frame-color, var(--ms-gold-light, #D4B06A)),
+              inset 0 0 16px rgba(199,165,82,.35);
+}
+
+.ms-seat-card__slot {
+  position: absolute;
+  top: .4rem; left: .4rem;
+  z-index: 1;
+  min-width: 1.3rem;
+  text-align: center;
+  padding: .08rem .35rem;
+  border-radius: 6px;
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: var(--ms-bg, #0D0D0D);
+  background: var(--ms-gold, #C7A552);
+  box-shadow: 0 2px 6px rgba(0,0,0,.4);
+}
+
+.ms-seat-card__info {
+  position: relative;
+  height: 28%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: .1rem;
+  padding: .3rem .5rem;
+  background: linear-gradient(180deg, rgba(13,13,13,.7), rgba(13,13,13,.95));
+  border-top: 1px solid var(--ms-border, rgba(199,165,82,.14));
+}
+
+.ms-seat-card__name {
   font-weight: 700;
   font-size: .8rem;
+  line-height: 1.15;
+  color: var(--ms-text, #F3E9D2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-shadow: 0 1px 3px rgba(0,0,0,.8);
 }
 
-.overlay-seat-tile__seat {
-  color: var(--ms-gold-light, #D4B06A);
-  margin-right: .25rem;
-}
-
-.overlay-seat-tile__stats {
+.ms-seat-card__stats {
   display: flex;
   gap: .5rem;
-  font-size: .68rem;
+  font-size: .64rem;
   color: var(--ms-text-dim, #D9D2C1);
   white-space: nowrap;
   overflow: hidden;
+}
+
+.ms-seat-card__stats .ms-stat-icon {
+  font-style: normal;
+  color: var(--ms-gold-light, #D4B06A);
+  margin-right: .1rem;
+}
+
+/* Eliminated player — the photo desaturates/dims, but the nameplate stays
+   fully legible (never hide who it is, just that they're out). Toggled by
+   whatever sets GameSlot.is_eliminated server-side; the class itself is a
+   plain add/remove so it's trivial to flip from JS if ever needed too. */
+.ms-seat-card.dead {
+  opacity: .82;
+}
+
+.ms-seat-card.dead .ms-seat-card__photo img,
+.ms-seat-card.dead .ms-seat-card__placeholder {
+  filter: grayscale(1) brightness(.55) saturate(.25);
+}
+
+.ms-seat-card.dead .ms-seat-card__photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 55%, rgba(123,15,15,.4) 100%);
+  pointer-events: none;
 }
 
 /* ── Section 2: last-game results reveal ──────────────────────────────── */
@@ -313,11 +422,12 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .fade-in-up, .reveal-card__inner, .ticker-fact.active, .totem-flash,
-  .results-reveal-panel {
+  .results-reveal-panel, .ms-seat-card {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
   }
   .results-reveal-panel { transform: translateX(-50%) !important; }
+  .ms-seat-card:hover { transform: none !important; }
 }
