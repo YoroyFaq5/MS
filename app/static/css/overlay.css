@@ -42,18 +42,24 @@ html, body {
 }
 
 /* ── Section 1: seat strip — broadcast-style portrait player cards ───────
-   Modeled on modern esports overlays (BLAST/PGL/Valorant Champions/LEC-
-   style lower-third player cards): the photo is the card — full-bleed,
-   edge to edge — with a frosted glass nameplate floating on TOP of it at
-   the bottom, not a separate block pushing the photo up. Built entirely
-   from the site's own tokens (--ms-gold/--ms-surface/--ms-text + the
-   --ovl-* composite tokens defined on #overlay-root above, which are
-   themselves just those same colors packaged into one shared radius/
-   blur/shadow recipe reused by the ticker/standings/reveal panels too).
-   flex:1 1 0 + aspect-ratio (not a fixed px height) is what makes 10
-   cards always fit one row on any OBS canvas size without horizontal
-   scrolling (a Browser Source can't be scrolled, so anything that
-   overflowed used to just get silently clipped off-screen). */
+   Rebuilt around one rule: the FACE is the card. Everything else (name,
+   seat number) is a small annotation on top of the photo, not content
+   competing with it for space. Modeled on modern esports lower-thirds
+   (BLAST/PGL/Valorant Champions/LEC player reveals): a tall, generous
+   photo with a thin glass caption — never a photo squeezed to make room
+   for a text block. Built entirely from the site's own tokens
+   (--ms-gold/--ms-surface/--ms-text + the --ovl-* composite tokens
+   defined on #overlay-root above, shared with the ticker/standings/
+   reveal panels so the whole broadcast surface reads as one UI kit).
+
+   Sizing: flex:1 1 0 divides the strip's width evenly across however
+   many seats there are (edge-to-edge, no horizontal scroll — a Browser
+   Source can't be scrolled, so anything that overflowed used to just
+   get silently clipped). Width is therefore fixed by seat count; the
+   only lever left for making the cards genuinely BIG is a tall
+   aspect-ratio, so this is deliberately closer to a trading-card portrait
+   (~9:16) than a squat thumbnail — that's what turns "10 small icons"
+   into "10 unmistakable faces" at a glance. */
 
 .overlay-seat-strip {
   position: fixed;
@@ -61,9 +67,9 @@ html, body {
   z-index: 1;
   display: flex;
   align-items: flex-end;
-  gap: .9rem;
-  padding: 0 1rem 1rem;
-  background: linear-gradient(to top, rgba(13,13,13,.85) 0%, rgba(13,13,13,.32) 62%, transparent 100%);
+  gap: .8rem;
+  padding: 0 1rem 1.1rem;
+  background: linear-gradient(to top, rgba(13,13,13,.88) 0%, rgba(13,13,13,.4) 55%, transparent 100%);
 }
 
 .overlay-seat-strip--empty {
@@ -86,11 +92,12 @@ html, body {
   pointer-events: auto;
   /* No max-width: flex:1 1 0 divides the full strip width evenly across
      however many seats there are, so the row of cards always reaches
-     edge-to-edge along the bottom border (not just a clump sized to a
-     handful of cards) — a standard 10-player game is the normal case. */
+     edge-to-edge along the bottom border. A tall ratio (~9:16) is what
+     makes each card genuinely large in absolute pixels despite the width
+     being capped by "10 across" — see the section note above. */
   flex: 1 1 0;
   min-width: 0;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 9 / 16;
   opacity: 0;
   animation: ms-card-in .65s cubic-bezier(.22,1,.36,1) both;
   animation-delay: var(--d, 0ms);
@@ -101,7 +108,7 @@ html, body {
    browser (e.g. while setting up the OBS source) — harmless in OBS itself
    since Browser Source never dispatches pointer events. */
 .ms-seat-card:hover {
-  transform: translateY(-8px) scale(1.045);
+  transform: translateY(-8px) scale(1.035);
   z-index: 3;
 }
 
@@ -113,7 +120,7 @@ html, body {
     0 0 34px color-mix(in srgb, var(--ms-gold, #C7A552) 45%, transparent);
 }
 
-.ms-seat-card:hover .ms-seat-card__img { transform: scale(1.14); }
+.ms-seat-card:hover .ms-seat-card__img { transform: scale(1.1); }
 
 @keyframes ms-card-in {
   0%   { opacity: 0; transform: translateY(28px) scale(.92); }
@@ -151,24 +158,15 @@ html, body {
   background: linear-gradient(160deg, var(--ms-surface-alt, #2B2B2B), var(--ms-surface, #1B1B1B));
 }
 
-/* Subtle top vignette — just enough to give the photo depth/richness even
-   when nothing is overlaid up there; the bottom is handled by __plate's
-   own gradient acting as both scrim and glass. */
-.ms-seat-card__media::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 42%;
-  background: linear-gradient(180deg, rgba(0,0,0,.32), transparent);
-  pointer-events: none;
-  z-index: 1;
-}
-
 .ms-seat-card__img {
   width: 100%; height: 100%;
   object-fit: cover;
+  /* Faces are typically framed in the upper portion of a portrait photo —
+     biasing the crop toward the top keeps the face the focal point even
+     on a very tall card instead of centering on the chest. */
+  object-position: 50% 18%;
   display: block;
-  transform: scale(1.06);
+  transform: scale(1.04);
   transition: transform .6s cubic-bezier(.22,1,.36,1), filter .3s ease;
 }
 
@@ -177,11 +175,11 @@ html, body {
   inset: 0;
   display: flex; align-items: center; justify-content: center;
   font-family: 'Playfair Display', Georgia, serif;
-  font-size: 2.4rem;
+  font-size: 3.4rem;
   font-weight: 700;
   color: var(--ms-gold, #C7A552);
-  opacity: .4;
-  background: radial-gradient(circle at 50% 35%, rgba(199,165,82,.16), var(--ms-surface-alt, #2B2B2B) 75%);
+  opacity: .5;
+  background: radial-gradient(circle at 50% 38%, rgba(199,165,82,.18), var(--ms-surface-alt, #2B2B2B) 75%);
   transition: filter .3s ease, opacity .3s ease;
 }
 
@@ -195,88 +193,63 @@ html, body {
               inset 0 0 22px rgba(199,165,82,.35);
 }
 
-/* The nameplate — a frosted glass strip floating OVER the bottom of the
-   photo (backdrop-filter blurs the photo pixels behind it; the gradient
-   on top darkens further for legibility), not a separate colored block
-   underneath. This is the single biggest change from the old layout: the
-   photo now fills 100% of the card and is the visual subject, the name
-   is a caption on top of it — exactly the BLAST.tv/Valorant Champions
-   lower-third convention. */
+/* Seat number — a small corner chip sitting ON the photo, never in the
+   nameplate's flow, so it can never visually compete with the name.
+   Purely a quiet reference detail (per feedback: it must not become the
+   card's dominant element). */
+.ms-seat-card__slotchip {
+  position: absolute;
+  top: .55rem; left: .55rem;
+  z-index: 3;
+  min-width: 1.6rem;
+  text-align: center;
+  padding: .12rem .4rem;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--ms-gold-light, #D4B06A);
+  background: rgba(13,12,10,.5);
+  border: 1px solid rgba(199,165,82,.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* The nameplate — a thin frosted glass caption floating OVER the very
+   bottom edge of the photo (backdrop-filter blurs the photo pixels
+   behind it; the gradient on top darkens just enough for legibility),
+   sized to fit exactly one line of text and nothing more. The photo
+   fills the entire rest of the card — this is the single biggest change
+   from earlier drafts: no separate info block stealing height from the
+   photo, no second line, no stats competing for the eye. Name first,
+   everything else is secondary. */
 .ms-seat-card__plate {
   position: absolute;
   left: 0; right: 0; bottom: 0;
   z-index: 2;
-  padding: .6rem .7rem .55rem;
-  background: linear-gradient(180deg, rgba(13,12,10,0) 0%, rgba(13,12,10,.55) 45%, rgba(13,12,10,.88) 100%);
-  backdrop-filter: blur(9px) saturate(160%);
-  -webkit-backdrop-filter: blur(9px) saturate(160%);
-  border-top: 1px solid rgba(199,165,82,.22);
+  padding: .8rem .65rem .55rem;
+  background: linear-gradient(180deg, rgba(13,12,10,0) 0%, rgba(13,12,10,.6) 55%, rgba(13,12,10,.9) 100%);
+  backdrop-filter: blur(8px) saturate(160%);
+  -webkit-backdrop-filter: blur(8px) saturate(160%);
 }
 
-.ms-seat-card__row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: .4rem;
-}
-
-.ms-seat-card__identity {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-/* Wraps to 2 lines instead of a single ellipsis-truncated line — the
-   nameplate has enough room that a 2-line clamp loses far less of longer
-   nicknames ("ФанФан Тюльпан") than a 1-line cut. */
 .ms-seat-card__name {
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1rem;
   line-height: 1.2;
   color: var(--ms-text, #F3E9D2);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
   text-shadow: 0 1px 4px rgba(0,0,0,.9);
 }
 
-.ms-seat-card__meta {
-  display: flex;
-  align-items: center;
-  gap: .35rem;
-  margin-top: .2rem;
-  font-size: .7rem;
-  color: var(--ms-text-dim, #D9D2C1);
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.ms-seat-card__meta .ms-stat-icon {
-  font-style: normal;
-  color: var(--ms-gold-light, #D4B06A);
-  margin-right: .1rem;
-}
-
-/* Seat number as a quiet "jersey number" flourish — a serif numeral, not
-   a badge, and deliberately muted/thin so the name (bold, full-opacity,
-   left-aligned) is still what the eye lands on first. */
-.ms-seat-card__slotnum {
-  flex-shrink: 0;
-  font-family: 'Playfair Display', Georgia, serif;
-  font-weight: 700;
-  font-size: 1.55rem;
-  line-height: 1;
-  color: var(--ms-gold-light, #D4B06A);
-  opacity: .55;
-  text-shadow: 0 1px 4px rgba(0,0,0,.7);
-}
-
 /* Eliminated player — ONLY the photo layer desaturates/dims/darkens and
-   gets a diagonal "out" mark; the nameplate is never touched, so the
-   nickname stays perfectly legible (never hide who it is, just that
-   they're out). Toggled by whatever sets GameSlot.is_eliminated
-   server-side; a plain class add/remove, so it's trivial to flip from
-   JS if a live "mark eliminated" control is ever wired up too. */
+   gets a diagonal "out" mark; the nameplate and seat chip are never
+   touched, so the nickname stays perfectly legible (never hide who it
+   is, just that they're out). Toggled by whatever sets
+   GameSlot.is_eliminated server-side; a plain class add/remove, so it's
+   trivial to flip from JS if a live "mark eliminated" control is ever
+   wired up too. */
 .ms-seat-card.dead .ms-seat-card__img,
 .ms-seat-card.dead .ms-seat-card__placeholder {
   filter: grayscale(1) brightness(.5) saturate(.2);
