@@ -741,6 +741,18 @@ def finish_game(game_id: int):
 
     # ── Apply all per-slot values from form ─────────────────────────────────
     for slot in game.slots:
+        # Player (swap who's seated here — e.g. a substitute before the game
+        # is actually played). Same reassignment finish_game's post-hoc
+        # sibling edit_game() already allows for a FINISHED game.
+        pid_str = request.form.get(f"player_{slot.id}", "").strip()
+        if pid_str:
+            try:
+                new_pid = int(pid_str)
+            except ValueError:
+                new_pid = None
+            if new_pid and new_pid != slot.player_id and db.session.get(Player, new_pid):
+                slot.player_id = new_pid
+
         # Role (editable for generated games where all roles are placeholder)
         role_val = request.form.get(f"role_{slot.id}", "").strip()
         if role_val:
@@ -785,6 +797,14 @@ def finish_game(game_id: int):
     if role_dist.get("mafia", 0) + role_dist.get("don", 0) == 0:
         flash("В игре должна быть хотя бы одна роль мафии (Мафия или Дон).", "danger")
         return redirect(url_for("games.game_detail", game_id=game_id))
+
+    if len({s.player_id for s in game.slots}) != len(game.slots):
+        db.session.rollback()
+        flash("Один и тот же игрок не может занимать два места.", "danger")
+        return redirect(url_for("games.game_detail", game_id=game_id))
+
+    if game.tournament_id:
+        _ensure_tournament_participants(game.tournament_id, [s.player_id for s in game.slots])
 
     game.is_finished = True
     db.session.flush()
@@ -835,6 +855,48 @@ def finish_game(game_id: int):
 
     if game.tournament_id:
         return redirect(url_for("tournaments.tournament_detail", tournament_id=game.tournament_id))
+    return redirect(url_for("games.game_detail", game_id=game_id))
+
+
+@games_bp.route("/<int:game_id>/reassign-seats", methods=["POST"])
+@admin_required
+def reassign_seats(game_id: int):
+    """
+    Swap who's seated where in a game that HASN'T been played yet — e.g. a
+    substitute needed mid-tournament, before there's any result to report.
+    finish_game() already accepts the same player_<slot.id> fields (so
+    correcting the roster right when reporting results still works in one
+    step), but forces a win_side/role-distribution submission too; this is
+    the lightweight "just fix the seating" action for while a game is still
+    in progress, submitted via the same form's second button
+    (formaction=... + formnovalidate skips the win_side <select required>).
+    """
+    game = db.session.get(Game, game_id) or abort(404)
+    if game.is_finished:
+        flash("Игра уже завершена — используйте редактирование игры.", "warning")
+        return redirect(url_for("games.game_detail", game_id=game_id))
+
+    for slot in game.slots:
+        pid_str = request.form.get(f"player_{slot.id}", "").strip()
+        if not pid_str:
+            continue
+        try:
+            new_pid = int(pid_str)
+        except ValueError:
+            continue
+        if new_pid and new_pid != slot.player_id and db.session.get(Player, new_pid):
+            slot.player_id = new_pid
+
+    if len({s.player_id for s in game.slots}) != len(game.slots):
+        db.session.rollback()
+        flash("Один и тот же игрок не может занимать два места.", "danger")
+        return redirect(url_for("games.game_detail", game_id=game_id))
+
+    if game.tournament_id:
+        _ensure_tournament_participants(game.tournament_id, [s.player_id for s in game.slots])
+
+    db.session.commit()
+    flash("Состав игры обновлён.", "success")
     return redirect(url_for("games.game_detail", game_id=game_id))
 
 
