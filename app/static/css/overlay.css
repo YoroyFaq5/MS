@@ -13,6 +13,23 @@ html, body {
   color: var(--ms-text, #F3E9D2);
 }
 
+/* Shared "broadcast glass" recipe for every floating panel on this page
+   (seat cards, ticker, standings, reveal) — composited entirely from the
+   site's own tokens (--ms-gold/--ms-surface/--ms-text), just packaged
+   into one consistent radius/blur/shadow language instead of each panel
+   redeclaring its own slightly-different values. This is what makes the
+   ticker/standings/cards read as ONE UI kit instead of separate widgets. */
+#overlay-root {
+  --ovl-radius-lg: 18px;
+  --ovl-radius-md: 14px;
+  --ovl-glass-bg: rgba(15,14,12,.6);
+  --ovl-glass-blur: blur(16px) saturate(160%);
+  --ovl-border-gold: rgba(199,165,82,.4);
+  --ovl-shadow-ambient: 0 24px 48px -16px rgba(0,0,0,.65);
+  --ovl-shadow-rim: inset 0 1px 0 rgba(255,255,255,.05);
+  --ovl-shadow-glow: 0 0 0 1px var(--ovl-border-gold), 0 0 28px rgba(199,165,82,.16);
+}
+
 #overlay-root {
   position: fixed;
   inset: 0;
@@ -25,14 +42,18 @@ html, body {
 }
 
 /* ── Section 1: seat strip — broadcast-style portrait player cards ───────
-   Modeled on modern esports overlays (BLAST/PGL/Valorant Champions-style
-   lower-third player cards): a tall photo with a dark nameplate underneath,
-   built entirely from the site's own tokens (ms-surface, ms-gold,
-   ms-text, ms-radius) — no new palette introduced. flex:1 1 0 +
-   aspect-ratio (not a fixed px height) is what makes 10 cards always fit
-   one row on any OBS canvas size without horizontal scrolling (a Browser
-   Source can't be scrolled, so anything that overflowed used to just get
-   silently clipped off-screen). */
+   Modeled on modern esports overlays (BLAST/PGL/Valorant Champions/LEC-
+   style lower-third player cards): the photo is the card — full-bleed,
+   edge to edge — with a frosted glass nameplate floating on TOP of it at
+   the bottom, not a separate block pushing the photo up. Built entirely
+   from the site's own tokens (--ms-gold/--ms-surface/--ms-text + the
+   --ovl-* composite tokens defined on #overlay-root above, which are
+   themselves just those same colors packaged into one shared radius/
+   blur/shadow recipe reused by the ticker/standings/reveal panels too).
+   flex:1 1 0 + aspect-ratio (not a fixed px height) is what makes 10
+   cards always fit one row on any OBS canvas size without horizontal
+   scrolling (a Browser Source can't be scrolled, so anything that
+   overflowed used to just get silently clipped off-screen). */
 
 .overlay-seat-strip {
   position: fixed;
@@ -40,9 +61,9 @@ html, body {
   z-index: 1;
   display: flex;
   align-items: flex-end;
-  gap: .55rem;
-  padding: 0 .85rem .85rem;
-  background: linear-gradient(to top, rgba(13,13,13,.85) 0%, rgba(13,13,13,.35) 60%, transparent 100%);
+  gap: .9rem;
+  padding: 0 1rem 1rem;
+  background: linear-gradient(to top, rgba(13,13,13,.85) 0%, rgba(13,13,13,.32) 62%, transparent 100%);
 }
 
 .overlay-seat-strip--empty {
@@ -54,6 +75,9 @@ html, body {
   text-shadow: 0 1px 4px rgba(0,0,0,.8);
 }
 
+/* Outer element: entrance animation + hover lift live here. Kept separate
+   from __inner (which owns the idle "breathing" scale) so the two
+   transforms compose instead of fighting over the same property. */
 .ms-seat-card {
   position: relative;
   /* #overlay-root disables pointer-events wholesale (there's no cursor in
@@ -66,132 +90,187 @@ html, body {
      handful of cards) — a standard 10-player game is the normal case. */
   flex: 1 1 0;
   min-width: 0;
-  aspect-ratio: 2 / 3;
-  border-radius: var(--ms-radius, 10px);
-  overflow: hidden;
-  background: var(--ms-surface-raised, #242424);
-  border: 1px solid var(--ms-border, rgba(199,165,82,.14));
-  box-shadow: 0 10px 26px rgba(0,0,0,.45);
+  aspect-ratio: 4 / 5;
   opacity: 0;
-  animation: ms-card-in .5s cubic-bezier(.34,1.56,.64,1) both;
+  animation: ms-card-in .65s cubic-bezier(.22,1,.36,1) both;
   animation-delay: var(--d, 0ms);
-  transition: transform .25s cubic-bezier(.2,.7,.3,1), box-shadow .25s ease, border-color .25s ease;
+  transition: transform .35s cubic-bezier(.22,1,.36,1);
 }
 
 /* Hover only ever fires when this page happens to be opened in a regular
    browser (e.g. while setting up the OBS source) — harmless in OBS itself
-   since Browser Source never dispatches pointer events. Values match the
-   site's existing "premium card" hover (.achv-card.is-unlocked:hover). */
+   since Browser Source never dispatches pointer events. */
 .ms-seat-card:hover {
-  transform: translateY(-4px) scale(1.035);
-  box-shadow: 0 16px 36px rgba(0,0,0,.5), 0 0 22px color-mix(in srgb, var(--ms-gold, #C7A552) 35%, transparent);
-  border-color: var(--ms-gold-light, #D4B06A);
-  will-change: transform;
-  z-index: 2;
+  transform: translateY(-8px) scale(1.045);
+  z-index: 3;
 }
 
+.ms-seat-card:hover .ms-seat-card__inner {
+  border-color: var(--ms-gold-light, #D4B06A);
+  box-shadow: var(--ovl-shadow-rim),
+    0 30px 56px -14px rgba(0,0,0,.7),
+    0 0 0 1px var(--ms-gold-light, #D4B06A),
+    0 0 34px color-mix(in srgb, var(--ms-gold, #C7A552) 45%, transparent);
+}
+
+.ms-seat-card:hover .ms-seat-card__img { transform: scale(1.14); }
+
 @keyframes ms-card-in {
-  0%   { opacity: 0; transform: translateY(18px) scale(.9); }
-  65%  { opacity: 1; transform: translateY(-3px) scale(1.03); }
+  0%   { opacity: 0; transform: translateY(28px) scale(.92); }
+  60%  { opacity: 1; transform: translateY(-4px) scale(1.015); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.ms-seat-card__photo {
+/* Inner element: the actual visible "glass card" surface — clips the
+   photo to the rounded corners, carries the depth (ambient shadow + gold
+   rim glow) and a barely-there idle breathing pulse so the whole strip
+   reads as quietly alive rather than a static screenshot. */
+.ms-seat-card__inner {
   position: relative;
   width: 100%;
-  height: 66%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--ovl-radius-lg, 18px);
+  background: var(--ms-surface-raised, #242424);
+  border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
+  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
+  animation: ms-card-breathe 6.5s ease-in-out infinite;
+  animation-delay: var(--d, 0ms);
+  transition: box-shadow .35s ease, border-color .35s ease;
+}
+
+@keyframes ms-card-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.012); }
+}
+
+.ms-seat-card__media {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   background: linear-gradient(160deg, var(--ms-surface-alt, #2B2B2B), var(--ms-surface, #1B1B1B));
 }
 
-.ms-seat-card__photo img {
+/* Subtle top vignette — just enough to give the photo depth/richness even
+   when nothing is overlaid up there; the bottom is handled by __plate's
+   own gradient acting as both scrim and glass. */
+.ms-seat-card__media::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 42%;
+  background: linear-gradient(180deg, rgba(0,0,0,.32), transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ms-seat-card__img {
   width: 100%; height: 100%;
   object-fit: cover;
   display: block;
-  transition: filter .3s ease;
+  transform: scale(1.06);
+  transition: transform .6s cubic-bezier(.22,1,.36,1), filter .3s ease;
 }
 
 .ms-seat-card__placeholder {
-  width: 100%; height: 100%;
+  position: absolute;
+  inset: 0;
   display: flex; align-items: center; justify-content: center;
   font-family: 'Playfair Display', Georgia, serif;
-  font-size: 2.6rem;
+  font-size: 2.4rem;
   font-weight: 700;
   color: var(--ms-gold, #C7A552);
-  background: radial-gradient(circle at 50% 35%, rgba(199,165,82,.18), transparent 70%);
-  transition: filter .3s ease;
+  opacity: .4;
+  background: radial-gradient(circle at 50% 35%, rgba(199,165,82,.16), var(--ms-surface-alt, #2B2B2B) 75%);
+  transition: filter .3s ease, opacity .3s ease;
 }
 
 /* Equipped avatar-frame cosmetic, re-expressed as a ring around the
-   rectangular photo instead of avatar_circle()'s circular border — the
-   full fx-frame-theme-* animation set is geometrically tuned for circles,
-   so themed/rainbow frames get a simple gold glow ring here rather than
-   their bespoke per-theme effect. */
-.ms-seat-card__photo--framed {
+   rectangular media box instead of avatar_circle()'s circular border —
+   the full fx-frame-theme-* animation set is geometrically tuned for
+   circles, so themed/rainbow frames get a simple gold glow ring here
+   rather than reproducing every theme's bespoke geometry. */
+.ms-seat-card__media--framed {
   box-shadow: inset 0 0 0 3px var(--frame-color, var(--ms-gold-light, #D4B06A)),
-              inset 0 0 16px rgba(199,165,82,.35);
+              inset 0 0 22px rgba(199,165,82,.35);
 }
 
-.ms-seat-card__info {
-  position: relative;
-  height: 34%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: .15rem;
-  padding: .4rem .6rem;
-  background: linear-gradient(180deg, rgba(13,13,13,.7), rgba(13,13,13,.95));
-  border-top: 1px solid var(--ms-border, rgba(199,165,82,.14));
+/* The nameplate — a frosted glass strip floating OVER the bottom of the
+   photo (backdrop-filter blurs the photo pixels behind it; the gradient
+   on top darkens further for legibility), not a separate colored block
+   underneath. This is the single biggest change from the old layout: the
+   photo now fills 100% of the card and is the visual subject, the name
+   is a caption on top of it — exactly the BLAST.tv/Valorant Champions
+   lower-third convention. */
+.ms-seat-card__plate {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 2;
+  padding: .6rem .7rem .55rem;
+  background: linear-gradient(180deg, rgba(13,12,10,0) 0%, rgba(13,12,10,.55) 45%, rgba(13,12,10,.88) 100%);
+  backdrop-filter: blur(9px) saturate(160%);
+  -webkit-backdrop-filter: blur(9px) saturate(160%);
+  border-top: 1px solid rgba(199,165,82,.22);
 }
 
 /* Wraps to 2 lines instead of a single ellipsis-truncated line — the
-   nameplate has enough room now that cards are bigger, and a 2-line clamp
-   loses far less of longer nicknames ("ФанФан Тюльпан") than a 1-line cut. */
+   nameplate has enough room that a 2-line clamp loses far less of longer
+   nicknames ("ФанФан Тюльпан") than a 1-line cut. */
 .ms-seat-card__name {
   font-weight: 700;
-  font-size: .95rem;
+  font-size: 1.05rem;
   line-height: 1.2;
   color: var(--ms-text, #F3E9D2);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  text-shadow: 0 1px 3px rgba(0,0,0,.8);
+  text-shadow: 0 1px 4px rgba(0,0,0,.9);
 }
 
-.ms-seat-card__stats {
+/* Seat number lives here as a quiet secondary detail — never a bold
+   badge competing with the name for attention. */
+.ms-seat-card__meta {
   display: flex;
-  gap: .6rem;
-  font-size: .74rem;
+  align-items: center;
+  gap: .35rem;
+  margin-top: .2rem;
+  font-size: .7rem;
   color: var(--ms-text-dim, #D9D2C1);
   white-space: nowrap;
   overflow: hidden;
 }
 
-.ms-seat-card__stats .ms-stat-icon {
+.ms-seat-card__seat,
+.ms-seat-card__dot {
+  color: var(--ms-muted, #8A8A8A);
+  font-weight: 500;
+}
+
+.ms-seat-card__meta .ms-stat-icon {
   font-style: normal;
   color: var(--ms-gold-light, #D4B06A);
   margin-right: .1rem;
 }
 
-/* Eliminated player — the photo desaturates/dims, but the nameplate stays
-   fully legible (never hide who it is, just that they're out). Toggled by
-   whatever sets GameSlot.is_eliminated server-side; the class itself is a
-   plain add/remove so it's trivial to flip from JS if ever needed too. */
-.ms-seat-card.dead {
-  opacity: .82;
-}
-
-.ms-seat-card.dead .ms-seat-card__photo img,
+/* Eliminated player — ONLY the photo desaturates/dims/darkens; the
+   nameplate is never touched, so the nickname stays perfectly legible
+   (never hide who it is, just that they're out). Toggled by whatever
+   sets GameSlot.is_eliminated server-side; a plain class add/remove, so
+   it's trivial to flip from JS if a live "mark eliminated" control is
+   ever wired up too. */
+.ms-seat-card.dead .ms-seat-card__img,
 .ms-seat-card.dead .ms-seat-card__placeholder {
-  filter: grayscale(1) brightness(.55) saturate(.25);
+  filter: grayscale(1) brightness(.5) saturate(.2);
+  opacity: .8;
 }
 
-.ms-seat-card.dead .ms-seat-card__photo::after {
+.ms-seat-card.dead .ms-seat-card__media::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 55%, rgba(123,15,15,.4) 100%);
+  z-index: 1;
+  background: linear-gradient(180deg, transparent 50%, rgba(123,15,15,.4) 100%);
   pointer-events: none;
 }
 
@@ -247,15 +326,17 @@ html, body {
   width: min(720px, 90vw);
   max-height: 62vh;
   overflow-y: auto;
-  background: rgba(13,13,13,.85);
-  border: 1px solid var(--ms-gold, #C7A552);
-  border-radius: 16px;
+  background: var(--ovl-glass-bg, rgba(15,14,12,.6));
+  border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
+  border-radius: var(--ovl-radius-lg, 18px);
   padding: 1rem 1.25rem;
   opacity: 0;
   visibility: hidden;
   transform: translate(-50%, -50%) scale(.4);
   transition: opacity .4s ease, visibility 0s linear .4s;
-  backdrop-filter: blur(3px);
+  backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient);
 }
 
 .overlay-fragment.reveal-active .results-reveal-panel {
@@ -372,14 +453,17 @@ html, body {
 
 .overlay-ticker {
   position: fixed;
-  top: 1rem; right: 1rem;
+  top: 1.1rem; right: 1.1rem;
   z-index: 2;
-  width: 260px;
-  background: rgba(13,13,13,.72);
-  border: 1px solid var(--ms-gold, #C7A552);
-  border-radius: 10px;
-  padding: .55rem .75rem;
+  width: 270px;
+  background: var(--ovl-glass-bg, rgba(15,14,12,.6));
+  border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
+  border-radius: var(--ovl-radius-md, 14px);
+  padding: .65rem .85rem;
   font-size: .78rem;
+  backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
   transition: opacity .3s ease, transform .3s cubic-bezier(.2,.7,.3,1);
 }
 
@@ -398,14 +482,17 @@ html, body {
 
 .overlay-mini-standings {
   position: fixed;
-  top: 1rem; left: 1rem;
+  top: 1.1rem; left: 1.1rem;
   z-index: 2;
-  width: 240px;
-  background: rgba(13,13,13,.72);
-  border: 1px solid var(--ms-gold, #C7A552);
-  border-radius: 10px;
-  padding: .55rem .7rem;
+  width: 250px;
+  background: var(--ovl-glass-bg, rgba(15,14,12,.6));
+  border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
+  border-radius: var(--ovl-radius-md, 14px);
+  padding: .65rem .75rem;
   font-size: .72rem;
+  backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
   transition: opacity .3s ease, transform .3s cubic-bezier(.2,.7,.3,1);
 }
 
@@ -433,11 +520,13 @@ html, body {
   width: min(560px, 85vw);
   max-height: 70vh;
   overflow-y: auto;
-  background: rgba(13,13,13,.85);
-  border: 1px solid var(--ms-gold, #C7A552);
-  border-radius: 16px;
+  background: var(--ovl-glass-bg, rgba(15,14,12,.6));
+  border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
+  border-radius: var(--ovl-radius-lg, 18px);
   padding: 1rem 1.25rem;
-  backdrop-filter: blur(3px);
+  backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
   transform: translate(-50%, -50%);
   transition: opacity .3s ease, transform .3s cubic-bezier(.2,.7,.3,1);
 }
@@ -479,14 +568,14 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .fade-in-up, .reveal-card__inner, .ticker-fact.active, .totem-flash,
-  .results-reveal-panel, .ms-seat-card {
+  .results-reveal-panel, .ms-seat-card, .ms-seat-card__inner, .ms-seat-card__img {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
   }
   .results-reveal-panel { transform: translate(-50%, -50%) !important; }
-  .ms-seat-card:hover { transform: none !important; }
+  .ms-seat-card:hover, .ms-seat-card:hover .ms-seat-card__img { transform: none !important; }
   .overlay-ticker, .overlay-mini-standings, .overlay-full-standings { transition: opacity .01s !important; }
   .overlay-ticker.is-hidden, .overlay-mini-standings.is-hidden { transform: none !important; }
   .overlay-full-standings, .overlay-full-standings.is-hidden { transform: translate(-50%, -50%) !important; }

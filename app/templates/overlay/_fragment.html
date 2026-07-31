@@ -1,20 +1,23 @@
 {% from "_macros.html" import player_name %}
 
-{# Broadcast-style portrait seat card — photo fills most of the card, a
-   dark info bar sits underneath (see ms-seat-card__* in overlay.css). The
-   equipped avatar "frame" cosmetic is the same data (equipped.get(
-   'profile_customization:frame')) that the profile page's circular avatar
-   uses, just re-expressed as a ring around a rectangular photo box instead
-   — full fx-frame-theme-* rendering is tuned for circles, so themed/
-   rainbow frames fall back to a simple glow ring here rather than
-   reproducing every theme's bespoke geometry. #}
-{% macro seat_card_photo(player, equipped) %}
+{# Broadcast-style portrait seat card — the photo is a full-bleed background
+   layer (ms-seat-card__media), with a frosted glass nameplate overlaid on
+   top of it at the bottom (ms-seat-card__plate), not a separate block
+   underneath — this is what makes the photo read as the card's actual
+   subject instead of a thumbnail next to a text block. See ms-seat-card__*
+   in overlay.css. The equipped avatar "frame" cosmetic is the same data
+   (equipped.get('profile_customization:frame')) that the profile page's
+   circular avatar uses, just re-expressed as a ring around the rectangular
+   media box instead — full fx-frame-theme-* rendering is tuned for
+   circles, so themed/rainbow frames fall back to a simple glow ring here
+   rather than reproducing every theme's bespoke geometry. #}
+{% macro seat_card_media(player, equipped) %}
 {% set frame = equipped.get('profile_customization:frame') %}
 {% set frame_color = frame.item.data.color if frame and frame.item.data.color else none %}
-<div class="ms-seat-card__photo {{ 'ms-seat-card__photo--framed' if frame else '' }}"
+<div class="ms-seat-card__media {{ 'ms-seat-card__media--framed' if frame else '' }}"
      {% if frame_color %}style="--frame-color:{{ frame_color }}"{% endif %}>
   {% if player.avatar_url %}
-    <img src="{{ player.avatar_url }}" alt="" loading="lazy">
+    <img src="{{ player.avatar_url }}" alt="" loading="lazy" class="ms-seat-card__img">
   {% else %}
     <div class="ms-seat-card__placeholder">{{ player.display_name[0]|upper }}</div>
   {% endif %}
@@ -38,13 +41,17 @@
   <div class="overlay-seat-strip">
     {% for slot in current_slots %}
     {% set rating = ratings_by_pid.get(slot.player_id) %}
-    <div class="ms-seat-card {{ 'dead' if slot.is_eliminated else '' }}" style="--d:{{ loop.index0 * 45 }}ms">
-      {{ seat_card_photo(slot.player, equipped_bulk.get(slot.player_id, {})) }}
-      <div class="ms-seat-card__info">
-        <div class="ms-seat-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}</div>
-        <div class="ms-seat-card__stats">
-          <span title="ELO"><i class="ms-stat-icon">⚡</i>{{ slot.player.elo|round|int }}</span>
-          <span title="Очки в турнире"><i class="ms-stat-icon">★</i>{{ (rating.total_score if rating else 0)|round(2) }}</span>
+    <div class="ms-seat-card {{ 'dead' if slot.is_eliminated else '' }}" style="--d:{{ loop.index0 * 70 }}ms">
+      <div class="ms-seat-card__inner">
+        {{ seat_card_media(slot.player, equipped_bulk.get(slot.player_id, {})) }}
+        <div class="ms-seat-card__plate">
+          <div class="ms-seat-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}</div>
+          <div class="ms-seat-card__meta">
+            <span class="ms-seat-card__seat">Место {{ slot.seat_number }}</span>
+            <span class="ms-seat-card__dot">·</span>
+            <span title="ELO"><i class="ms-stat-icon">⚡</i>{{ slot.player.elo|round|int }}</span>
+            <span title="Очки в турнире"><i class="ms-stat-icon">★</i>{{ (rating.total_score if rating else 0)|round(2) }}</span>
+          </div>
         </div>
       </div>
     </div>
