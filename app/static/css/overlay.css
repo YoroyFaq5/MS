@@ -29,11 +29,11 @@ html, body {
 .overlay-seat-strip {
   position: fixed;
   left: 0; right: 0; bottom: 0;
+  z-index: 1;
   display: flex;
-  gap: .6rem;
-  padding: .85rem 1rem;
-  background: linear-gradient(to top, rgba(13,13,13,.75), transparent);
-  overflow-x: auto;
+  gap: .4rem;
+  padding: .6rem .75rem;
+  background: linear-gradient(to top, rgba(13,13,13,.8), transparent);
 }
 
 .overlay-seat-strip--empty {
@@ -45,64 +45,136 @@ html, body {
   text-shadow: 0 1px 4px rgba(0,0,0,.8);
 }
 
+/* flex:1 1 0 + min-width:0 lets tiles shrink proportionally so ALL seats
+   (up to 10) always fit in one row with no horizontal scrolling — an OBS
+   Browser Source can't be scrolled, so anything that overflowed used to
+   just get clipped off-screen. max-width caps growth when there are few
+   players so tiles don't stretch absurdly wide. */
 .overlay-seat-tile {
   display: flex;
   align-items: center;
-  gap: .5rem;
+  gap: .35rem;
   background: rgba(13,13,13,.55);
   border: 1px solid var(--ms-gold, #C7A552);
-  border-radius: 12px;
-  padding: .4rem .7rem .4rem .4rem;
-  flex-shrink: 0;
+  border-radius: 10px;
+  padding: .3rem .5rem .3rem .3rem;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 190px;
   backdrop-filter: blur(2px);
 }
 
 .overlay-seat-tile__avatar {
-  width: 46px; height: 46px;
+  width: 36px; height: 36px;
+  flex-shrink: 0;
+  font-size: 1.05rem;
 }
 
-.overlay-seat-tile__info { min-width: 0; }
+.overlay-seat-tile__info { min-width: 0; flex: 1 1 0; }
 
 .overlay-seat-tile__name {
   font-weight: 700;
-  font-size: .85rem;
+  font-size: .8rem;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-shadow: 0 1px 3px rgba(0,0,0,.8);
 }
 
 .overlay-seat-tile__seat {
   color: var(--ms-gold-light, #D4B06A);
-  margin-right: .3rem;
+  margin-right: .25rem;
 }
 
 .overlay-seat-tile__stats {
   display: flex;
-  gap: .6rem;
-  font-size: .72rem;
+  gap: .5rem;
+  font-size: .68rem;
   color: var(--ms-text-dim, #D9D2C1);
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 /* ── Section 2: last-game results reveal ──────────────────────────────── */
+/* "Totem of Undying"-style impact: a full-screen radial flash burst fires
+   once, then the results panel pops in with an overshoot bounce + glow,
+   and each seat card punches into place staggered by --d. Triggered by
+   overlay.js adding .reveal-active to the .overlay-fragment root (not the
+   panel itself) so the full-viewport flash and the panel react together. */
+
+.totem-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.totem-flash::before,
+.totem-flash::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.totem-flash::before {
+  background: radial-gradient(circle at 50% 45%,
+    rgba(255,255,255,.95) 0%, rgba(255,215,120,.6) 16%,
+    rgba(199,165,82,.2) 38%, transparent 68%);
+}
+
+.totem-flash::after {
+  background: repeating-conic-gradient(from 0deg,
+    rgba(255,230,160,.4) 0deg 5deg, transparent 5deg 20deg);
+  mix-blend-mode: screen;
+}
+
+.overlay-fragment.reveal-active .totem-flash {
+  animation: totem-flash-burst .8s cubic-bezier(.2,.8,.3,1) both;
+}
+
+@keyframes totem-flash-burst {
+  0%   { opacity: 0;   transform: scale(.15) rotate(0deg); }
+  12%  { opacity: 1;   transform: scale(1)   rotate(5deg); }
+  35%  { opacity: .85; transform: scale(1.35) rotate(10deg); }
+  100% { opacity: 0;   transform: scale(2.4) rotate(20deg); }
+}
 
 .results-reveal-panel {
   position: fixed;
   top: 5%; left: 50%;
-  transform: translateX(-50%);
+  z-index: 15;
   width: min(720px, 90vw);
-  background: rgba(13,13,13,.82);
+  background: rgba(13,13,13,.85);
   border: 1px solid var(--ms-gold, #C7A552);
   border-radius: 16px;
   padding: 1rem 1.25rem;
   opacity: 0;
   visibility: hidden;
-  transition: opacity .35s ease, visibility 0s linear .35s;
+  transform: translateX(-50%) scale(.4);
+  transition: opacity .4s ease, visibility 0s linear .4s;
   backdrop-filter: blur(3px);
 }
 
-.results-reveal-panel.reveal-active {
+.overlay-fragment.reveal-active .results-reveal-panel {
   opacity: 1;
   visibility: visible;
-  transition: opacity .35s ease;
+  transition: opacity .1s ease;
+  animation: totem-panel-in .6s cubic-bezier(.34,1.56,.64,1) both;
+}
+
+@keyframes totem-panel-in {
+  0%   { transform: translateX(-50%) scale(.3); box-shadow: 0 0 0 rgba(199,165,82,0); }
+  55%  { transform: translateX(-50%) scale(1.08); box-shadow: 0 0 60px rgba(199,165,82,.55); }
+  100% { transform: translateX(-50%) scale(1); box-shadow: 0 0 25px rgba(199,165,82,.25); }
+}
+
+/* The reveal panel can be wide enough to graze the corner ticker/standings
+   at narrower viewport widths — dim them out during the reveal instead of
+   fighting for space, since the reveal is meant to be the focal moment. */
+.overlay-fragment.reveal-active .overlay-ticker,
+.overlay-fragment.reveal-active .overlay-mini-standings {
+  opacity: .12;
 }
 
 .results-reveal-panel__header {
@@ -157,10 +229,6 @@ html, body {
   perspective: 800px;
 }
 
-.reveal-card {
-  perspective: 600px;
-}
-
 .reveal-card__inner {
   display: flex;
   flex-direction: column;
@@ -169,8 +237,8 @@ html, body {
   border-radius: 8px;
   padding: .4rem .5rem;
   font-size: .72rem;
-  transform-style: preserve-3d;
-  animation: seat-flip-in .5s cubic-bezier(.2,.7,.3,1) both;
+  opacity: 0;
+  animation: totem-card-in .5s cubic-bezier(.34,1.56,.64,1) both;
   animation-delay: var(--d, 0ms);
 }
 
@@ -184,9 +252,10 @@ html, body {
 .reveal-card__role--don       { color: #E0463F; }
 .reveal-card__role--mafia     { color: var(--ms-wine-light, #C75A5A); }
 
-@keyframes seat-flip-in {
-  from { opacity: 0; transform: rotateY(90deg); }
-  to   { opacity: 1; transform: rotateY(0deg); }
+@keyframes totem-card-in {
+  0%   { opacity: 0; transform: scale(.3) translateY(8px); filter: brightness(2.4); }
+  60%  { opacity: 1; transform: scale(1.08) translateY(0); filter: brightness(1.5); }
+  100% { opacity: 1; transform: scale(1) translateY(0); filter: brightness(1); }
 }
 
 /* ── Section 3: rotating stats ticker ─────────────────────────────────── */
@@ -194,12 +263,14 @@ html, body {
 .overlay-ticker {
   position: fixed;
   top: 1rem; right: 1rem;
+  z-index: 2;
   width: 260px;
   background: rgba(13,13,13,.72);
   border: 1px solid var(--ms-gold, #C7A552);
   border-radius: 10px;
   padding: .55rem .75rem;
   font-size: .78rem;
+  transition: opacity .3s ease;
 }
 
 .ticker-fact { display: none; }
@@ -218,12 +289,14 @@ html, body {
 .overlay-mini-standings {
   position: fixed;
   top: 1rem; left: 1rem;
+  z-index: 2;
   width: 240px;
   background: rgba(13,13,13,.72);
   border: 1px solid var(--ms-gold, #C7A552);
   border-radius: 10px;
   padding: .55rem .7rem;
   font-size: .72rem;
+  transition: opacity .3s ease;
 }
 
 .overlay-mini-standings__title {
@@ -236,13 +309,15 @@ html, body {
 .overlay-mini-standings td { padding: .12rem 0; }
 .overlay-mini-standings__rank { color: var(--ms-muted, #8A8A8A); width: 1.2rem; }
 .overlay-mini-standings__name { font-weight: 600; }
-.overlay-mini-standings__elo,
 .overlay-mini-standings__score { text-align: right; color: var(--ms-text-dim, #D9D2C1); }
 
 @media (prefers-reduced-motion: reduce) {
-  .fade-in-up, .reveal-card__inner, .ticker-fact.active {
+  .fade-in-up, .reveal-card__inner, .ticker-fact.active, .totem-flash,
+  .results-reveal-panel {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+    filter: none !important;
   }
+  .results-reveal-panel { transform: translateX(-50%) !important; }
 }

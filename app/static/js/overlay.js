@@ -31,11 +31,11 @@
   }
 
   function triggerReveal() {
-    const panel = root.querySelector('.results-reveal-panel');
-    if (!panel) return;
+    const fragmentRoot = root.querySelector('.overlay-fragment');
+    if (!fragmentRoot || !fragmentRoot.querySelector('.results-reveal-panel')) return;
     if (revealTimeoutHandle) clearTimeout(revealTimeoutHandle);
-    panel.classList.add('reveal-active');
-    revealTimeoutHandle = setTimeout(() => panel.classList.remove('reveal-active'), REVEAL_MS);
+    fragmentRoot.classList.add('reveal-active');
+    revealTimeoutHandle = setTimeout(() => fragmentRoot.classList.remove('reveal-active'), REVEAL_MS);
   }
 
   async function poll() {

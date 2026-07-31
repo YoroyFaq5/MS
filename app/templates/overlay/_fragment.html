@@ -16,6 +16,11 @@
 
 <div class="overlay-fragment" data-sig="{{ sig }}" data-last-finished-id="{{ last_game.id if last_game else '' }}">
 
+  <!-- Full-viewport flash burst for the results reveal (Totem-of-Undying
+       style impact) — always present, empty, purely CSS-animated when
+       overlay.js adds .reveal-active to this same root element. -->
+  <div class="totem-flash"></div>
+
   <!-- SECTION 1: seat strip (bottom bar) — current in-progress game only.
        Roles are intentionally never rendered here: current_game is always
        is_finished=False by the query in overlay.py, so there's nothing to
@@ -134,7 +139,6 @@
       <tr>
         <td class="overlay-mini-standings__rank">{{ r.rank }}</td>
         <td class="overlay-mini-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
-        <td class="overlay-mini-standings__elo">{{ r.elo|round|int }}</td>
         <td class="overlay-mini-standings__score">{{ r.total_score|round(2) }}</td>
       </tr>
       {% endfor %}
