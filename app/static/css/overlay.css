@@ -213,6 +213,18 @@ html, body {
   border-top: 1px solid rgba(199,165,82,.22);
 }
 
+.ms-seat-card__row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: .4rem;
+}
+
+.ms-seat-card__identity {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 /* Wraps to 2 lines instead of a single ellipsis-truncated line — the
    nameplate has enough room that a 2-line clamp loses far less of longer
    nicknames ("ФанФан Тюльпан") than a 1-line cut. */
@@ -228,8 +240,6 @@ html, body {
   text-shadow: 0 1px 4px rgba(0,0,0,.9);
 }
 
-/* Seat number lives here as a quiet secondary detail — never a bold
-   badge competing with the name for attention. */
 .ms-seat-card__meta {
   display: flex;
   align-items: center;
@@ -241,24 +251,32 @@ html, body {
   overflow: hidden;
 }
 
-.ms-seat-card__seat,
-.ms-seat-card__dot {
-  color: var(--ms-muted, #8A8A8A);
-  font-weight: 500;
-}
-
 .ms-seat-card__meta .ms-stat-icon {
   font-style: normal;
   color: var(--ms-gold-light, #D4B06A);
   margin-right: .1rem;
 }
 
-/* Eliminated player — ONLY the photo desaturates/dims/darkens; the
-   nameplate is never touched, so the nickname stays perfectly legible
-   (never hide who it is, just that they're out). Toggled by whatever
-   sets GameSlot.is_eliminated server-side; a plain class add/remove, so
-   it's trivial to flip from JS if a live "mark eliminated" control is
-   ever wired up too. */
+/* Seat number as a quiet "jersey number" flourish — a serif numeral, not
+   a badge, and deliberately muted/thin so the name (bold, full-opacity,
+   left-aligned) is still what the eye lands on first. */
+.ms-seat-card__slotnum {
+  flex-shrink: 0;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 1.55rem;
+  line-height: 1;
+  color: var(--ms-gold-light, #D4B06A);
+  opacity: .55;
+  text-shadow: 0 1px 4px rgba(0,0,0,.7);
+}
+
+/* Eliminated player — ONLY the photo layer desaturates/dims/darkens and
+   gets a diagonal "out" mark; the nameplate is never touched, so the
+   nickname stays perfectly legible (never hide who it is, just that
+   they're out). Toggled by whatever sets GameSlot.is_eliminated
+   server-side; a plain class add/remove, so it's trivial to flip from
+   JS if a live "mark eliminated" control is ever wired up too. */
 .ms-seat-card.dead .ms-seat-card__img,
 .ms-seat-card.dead .ms-seat-card__placeholder {
   filter: grayscale(1) brightness(.5) saturate(.2);
@@ -270,8 +288,12 @@ html, body {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: linear-gradient(180deg, transparent 50%, rgba(123,15,15,.4) 100%);
   pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent calc(50% - 1.5px),
+      rgba(196,42,42,.9) calc(50% - 1.5px), rgba(196,42,42,.9) calc(50% + 1.5px),
+      transparent calc(50% + 1.5px)),
+    linear-gradient(180deg, transparent 50%, rgba(123,15,15,.4) 100%);
 }
 
 /* ── Section 2: last-game results reveal ──────────────────────────────── */

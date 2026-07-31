@@ -45,12 +45,15 @@
       <div class="ms-seat-card__inner">
         {{ seat_card_media(slot.player, equipped_bulk.get(slot.player_id, {})) }}
         <div class="ms-seat-card__plate">
-          <div class="ms-seat-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}</div>
-          <div class="ms-seat-card__meta">
-            <span class="ms-seat-card__seat">Место {{ slot.seat_number }}</span>
-            <span class="ms-seat-card__dot">·</span>
-            <span title="ELO"><i class="ms-stat-icon">⚡</i>{{ slot.player.elo|round|int }}</span>
-            <span title="Очки в турнире"><i class="ms-stat-icon">★</i>{{ (rating.total_score if rating else 0)|round(2) }}</span>
+          <div class="ms-seat-card__row">
+            <div class="ms-seat-card__identity">
+              <div class="ms-seat-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}</div>
+              <div class="ms-seat-card__meta">
+                <span title="ELO"><i class="ms-stat-icon">⚡</i>{{ slot.player.elo|round|int }}</span>
+                <span title="Очки в турнире"><i class="ms-stat-icon">★</i>{{ (rating.total_score if rating else 0)|round(2) }}</span>
+              </div>
+            </div>
+            <div class="ms-seat-card__slotnum" title="Место {{ slot.seat_number }}">{{ slot.seat_number }}</div>
           </div>
         </div>
       </div>
