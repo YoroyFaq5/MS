@@ -1,0 +1,145 @@
+{% from "_macros.html" import player_name %}
+
+{% macro avatar_circle(player, equipped, extra_class='') %}
+{% set frame = equipped.get('profile_customization:frame') %}
+<div class="avatar-circle {{ extra_class }} {% if frame %}profile-frame{% if frame.item.data.theme or frame.item.data.effect == 'rainbow' %} fx-frame-themed fx-frame-theme-{{ frame.item.data.theme or 'rainbow' }}{% elif frame.item.data.effect == 'glow' %} fx-frame-glow{% endif %}{% endif %}"
+     {% if frame and frame.item.data.color and not frame.item.data.theme and frame.item.data.effect != 'rainbow' %}style="border-color:{{ frame.item.data.color }};--fx-color:{{ frame.item.data.color }}"{% endif %}>
+  {% if player.avatar_url %}
+    <img src="{{ player.avatar_url }}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
+  {% else %}
+    <span>{{ player.display_name[0]|upper }}</span>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% set role_labels = {'civilian': 'Мирный', 'sheriff': 'Шериф', 'don': 'Дон', 'mafia': 'Мафия'} %}
+
+<div class="overlay-fragment" data-sig="{{ sig }}" data-last-finished-id="{{ last_game.id if last_game else '' }}">
+
+  <!-- SECTION 1: seat strip (bottom bar) — current in-progress game only.
+       Roles are intentionally never rendered here: current_game is always
+       is_finished=False by the query in overlay.py, so there's nothing to
+       accidentally leak while the game is still being played. -->
+  {% if current_game %}
+  <div class="overlay-seat-strip">
+    {% for slot in current_slots %}
+    {% set rating = ratings_by_pid.get(slot.player_id) %}
+    <div class="overlay-seat-tile fade-in-up" style="--d:{{ loop.index0 * 40 }}ms">
+      {{ avatar_circle(slot.player, equipped_bulk.get(slot.player_id, {}), 'overlay-seat-tile__avatar') }}
+      <div class="overlay-seat-tile__info">
+        <div class="overlay-seat-tile__name">
+          <span class="overlay-seat-tile__seat">#{{ slot.seat_number }}</span>
+          {{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}
+        </div>
+        <div class="overlay-seat-tile__stats">
+          <span title="ELO">⚡{{ slot.player.elo|round|int }}</span>
+          <span title="Очки в турнире">★{{ (rating.total_score if rating else 0)|round(2) }}</span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="overlay-seat-strip overlay-seat-strip--empty">
+    <span class="fade-in-up">Ожидание начала игры — {{ tournament.name }}</span>
+  </div>
+  {% endif %}
+
+  <!-- SECTION 2: last-game results reveal — always rendered when a game has
+       finished; visibility/timing is controlled client-side (overlay.js
+       toggles .reveal-active for a limited duration whenever
+       data-last-finished-id changes). -->
+  {% if last_game %}
+  {% set mvp = (last_slots | sort(attribute='total_score', reverse=true) | list | first) if last_slots else none %}
+  {% set has_mvp = mvp and mvp.total_score > 0 %}
+  {% set sheriff_slot = (last_slots | selectattr('role.value', 'equalto', 'sheriff') | list | first) if last_slots else none %}
+  {% set don_slot = (last_slots | selectattr('role.value', 'equalto', 'don') | list | first) if last_slots else none %}
+  {% set win = last_game.win_side.value %}
+  <div class="results-reveal-panel">
+    <div class="results-reveal-panel__header results-reveal-panel__header--{{ win }}">
+      {% if win == 'city' %}🏙 Победа города
+      {% elif win == 'mafia' %}🔫 Победа мафии
+      {% else %}🤝 Ничья{% endif %}
+      <span class="results-reveal-panel__game-id">Игра №{{ last_game.id }}</span>
+    </div>
+    {% if has_mvp or sheriff_slot or don_slot %}
+    <div class="results-reveal-panel__callouts">
+      {% if has_mvp %}
+      <div class="callout callout--mvp">
+        <span class="callout__label">⭐ MVP</span>
+        <span class="callout__value">{{ player_name(mvp.player, equipped_bulk.get(mvp.player_id, {})) if mvp.player else '?' }}</span>
+      </div>
+      {% endif %}
+      {% if sheriff_slot %}
+      <div class="callout callout--sheriff">
+        <span class="callout__label">🔍 Шериф</span>
+        <span class="callout__value">{{ player_name(sheriff_slot.player, equipped_bulk.get(sheriff_slot.player_id, {})) if sheriff_slot.player else '?' }}</span>
+      </div>
+      {% endif %}
+      {% if don_slot %}
+      <div class="callout callout--don">
+        <span class="callout__label">👑 Дон</span>
+        <span class="callout__value">{{ player_name(don_slot.player, equipped_bulk.get(don_slot.player_id, {})) if don_slot.player else '?' }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+    <div class="results-reveal-panel__seats">
+      {% for slot in last_slots %}
+      <div class="reveal-card" style="--d:{{ loop.index0 * 90 }}ms">
+        <div class="reveal-card__inner">
+          <span class="reveal-card__seat">#{{ slot.seat_number }}</span>
+          <span class="reveal-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}</span>
+          <span class="reveal-card__role reveal-card__role--{{ slot.role.value }}">{{ role_labels[slot.role.value] }}</span>
+          <span class="reveal-card__score">{{ slot.total_score|round(2) }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- SECTION 3: rotating stats ticker — all facts rendered server-side,
+       JS only toggles which .ticker-fact has .active every ~8s. -->
+  {% set facts = [] %}
+  {% if superlatives.mvp %}{% set _ = facts.append({'label': '🏆 MVP турнира', 'rating': superlatives.mvp.rating, 'value': superlatives.mvp.value}) %}{% endif %}
+  {% if superlatives.don %}{% set _ = facts.append({'label': '👑 Лучший Дон', 'rating': superlatives.don.rating, 'value': superlatives.don.value}) %}{% endif %}
+  {% if superlatives.sheriff %}{% set _ = facts.append({'label': '🔍 Лучший Шериф', 'rating': superlatives.sheriff.rating, 'value': superlatives.sheriff.value}) %}{% endif %}
+  {% if superlatives.civilian %}{% set _ = facts.append({'label': '🔴 Лучший Мирный', 'rating': superlatives.civilian.rating, 'value': superlatives.civilian.value}) %}{% endif %}
+  {% if superlatives.mafia %}{% set _ = facts.append({'label': '⚫ Лучший Чёрный', 'rating': superlatives.mafia.rating, 'value': superlatives.mafia.value}) %}{% endif %}
+  {% if hot_streak_rating and hot_streak_count >= 2 %}{% set _ = facts.append({'label': '🔥 Серия побед', 'rating': hot_streak_rating, 'value': hot_streak_count}) %}{% endif %}
+  {% if facts %}
+  <div class="overlay-ticker">
+    {% for fact in facts %}
+    <div class="ticker-fact {{ 'active' if loop.first }}">
+      <span class="ticker-fact__label">{{ fact.label }}</span>
+      <span class="ticker-fact__value">{{ player_name(fact.rating, equipped_bulk.get(fact.rating.player_id, {})) }}</span>
+      <span class="ticker-fact__extra">{{ fact.value|round(2) if fact.value is number else fact.value }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- SECTION 4: mini standings — PRIVACY GATE. can_show_standings was
+       computed in overlay.py as `not tournament.hide_standings`, WITHOUT
+       the admin-bypass helper from tournaments.py. When false, this block
+       is simply absent from the rendered HTML (not CSS-hidden) — a public
+       broadcast source must never carry hidden data in its response body,
+       inspectable or not. -->
+  {% if can_show_standings and top_ratings %}
+  <div class="overlay-mini-standings">
+    <div class="overlay-mini-standings__title">Топ-5 · {{ tournament.name }}</div>
+    <table>
+      {% for r in top_ratings %}
+      <tr>
+        <td class="overlay-mini-standings__rank">{{ r.rank }}</td>
+        <td class="overlay-mini-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
+        <td class="overlay-mini-standings__elo">{{ r.elo|round|int }}</td>
+        <td class="overlay-mini-standings__score">{{ r.total_score|round(2) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+</div>

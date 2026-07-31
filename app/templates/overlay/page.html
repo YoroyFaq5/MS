@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Оверлей — {{ tournament.name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/overlay.css') }}">
+</head>
+<body>
+  <div id="overlay-root"
+       data-fragment-url="{{ url_for('overlay.overlay_fragment', tournament_id=tournament.id) }}"
+       data-poll-interval-ms="5000"
+       data-reveal-duration-ms="25000"
+       data-ticker-interval-ms="8000">
+    {% include "overlay/_fragment.html" %}
+  </div>
+  <script src="{{ url_for('static', filename='js/overlay.js') }}" defer></script>
+</body>
+</html>

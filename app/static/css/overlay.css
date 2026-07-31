@@ -1,0 +1,248 @@
+/* Stream overlay (OBS Browser Source) — transparent-background layer meant
+   to sit over live video capture. Loaded together with main.css so the
+   player cosmetics system (fx-frame-*/fx-nick-*, .avatar-circle) renders
+   identically to the rest of the site; everything below is overlay-only
+   layout/animation on top of that. */
+
+html, body {
+  background: transparent;
+  margin: 0;
+  overflow: hidden;
+  height: 100%;
+  font-family: 'Inter', -apple-system, sans-serif;
+  color: var(--ms-text, #F3E9D2);
+}
+
+#overlay-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.overlay-fragment {
+  position: fixed;
+  inset: 0;
+}
+
+/* ── Section 1: seat strip ─────────────────────────────────────────────── */
+
+.overlay-seat-strip {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  gap: .6rem;
+  padding: .85rem 1rem;
+  background: linear-gradient(to top, rgba(13,13,13,.75), transparent);
+  overflow-x: auto;
+}
+
+.overlay-seat-strip--empty {
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  font-size: 1.1rem;
+  color: var(--ms-muted, #8A8A8A);
+  text-shadow: 0 1px 4px rgba(0,0,0,.8);
+}
+
+.overlay-seat-tile {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  background: rgba(13,13,13,.55);
+  border: 1px solid var(--ms-gold, #C7A552);
+  border-radius: 12px;
+  padding: .4rem .7rem .4rem .4rem;
+  flex-shrink: 0;
+  backdrop-filter: blur(2px);
+}
+
+.overlay-seat-tile__avatar {
+  width: 46px; height: 46px;
+}
+
+.overlay-seat-tile__info { min-width: 0; }
+
+.overlay-seat-tile__name {
+  font-weight: 700;
+  font-size: .85rem;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0,0,0,.8);
+}
+
+.overlay-seat-tile__seat {
+  color: var(--ms-gold-light, #D4B06A);
+  margin-right: .3rem;
+}
+
+.overlay-seat-tile__stats {
+  display: flex;
+  gap: .6rem;
+  font-size: .72rem;
+  color: var(--ms-text-dim, #D9D2C1);
+}
+
+/* ── Section 2: last-game results reveal ──────────────────────────────── */
+
+.results-reveal-panel {
+  position: fixed;
+  top: 5%; left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, 90vw);
+  background: rgba(13,13,13,.82);
+  border: 1px solid var(--ms-gold, #C7A552);
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .35s ease, visibility 0s linear .35s;
+  backdrop-filter: blur(3px);
+}
+
+.results-reveal-panel.reveal-active {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity .35s ease;
+}
+
+.results-reveal-panel__header {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: .5rem;
+  margin-bottom: .5rem;
+  border-bottom: 1px solid rgba(199,165,82,.3);
+}
+
+.results-reveal-panel__header--city {
+  color: var(--ms-gold-light, #D4B06A);
+}
+
+.results-reveal-panel__header--mafia {
+  color: var(--ms-wine-light, #C75A5A);
+}
+
+.results-reveal-panel__game-id {
+  font-size: .75rem;
+  font-weight: 400;
+  color: var(--ms-muted, #8A8A8A);
+}
+
+.results-reveal-panel__callouts {
+  display: flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-bottom: .75rem;
+}
+
+.callout {
+  display: flex;
+  flex-direction: column;
+  background: rgba(199,165,82,.08);
+  border-radius: 8px;
+  padding: .3rem .6rem;
+  font-size: .78rem;
+}
+
+.callout__label { color: var(--ms-muted, #8A8A8A); font-size: .68rem; }
+.callout__value { font-weight: 700; }
+
+.results-reveal-panel__seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: .4rem;
+  perspective: 800px;
+}
+
+.reveal-card {
+  perspective: 600px;
+}
+
+.reveal-card__inner {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  background: rgba(255,255,255,.04);
+  border-radius: 8px;
+  padding: .4rem .5rem;
+  font-size: .72rem;
+  transform-style: preserve-3d;
+  animation: seat-flip-in .5s cubic-bezier(.2,.7,.3,1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+.reveal-card__seat { color: var(--ms-gold-light, #D4B06A); font-weight: 600; }
+.reveal-card__name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reveal-card__score { color: var(--ms-text-dim, #D9D2C1); }
+
+.reveal-card__role { font-weight: 700; }
+.reveal-card__role--civilian { color: var(--ms-text-dim, #D9D2C1); }
+.reveal-card__role--sheriff   { color: var(--ms-gold-light, #D4B06A); }
+.reveal-card__role--don       { color: #E0463F; }
+.reveal-card__role--mafia     { color: var(--ms-wine-light, #C75A5A); }
+
+@keyframes seat-flip-in {
+  from { opacity: 0; transform: rotateY(90deg); }
+  to   { opacity: 1; transform: rotateY(0deg); }
+}
+
+/* ── Section 3: rotating stats ticker ─────────────────────────────────── */
+
+.overlay-ticker {
+  position: fixed;
+  top: 1rem; right: 1rem;
+  width: 260px;
+  background: rgba(13,13,13,.72);
+  border: 1px solid var(--ms-gold, #C7A552);
+  border-radius: 10px;
+  padding: .55rem .75rem;
+  font-size: .78rem;
+}
+
+.ticker-fact { display: none; }
+.ticker-fact.active { display: flex; flex-direction: column; gap: .1rem; animation: ticker-fade .4s ease; }
+.ticker-fact__label { color: var(--ms-gold-light, #D4B06A); font-weight: 600; }
+.ticker-fact__value { font-weight: 700; }
+.ticker-fact__extra { color: var(--ms-muted, #8A8A8A); font-size: .7rem; }
+
+@keyframes ticker-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Section 4: mini standings ─────────────────────────────────────────── */
+
+.overlay-mini-standings {
+  position: fixed;
+  top: 1rem; left: 1rem;
+  width: 240px;
+  background: rgba(13,13,13,.72);
+  border: 1px solid var(--ms-gold, #C7A552);
+  border-radius: 10px;
+  padding: .55rem .7rem;
+  font-size: .72rem;
+}
+
+.overlay-mini-standings__title {
+  font-weight: 700;
+  color: var(--ms-gold-light, #D4B06A);
+  margin-bottom: .3rem;
+}
+
+.overlay-mini-standings table { width: 100%; border-collapse: collapse; }
+.overlay-mini-standings td { padding: .12rem 0; }
+.overlay-mini-standings__rank { color: var(--ms-muted, #8A8A8A); width: 1.2rem; }
+.overlay-mini-standings__name { font-weight: 600; }
+.overlay-mini-standings__elo,
+.overlay-mini-standings__score { text-align: right; color: var(--ms-text-dim, #D9D2C1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-up, .reveal-card__inner, .ticker-fact.active {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
