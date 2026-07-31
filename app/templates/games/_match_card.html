@@ -1,6 +1,6 @@
 {% from "_macros.html" import player_name %}
 
-{% macro render_match_card(game, slots, equipped_bulk, delay_ms=0, is_admin=false) %}
+{% macro render_match_card(game, slots, equipped_bulk, delay_ms=0, is_admin=false, badge_label=none) %}
 {% set mvp = (slots | sort(attribute='total_score', reverse=true) | list | first) if slots else none %}
 {% set has_mvp = mvp and mvp.total_score > 0 %}
 {% set sheriff_slot = (slots | selectattr('role.value', 'equalto', 'sheriff') | list | first) if slots else none %}
@@ -25,7 +25,7 @@
         {% else %}Ничья{% endif %}
       </span>
     </div>
-    <span class="match-card__id">Матч №{{ game.id }}</span>
+    <span class="match-card__id">{{ badge_label if badge_label else 'Матч №' ~ game.id }}</span>
   </div>
 
   <!-- Sub-header: date + "type" context -->

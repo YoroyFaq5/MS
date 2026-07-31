@@ -14,7 +14,7 @@
 {% if games %}
 <div class="matches-grid">
   {% for game in games %}
-  {{ render_match_card(game, slots_by_game.get(game.id, []), equipped_bulk, delay_ms=(loop.index0 % 8) * 35, is_admin=is_admin) }}
+  {{ render_match_card(game, slots_by_game.get(game.id, []), equipped_bulk, delay_ms=(loop.index0 % 8) * 35, is_admin=is_admin, badge_label="Тур " ~ loop.index) }}
   {% endfor %}
 </div>
 {% else %}
