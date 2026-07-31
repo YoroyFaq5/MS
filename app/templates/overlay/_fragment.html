@@ -40,7 +40,6 @@
     {% set rating = ratings_by_pid.get(slot.player_id) %}
     <div class="ms-seat-card {{ 'dead' if slot.is_eliminated else '' }}" style="--d:{{ loop.index0 * 45 }}ms">
       {{ seat_card_photo(slot.player, equipped_bulk.get(slot.player_id, {})) }}
-      <span class="ms-seat-card__slot">#{{ slot.seat_number }}</span>
       <div class="ms-seat-card__info">
         <div class="ms-seat-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}</div>
         <div class="ms-seat-card__stats">
