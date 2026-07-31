@@ -48,6 +48,28 @@ def _get_tournament_or_404(tournament_id: int) -> Tournament:
     return db.session.get(Tournament, tournament_id) or abort(404)
 
 
+def _is_tournament_participant(tournament_id: int) -> bool:
+    if not current_user.is_authenticated or not current_user.player_id:
+        return False
+    return db.session.query(TournamentParticipant).filter_by(
+        tournament_id=tournament_id, player_id=current_user.player_id
+    ).first() is not None
+
+
+def _can_view_standings(tournament_id: int, t: Tournament) -> bool:
+    """Таблица очков/мест видна всем, если не скрыта явно. Если скрыта —
+    видна только админам, которые сами НЕ являются участниками этого
+    турнира (иначе админ-игрок мог бы подглядывать за собственным
+    раскладом, что и является смыслом скрытия)."""
+    if not t.hide_standings:
+        return True
+    return (
+        current_user.is_authenticated
+        and current_user.is_admin
+        and not _is_tournament_participant(tournament_id)
+    )
+
+
 def _get_stage_or_404(stage_id: int) -> TournamentStage:
     return db.session.get(TournamentStage, stage_id) or abort(404)
 
@@ -175,6 +197,7 @@ def tournament_detail(tournament_id: int):
         registered_ids=list(registered_ids),
         equipped_bulk=equipped_bulk,
         series_tournament_id=_get_series_tournament_id(tournament_id),
+        can_view_standings=_can_view_standings(tournament_id, summary["tournament"]),
     )
 
 
@@ -199,6 +222,25 @@ def toggle_ranked(tournament_id: int):
         f"{'рейтинговый 📈' if t.is_ranked else 'нерейтинговый 🏖'}. "
         f"Уже завершённые игры сохраняют старое значение — поменяется только "
         f"у новых и у пересохранённых через редактирование.",
+        "success",
+    )
+    return redirect(url_for("tournaments.tournament_detail", tournament_id=tournament_id))
+
+
+@tournaments_bp.route("/<int:tournament_id>/toggle-standings", methods=["POST"])
+@admin_required
+def toggle_standings_visibility(tournament_id: int):
+    t = _get_tournament_or_404(tournament_id)
+    t.hide_standings = not t.hide_standings
+    db.session.commit()
+    flash(
+        f"Таблица очков и мест турнира «{t.name}» теперь "
+        f"{'скрыта 🙈' if t.hide_standings else 'видна всем 👁'}. "
+        + (
+            "Учтите: если вы сами участвуете в этом турнире, вам она тоже "
+            "будет недоступна, пока не выключите скрытие."
+            if t.hide_standings else ""
+        ),
         "success",
     )
     return redirect(url_for("tournaments.tournament_detail", tournament_id=tournament_id))
@@ -281,10 +323,12 @@ def remove_participant(tournament_id: int, player_id: int):
 @tournaments_bp.route("/<int:tournament_id>/stages")
 def stages(tournament_id: int):
     t = _get_tournament_or_404(tournament_id)
+    can_view_standings = _can_view_standings(tournament_id, t)
     sorted_stages = sorted(t.stages, key=lambda s: s.order)
     stage_ratings = {}
-    for s in sorted_stages:
-        stage_ratings[s.id] = RatingService.get_stage_rating(s.id)
+    if can_view_standings:
+        for s in sorted_stages:
+            stage_ratings[s.id] = RatingService.get_stage_rating(s.id)
 
     player_ids = {r.player_id for ratings in stage_ratings.values() for r in ratings}
     equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
@@ -296,6 +340,7 @@ def stages(tournament_id: int):
         stage_ratings=stage_ratings,
         equipped_bulk=equipped_bulk,
         series_tournament_id=_get_series_tournament_id(tournament_id),
+        can_view_standings=can_view_standings,
     )
 
 
@@ -370,6 +415,21 @@ def generate_next_round(stage_id: int):
 @tournaments_bp.route("/<int:tournament_id>/leaderboard")
 def leaderboard(tournament_id: int):
     t = _get_tournament_or_404(tournament_id)
+    can_view_standings = _can_view_standings(tournament_id, t)
+
+    if not can_view_standings:
+        return render_template(
+            "tournaments/leaderboard.html",
+            tournament=t,
+            can_view_standings=False,
+            player_ratings=[],
+            team_ratings=[],
+            final_ids=set(),
+            equipped_titles={},
+            equipped_bulk={},
+            superlatives={},
+        )
+
     player_ratings = RatingService.get_tournament_rating(tournament_id)
     team_ratings = (
         RatingService.get_team_rating(tournament_id)
@@ -395,6 +455,7 @@ def leaderboard(tournament_id: int):
     return render_template(
         "tournaments/leaderboard.html",
         tournament=t,
+        can_view_standings=True,
         player_ratings=player_ratings,
         team_ratings=team_ratings,
         final_ids=final_ids,
@@ -418,7 +479,8 @@ def final_view(tournament_id: int):
         flash("Финальный этап не найден.", "warning")
         return redirect(url_for("tournaments.tournament_detail", tournament_id=tournament_id))
 
-    final_ratings = RatingService.get_stage_rating(final_stage.id)
+    can_view_standings = _can_view_standings(tournament_id, t)
+    final_ratings = RatingService.get_stage_rating(final_stage.id) if can_view_standings else []
     final_games = sorted(final_stage.games, key=lambda g: g.played_at, reverse=True)
     final_participants = TournamentService.get_final_stage_participants(tournament_id)
 
@@ -434,6 +496,7 @@ def final_view(tournament_id: int):
         final_games=final_games,
         final_participants=final_participants,
         equipped_bulk=equipped_bulk,
+        can_view_standings=can_view_standings,
     )
 
 
@@ -545,8 +608,10 @@ def api_stages(tournament_id: int):
 
 @tournaments_bp.route("/api/<int:tournament_id>/ratings")
 def api_ratings(tournament_id: int):
-    player_ratings = RatingService.get_tournament_rating(tournament_id)
     t = _get_tournament_or_404(tournament_id)
+    if not _can_view_standings(tournament_id, t):
+        return jsonify({"error": "Таблица очков и мест скрыта администратором."}), 403
+    player_ratings = RatingService.get_tournament_rating(tournament_id)
     team_ratings = (
         RatingService.get_team_rating(tournament_id)
         if t.type == TournamentType.TEAM else []

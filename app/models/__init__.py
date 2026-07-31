@@ -116,6 +116,10 @@ class Tournament(db.Model):
     )
     is_ranked = Column(Boolean, default=True, nullable=False)
     has_stages = Column(Boolean, default=False, nullable=False)
+    # Скрыть таблицу очков/итоговых мест от всех, кроме админов-неучастников
+    # (см. tournaments.py::_can_view_standings) — обычно включается на время
+    # активного турнира, чтобы участники не подглядывали за раскладом.
+    hide_standings = Column(Boolean, default=False, nullable=False)
     # Cutoff: how many players advance from main→final stage
     cutoff_size = Column(Integer, default=10, nullable=False)
 
@@ -163,6 +167,7 @@ class Tournament(db.Model):
             "type": self.type.value,
             "is_ranked": self.is_ranked,
             "has_stages": self.has_stages,
+            "hide_standings": self.hide_standings,
             "cutoff_size": self.cutoff_size,
             "status": self.status,
             "created_at": self.created_at.isoformat(),

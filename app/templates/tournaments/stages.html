@@ -102,6 +102,12 @@
 
   <div class="card-body p-0">
     <!-- Stage rating table -->
+    {% if not can_view_standings %}
+    <div class="text-center text-muted py-4">
+      <i class="bi bi-eye-slash fs-2 d-block mb-2 opacity-25"></i>
+      Таблица очков и мест скрыта администратором.
+    </div>
+    {% else %}
     {% set s_ratings = stage_ratings.get(stage.id, []) %}
     {% if s_ratings %}
     <div class="table-responsive">
@@ -143,6 +149,7 @@
     {% endif %}
     {% else %}
     <div class="text-center text-muted py-4">Нет данных об играх в этом этапе</div>
+    {% endif %}
     {% endif %}
   </div>
 </div>

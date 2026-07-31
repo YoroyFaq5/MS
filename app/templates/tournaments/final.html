@@ -36,7 +36,14 @@
 </div>
 
 <!-- Final rating podium -->
-{% if final_ratings %}
+{% if not can_view_standings %}
+<div class="card mb-4">
+  <div class="card-body text-center text-muted py-4">
+    <i class="bi bi-eye-slash fs-2 d-block mb-2 opacity-25"></i>
+    Таблица очков и мест скрыта администратором.
+  </div>
+</div>
+{% elif final_ratings %}
 <h5 class="fw-semibold mb-3">🏅 Рейтинг финала</h5>
 {% if final_ratings|length >= 3 %}
 <div class="row g-3 justify-content-center mb-4">

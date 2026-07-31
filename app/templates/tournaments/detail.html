@@ -50,6 +50,20 @@
       {% if tournament.has_stages %}
         <span class="badge bg-info-subtle text-info border border-info-subtle">📋 Этапы · cutoff={{ tournament.cutoff_size }}</span>
       {% endif %}
+      {% if current_user.is_authenticated and current_user.is_admin %}
+        <form method="POST" action="{{ url_for('tournaments.toggle_standings_visibility', tournament_id=tournament.id) }}"
+              class="d-inline"
+              data-confirm="{{ 'Скрыть таблицу очков и мест от всех, кроме админов-неучастников?' if not tournament.hide_standings else 'Снова показать таблицу очков и мест всем?' }}">
+          <button type="submit" class="badge border-0
+            {% if tournament.hide_standings %}bg-danger-subtle text-danger{% else %}bg-secondary-subtle text-secondary{% endif %}"
+            title="Нажмите, чтобы переключить видимость таблицы очков/мест">
+            {% if tournament.hide_standings %}🙈 Таблица скрыта{% else %}👁 Таблица видна{% endif %}
+            <i class="bi bi-arrow-repeat ms-1"></i>
+          </button>
+        </form>
+      {% elif tournament.hide_standings %}
+        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">🙈 Таблица очков скрыта</span>
+      {% endif %}
     </div>
   </div>
   <!-- Actions -->
@@ -289,9 +303,17 @@
     <div class="card h-100">
       <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
         <span>🏅 Текущий рейтинг</span>
+        {% if can_view_standings %}
         <a href="{{ url_for('tournaments.leaderboard', tournament_id=tournament.id) }}"
            class="btn btn-sm btn-outline-secondary">Все →</a>
+        {% endif %}
       </div>
+      {% if not can_view_standings %}
+      <div class="card-body text-center text-muted py-4">
+        <i class="bi bi-eye-slash fs-2 d-block mb-2 opacity-25"></i>
+        Таблица очков и мест скрыта администратором до конца турнира.
+      </div>
+      {% else %}
       {% if tournament.status != 'finished' %}
       <div class="px-3 pt-2 text-muted small">
         <i class="bi bi-hourglass-split me-1"></i>Турнир ещё не завершён — места и очки предварительные, могут измениться до конца.
@@ -325,6 +347,7 @@
         <div class="text-center text-muted py-4">Рейтинг появится после первых игр</div>
         {% endif %}
       </div>
+      {% endif %}
     </div>
     {% endif %}
   </div>
