@@ -60,9 +60,12 @@ html, body {
      an OBS Browser Source), but hover should still work if this page is
      ever opened in a plain browser tab — re-enable just on the cards. */
   pointer-events: auto;
+  /* No max-width: flex:1 1 0 divides the full strip width evenly across
+     however many seats there are, so the row of cards always reaches
+     edge-to-edge along the bottom border (not just a clump sized to a
+     handful of cards) — a standard 10-player game is the normal case. */
   flex: 1 1 0;
   min-width: 0;
-  max-width: 150px;
   aspect-ratio: 3 / 4;
   border-radius: var(--ms-radius, 10px);
   overflow: hidden;
@@ -251,16 +254,18 @@ html, body {
 
 .results-reveal-panel {
   position: fixed;
-  top: 5%; left: 50%;
+  top: 50%; left: 50%;
   z-index: 15;
   width: min(720px, 90vw);
+  max-height: 62vh;
+  overflow-y: auto;
   background: rgba(13,13,13,.85);
   border: 1px solid var(--ms-gold, #C7A552);
   border-radius: 16px;
   padding: 1rem 1.25rem;
   opacity: 0;
   visibility: hidden;
-  transform: translateX(-50%) scale(.4);
+  transform: translate(-50%, -50%) scale(.4);
   transition: opacity .4s ease, visibility 0s linear .4s;
   backdrop-filter: blur(3px);
 }
@@ -273,9 +278,9 @@ html, body {
 }
 
 @keyframes totem-panel-in {
-  0%   { transform: translateX(-50%) scale(.3); box-shadow: 0 0 0 rgba(199,165,82,0); }
-  55%  { transform: translateX(-50%) scale(1.08); box-shadow: 0 0 60px rgba(199,165,82,.55); }
-  100% { transform: translateX(-50%) scale(1); box-shadow: 0 0 25px rgba(199,165,82,.25); }
+  0%   { transform: translate(-50%, -50%) scale(.3); box-shadow: 0 0 0 rgba(199,165,82,0); }
+  55%  { transform: translate(-50%, -50%) scale(1.08); box-shadow: 0 0 60px rgba(199,165,82,.55); }
+  100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 25px rgba(199,165,82,.25); }
 }
 
 /* The reveal panel can be wide enough to graze the corner ticker/standings
@@ -428,6 +433,6 @@ html, body {
     transform: none !important;
     filter: none !important;
   }
-  .results-reveal-panel { transform: translateX(-50%) !important; }
+  .results-reveal-panel { transform: translate(-50%, -50%) !important; }
   .ms-seat-card:hover { transform: none !important; }
 }
