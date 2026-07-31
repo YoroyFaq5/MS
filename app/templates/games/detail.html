@@ -2,6 +2,24 @@
 {% from "_macros.html" import player_name %}
 {% block title %}Игра #{{ game.id }}{% endblock %}
 
+{% block head %}
+<style>
+  /* Drag-and-drop seat swap (desktop only for now — see seat-drag-handle's
+     JS init further down the page: native HTML5 DnD doesn't fire on touch,
+     a mobile-friendly variant would need a separate tap-to-swap flow). */
+  .seat-drag-handle {
+    cursor: grab;
+    color: var(--ms-muted);
+    margin-right: .4rem;
+    display: inline-flex;
+    align-items: center;
+  }
+  .seat-drag-handle:active { cursor: grabbing; }
+  .seat-row.is-dragging { opacity: .4; }
+  .seat-row.is-drag-over td { box-shadow: inset 0 0 0 2px var(--ms-gold); background: var(--ms-gold-glow); }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex align-items-center gap-3 mb-4">
   <a href="{{ url_for('games.list_games') }}" class="btn btn-outline-secondary btn-sm">← Все игры</a>
@@ -99,10 +117,17 @@
         {% if current_user.is_admin %}
         {% set role_editable_now = (not game.is_finished and roles_editable) or edit_mode %}
         {% set fields_editable_now = not game.is_finished or edit_mode %}
-        <tbody>
+        {% set seats_swappable = edit_mode or not game.is_finished %}
+        <tbody id="seatsTbody">
           {% for slot in slots %}
-          <tr>
+          <tr class="{% if seats_swappable %}seat-row{% endif %}"
+              {% if seats_swappable %}data-slot-id="{{ slot.id }}"{% endif %}>
             <td class="ps-4">
+              {% if seats_swappable %}
+              <span class="seat-drag-handle" title="Перетащите, чтобы поменять местами" draggable="true">
+                <i class="bi bi-grip-vertical"></i>
+              </span>
+              {% endif %}
               <span class="badge bg-body-secondary text-body border">{{ slot.seat_number }}</span>
             </td>
             <td class="fw-medium">
@@ -339,6 +364,53 @@ editSlotIds.forEach(slotId => {
     },
   });
 });
+
+// ── Drag-and-drop seat swap (desktop) ──────────────────────────────────
+// Swaps the two rows' player (hidden id + visible name) without touching
+// role/bonus/PU/quality/score cells — same underlying player_<slot.id>
+// fields the autocomplete above already writes to, so the backend needs
+// no special-casing: submitting the form afterwards is indistinguishable
+// from having typed the swap into the search boxes by hand.
+let dragSrcRow = null;
+
+document.querySelectorAll('.seat-drag-handle').forEach((handle) => {
+  handle.addEventListener('dragstart', (e) => {
+    dragSrcRow = handle.closest('tr');
+    dragSrcRow.classList.add('is-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragSrcRow.dataset.slotId);
+  });
+  handle.addEventListener('dragend', () => {
+    dragSrcRow?.classList.remove('is-dragging');
+    dragSrcRow = null;
+  });
+});
+
+document.querySelectorAll('tr.seat-row').forEach((row) => {
+  row.addEventListener('dragover', (e) => {
+    if (!dragSrcRow || dragSrcRow === row) return;
+    e.preventDefault();
+    row.classList.add('is-drag-over');
+  });
+  row.addEventListener('dragleave', () => row.classList.remove('is-drag-over'));
+  row.addEventListener('drop', (e) => {
+    e.preventDefault();
+    row.classList.remove('is-drag-over');
+    if (!dragSrcRow || dragSrcRow === row) return;
+    swapSeatPlayers(dragSrcRow, row);
+  });
+});
+
+function swapSeatPlayers(rowA, rowB) {
+  const a = rowA.dataset.slotId, b = rowB.dataset.slotId;
+  const hiddenA = document.getElementById('player-hidden-' + a);
+  const hiddenB = document.getElementById('player-hidden-' + b);
+  const inputA = document.getElementById('player-input-' + a);
+  const inputB = document.getElementById('player-input-' + b);
+  if (!hiddenA || !hiddenB || !inputA || !inputB) return;
+  [hiddenA.value, hiddenB.value] = [hiddenB.value, hiddenA.value];
+  [inputA.value, inputB.value] = [inputB.value, inputA.value];
+}
 </script>
 {% endif %}
 <script>
