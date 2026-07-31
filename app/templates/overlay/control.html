@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Управление оверлеем — {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <h2 class="mb-0 fw-bold">🎥 Управление оверлеем</h2>
+    <p class="text-muted small mb-0">{{ tournament.name }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('tournaments.tournament_detail', tournament_id=tournament.id) }}"
+       class="btn btn-outline-secondary btn-sm">← Турнир</a>
+    <a href="{{ url_for('overlay.overlay_page', tournament_id=tournament.id) }}"
+       target="_blank" class="btn btn-outline-warning btn-sm">Открыть страницу оверлея ↗</a>
+  </div>
+</div>
+
+<div class="alert alert-secondary small">
+  <i class="bi bi-info-circle me-1"></i>
+  Изменения подхватываются на странице оверлея в течение ~5 секунд
+  (следующий опрос) — обновлять страницу оверлея вручную не нужно.
+</div>
+
+<div class="row g-4">
+
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">📊 Тикер статистики</div>
+      <div class="card-body">
+        <p class="text-muted small">Ротация MVP/лучших по ролям/серии побед в углу оверлея.</p>
+        <form method="POST" action="{{ url_for('overlay.overlay_toggle_ticker', tournament_id=tournament.id) }}">
+          <button type="submit" class="btn w-100 {{ 'btn-success' if control.show_ticker else 'btn-outline-secondary' }}">
+            {% if control.show_ticker %}👁 Виден — нажмите, чтобы скрыть{% else %}🙈 Скрыт — нажмите, чтобы показать{% endif %}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">🏆 Таблица</div>
+      <div class="card-body">
+        <p class="text-muted small">Топ-5 в углу, полная таблица по центру, или скрыто совсем.</p>
+        <div class="d-flex flex-column gap-2">
+          {% for mode, label in [('top5', 'Топ-5'), ('full', 'Полная таблица'), ('hidden', 'Скрыто')] %}
+          <form method="POST" action="{{ url_for('overlay.overlay_set_standings_mode', tournament_id=tournament.id) }}">
+            <input type="hidden" name="mode" value="{{ mode }}">
+            <button type="submit" class="btn w-100 {{ 'btn-success' if control.standings_mode == mode else 'btn-outline-secondary' }}">
+              {{ label }}{{ ' ✓' if control.standings_mode == mode else '' }}
+            </button>
+          </form>
+          {% endfor %}
+        </div>
+        {% if tournament.hide_standings %}
+        <div class="form-text mt-2">
+          <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+          У турнира включено «Таблица скрыта» на сайте — таблица на оверлее
+          не покажется независимо от выбора здесь.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">🎬 Реванш последней игры</div>
+      <div class="card-body">
+        <p class="text-muted small">По умолчанию появляется сам на ~25с при завершении игры.</p>
+        <div class="d-flex flex-column gap-2">
+          {% for value, label in [(none, 'Авто'), ('on', 'Показать сейчас'), ('off', 'Скрыть')] %}
+          <form method="POST" action="{{ url_for('overlay.overlay_set_reveal_override', tournament_id=tournament.id) }}">
+            <input type="hidden" name="override" value="{{ value or '' }}">
+            <button type="submit" class="btn w-100 {{ 'btn-success' if control.reveal_override == value else 'btn-outline-secondary' }}">
+              {{ label }}{{ ' ✓' if control.reveal_override == value else '' }}
+            </button>
+          </form>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

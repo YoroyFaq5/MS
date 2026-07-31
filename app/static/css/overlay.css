@@ -279,6 +279,14 @@ html, body {
   opacity: .12;
 }
 
+/* Both the reveal panel and the full-table panel are "center stage"
+   elements — if an admin forces the reveal open while standings_mode is
+   "full", let the reveal win outright rather than visually overlapping. */
+.overlay-fragment.reveal-active .overlay-full-standings {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
 .results-reveal-panel__header {
   font-family: 'Playfair Display', Georgia, serif;
   font-weight: 700;
@@ -372,7 +380,7 @@ html, body {
   border-radius: 10px;
   padding: .55rem .75rem;
   font-size: .78rem;
-  transition: opacity .3s ease;
+  transition: opacity .3s ease, transform .3s cubic-bezier(.2,.7,.3,1);
 }
 
 .ticker-fact { display: none; }
@@ -398,7 +406,7 @@ html, body {
   border-radius: 10px;
   padding: .55rem .7rem;
   font-size: .72rem;
-  transition: opacity .3s ease;
+  transition: opacity .3s ease, transform .3s cubic-bezier(.2,.7,.3,1);
 }
 
 .overlay-mini-standings__title {
@@ -413,6 +421,62 @@ html, body {
 .overlay-mini-standings__name { font-weight: 600; }
 .overlay-mini-standings__score { text-align: right; color: var(--ms-text-dim, #D9D2C1); }
 
+/* ── Section 5: full standings panel (admin "full table" mode) ─────────── */
+/* Same chrome as .results-reveal-panel (centered, gold border, blur) since
+   it's the same kind of "spotlight" moment — just listing every ranked
+   participant instead of one game's recap. */
+
+.overlay-full-standings {
+  position: fixed;
+  top: 50%; left: 50%;
+  z-index: 14;
+  width: min(560px, 85vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: rgba(13,13,13,.85);
+  border: 1px solid var(--ms-gold, #C7A552);
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  backdrop-filter: blur(3px);
+  transform: translate(-50%, -50%);
+  transition: opacity .3s ease, transform .3s cubic-bezier(.2,.7,.3,1);
+}
+
+.overlay-full-standings__title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--ms-gold-light, #D4B06A);
+  padding-bottom: .5rem;
+  margin-bottom: .5rem;
+  border-bottom: 1px solid rgba(199,165,82,.3);
+}
+
+.overlay-full-standings table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.overlay-full-standings td { padding: .3rem 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+.overlay-full-standings__rank { color: var(--ms-muted, #8A8A8A); width: 2rem; }
+.overlay-full-standings__name { font-weight: 600; }
+.overlay-full-standings__games { color: var(--ms-muted, #8A8A8A); text-align: center; width: 4rem; }
+.overlay-full-standings__score { text-align: right; color: var(--ms-text-dim, #D9D2C1); font-weight: 600; }
+
+/* ── Admin-controlled show/hide (ticker / top-5 / full table) ───────────
+   Panel stays in the DOM whenever the underlying data exists; only this
+   class (toggled directly on the persisted element by overlay.js, driven
+   by data-ctl — see poll()/applyCtl()) controls visibility, so switching
+   modes/toggling from the control page animates instead of the panel
+   just appearing/disappearing with the next full data refresh. */
+.overlay-ticker.is-hidden,
+.overlay-mini-standings.is-hidden,
+.overlay-full-standings.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-12px) scale(.94);
+}
+
+.overlay-full-standings.is-hidden {
+  transform: translate(-50%, -50%) translateY(-12px) scale(.94);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fade-in-up, .reveal-card__inner, .ticker-fact.active, .totem-flash,
   .results-reveal-panel, .ms-seat-card {
@@ -423,4 +487,7 @@ html, body {
   }
   .results-reveal-panel { transform: translate(-50%, -50%) !important; }
   .ms-seat-card:hover { transform: none !important; }
+  .overlay-ticker, .overlay-mini-standings, .overlay-full-standings { transition: opacity .01s !important; }
+  .overlay-ticker.is-hidden, .overlay-mini-standings.is-hidden { transform: none !important; }
+  .overlay-full-standings, .overlay-full-standings.is-hidden { transform: translate(-50%, -50%) !important; }
 }

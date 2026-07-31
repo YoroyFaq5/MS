@@ -23,7 +23,7 @@
 
 {% set role_labels = {'civilian': 'Мирный', 'sheriff': 'Шериф', 'don': 'Дон', 'mafia': 'Мафия'} %}
 
-<div class="overlay-fragment" data-sig="{{ sig }}" data-last-finished-id="{{ last_game.id if last_game else '' }}">
+<div class="overlay-fragment" data-sig="{{ sig }}" data-last-finished-id="{{ last_game.id if last_game else '' }}" data-ctl="{{ ctl_sig }}">
 
   <!-- Full-viewport flash burst for the results reveal (Totem-of-Undying
        style impact) — always present, empty, purely CSS-animated when
@@ -120,7 +120,7 @@
   {% if superlatives.mafia %}{% set _ = facts.append({'label': '⚫ Лучший Чёрный', 'rating': superlatives.mafia.rating, 'value': superlatives.mafia.value}) %}{% endif %}
   {% if hot_streak_rating and hot_streak_count >= 2 %}{% set _ = facts.append({'label': '🔥 Серия побед', 'rating': hot_streak_rating, 'value': hot_streak_count}) %}{% endif %}
   {% if facts %}
-  <div class="overlay-ticker">
+  <div class="overlay-ticker {{ '' if control.show_ticker else 'is-hidden' }}">
     {% for fact in facts %}
     <div class="ticker-fact {{ 'active' if loop.first }}">
       <span class="ticker-fact__label">{{ fact.label }}</span>
@@ -131,14 +131,20 @@
   </div>
   {% endif %}
 
-  <!-- SECTION 4: mini standings — PRIVACY GATE. can_show_standings was
+  <!-- SECTION 4: standings — PRIVACY GATE. can_show_standings was
        computed in overlay.py as `not tournament.hide_standings`, WITHOUT
-       the admin-bypass helper from tournaments.py. When false, this block
-       is simply absent from the rendered HTML (not CSS-hidden) — a public
-       broadcast source must never carry hidden data in its response body,
-       inspectable or not. -->
+       the admin-bypass helper from tournaments.py. When false, BOTH
+       standings panels below are simply absent from the rendered HTML
+       (not CSS-hidden) — a public broadcast source must never carry
+       hidden data in its response body, inspectable or not.
+
+       Both panels render whenever privacy allows it, regardless of
+       control.standings_mode — which one is actually visible (or
+       neither) is a pure CSS class toggle driven by data-ctl in
+       overlay.js, not DOM presence, so switching modes animates instead
+       of panels abruptly appearing/disappearing. -->
   {% if can_show_standings and top_ratings %}
-  <div class="overlay-mini-standings">
+  <div class="overlay-mini-standings {{ '' if control.standings_mode == 'top5' else 'is-hidden' }}">
     <div class="overlay-mini-standings__title">Топ-5 · {{ tournament.name }}</div>
     <table>
       {% for r in top_ratings %}
@@ -146,6 +152,22 @@
         <td class="overlay-mini-standings__rank">{{ r.rank }}</td>
         <td class="overlay-mini-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
         <td class="overlay-mini-standings__score">{{ r.total_score|round(2) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  {% if can_show_standings and full_ratings %}
+  <div class="overlay-full-standings {{ '' if control.standings_mode == 'full' else 'is-hidden' }}">
+    <div class="overlay-full-standings__title">Турнирная таблица · {{ tournament.name }}</div>
+    <table>
+      {% for r in full_ratings %}
+      <tr>
+        <td class="overlay-full-standings__rank">{{ r.rank }}</td>
+        <td class="overlay-full-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
+        <td class="overlay-full-standings__games">{{ r.games_played }} игр</td>
+        <td class="overlay-full-standings__score">{{ r.total_score|round(2) }}</td>
       </tr>
       {% endfor %}
     </table>

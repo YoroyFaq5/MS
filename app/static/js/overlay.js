@@ -1,9 +1,12 @@
 // Stream overlay poller — plain vanilla JS, no dependencies.
 // Polls the fragment endpoint every few seconds, only replaces the DOM
 // when the server-provided data-sig actually changed (so CSS animations
-// already in progress aren't interrupted on a no-op poll), and separately
+// already in progress aren't interrupted on a no-op poll), separately
 // triggers the last-game results reveal for a limited time whenever
-// data-last-finished-id changes.
+// data-last-finished-id changes, and separately again applies the
+// admin-controlled panel visibility (data-ctl) as plain class toggles on
+// the already-existing elements — so toggling from the control page
+// animates instead of snapping, since it doesn't require a DOM replace.
 (function () {
   const root = document.getElementById('overlay-root');
   if (!root) return;
@@ -15,8 +18,22 @@
 
   let currentSig = root.firstElementChild ? root.firstElementChild.dataset.sig : null;
   let lastFinishedId = root.firstElementChild ? root.firstElementChild.dataset.lastFinishedId : '';
+  let currentCtl = root.firstElementChild ? parseCtl(root.firstElementChild.dataset.ctl) : null;
   let revealTimeoutHandle = null;
   let tickerHandle = null;
+
+  function parseCtl(str) {
+    const parts = {};
+    (str || 'tk=1|sm=top5|rv=auto').split('|').forEach((pair) => {
+      const [key, value] = pair.split('=');
+      parts[key] = value;
+    });
+    return {
+      ticker: parts.tk === '1',
+      standingsMode: parts.sm || 'top5',
+      revealOverride: parts.rv || 'auto',
+    };
+  }
 
   function startTicker() {
     if (tickerHandle) clearInterval(tickerHandle);
@@ -30,12 +47,40 @@
     }, TICKER_MS);
   }
 
-  function triggerReveal() {
+  function triggerReveal(pin) {
     const fragmentRoot = root.querySelector('.overlay-fragment');
     if (!fragmentRoot || !fragmentRoot.querySelector('.results-reveal-panel')) return;
-    if (revealTimeoutHandle) clearTimeout(revealTimeoutHandle);
+    if (revealTimeoutHandle) { clearTimeout(revealTimeoutHandle); revealTimeoutHandle = null; }
     fragmentRoot.classList.add('reveal-active');
-    revealTimeoutHandle = setTimeout(() => fragmentRoot.classList.remove('reveal-active'), REVEAL_MS);
+    if (!pin) {
+      revealTimeoutHandle = setTimeout(() => fragmentRoot.classList.remove('reveal-active'), REVEAL_MS);
+    }
+  }
+
+  function hideReveal() {
+    const fragmentRoot = root.querySelector('.overlay-fragment');
+    if (!fragmentRoot) return;
+    if (revealTimeoutHandle) { clearTimeout(revealTimeoutHandle); revealTimeoutHandle = null; }
+    fragmentRoot.classList.remove('reveal-active');
+  }
+
+  // Applies the admin-controlled ticker/standings-mode/reveal-override
+  // state to whatever's currently in the DOM (old or freshly swapped-in —
+  // called after any sig-triggered replace, same ordering as the reveal
+  // trigger below) via plain class toggles, so CSS transitions animate it.
+  function applyCtl(ctl) {
+    const ticker = root.querySelector('.overlay-ticker');
+    if (ticker) ticker.classList.toggle('is-hidden', !ctl.ticker);
+
+    const top5 = root.querySelector('.overlay-mini-standings');
+    if (top5) top5.classList.toggle('is-hidden', ctl.standingsMode !== 'top5');
+
+    const full = root.querySelector('.overlay-full-standings');
+    if (full) full.classList.toggle('is-hidden', ctl.standingsMode !== 'full');
+
+    if (ctl.revealOverride === 'on') triggerReveal(true);
+    else if (ctl.revealOverride === 'off') hideReveal();
+    // 'auto' — leave whatever the lastFinishedId-driven trigger already set.
   }
 
   async function poll() {
@@ -55,6 +100,7 @@
 
     const newSig = newRoot.dataset.sig;
     const newLastFinishedId = newRoot.dataset.lastFinishedId || '';
+    const newCtl = parseCtl(newRoot.dataset.ctl);
 
     if (newSig !== currentSig) {
       root.innerHTML = '';
@@ -65,7 +111,14 @@
 
     if (newLastFinishedId !== lastFinishedId) {
       lastFinishedId = newLastFinishedId;
-      triggerReveal();
+      if (newCtl.revealOverride !== 'off') triggerReveal(newCtl.revealOverride === 'on');
+    }
+
+    if (!currentCtl || currentCtl.ticker !== newCtl.ticker
+        || currentCtl.standingsMode !== newCtl.standingsMode
+        || currentCtl.revealOverride !== newCtl.revealOverride) {
+      applyCtl(newCtl);
+      currentCtl = newCtl;
     }
   }
 

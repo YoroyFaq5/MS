@@ -177,6 +177,49 @@ class Tournament(db.Model):
 
 
 # ---------------------------------------------------------------------------
+# OverlayControl — admin-editable live toggles for the /overlay/<id> stream
+# page (see app/routes/overlay.py, app/services/overlay_control_service.py).
+# One row per tournament, lazily created with defaults on first access —
+# same "singleton settings row" pattern as EconomySettings, just keyed by
+# tournament_id instead of being a single global row.
+# ---------------------------------------------------------------------------
+
+class OverlayControl(db.Model):
+    __tablename__ = "overlay_controls"
+    __allow_unmapped__ = True
+
+    id = Column(Integer, primary_key=True)
+    tournament_id = Column(
+        Integer, ForeignKey("tournaments.id", ondelete="CASCADE"),
+        nullable=False, unique=True,
+    )
+
+    show_ticker = Column(Boolean, default=True, nullable=False)
+    # top5 | full | hidden — Tournament.hide_standings still wins over this
+    # regardless of value (privacy beats any broadcast-control convenience).
+    standings_mode = Column(String(10), default="top5", nullable=False)
+    # None (auto — the existing ~25s on-finish timer) | "on" (pinned open) |
+    # "off" (suppressed even during the normal auto window).
+    reveal_override = Column(String(10), nullable=True)
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "tournament_id": self.tournament_id,
+            "show_ticker": self.show_ticker,
+            "standings_mode": self.standings_mode,
+            "reveal_override": self.reveal_override,
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+
+# ---------------------------------------------------------------------------
 # TournamentStage
 # ---------------------------------------------------------------------------
 

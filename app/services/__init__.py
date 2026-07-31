@@ -17,6 +17,7 @@ from .admin_analytics_service import AdminAnalyticsService
 from .series_tournament_service import SeriesTournamentService, SeriesResult, SeriesOverallEntry
 from .migration_service import MigrationService, BatchResult, ItemResult
 from .orchestrator import PostGameOrchestrator, PostTournamentOrchestrator
+from .overlay_control_service import OverlayControlService
 
 __all__ = [
     "RatingService", "calculate_base_score",
@@ -38,4 +39,5 @@ __all__ = [
     "SeriesTournamentService", "SeriesResult", "SeriesOverallEntry",
     "MigrationService", "BatchResult", "ItemResult",
     "PostGameOrchestrator", "PostTournamentOrchestrator",
+    "OverlayControlService",
 ]

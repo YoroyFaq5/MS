@@ -85,6 +85,10 @@
     {% endif %}
     <a href="{{ url_for('tournaments.leaderboard', tournament_id=tournament.id) }}"
        class="btn btn-outline-warning"><i class="bi bi-trophy me-1"></i>Рейтинг</a>
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    <a href="{{ url_for('overlay.overlay_control', tournament_id=tournament.id) }}"
+       class="btn btn-outline-warning"><i class="bi bi-camera-reels me-1"></i>Оверлей</a>
+    {% endif %}
     {% if tournament.has_stages %}
     <a href="{{ url_for('tournaments.stages', tournament_id=tournament.id) }}"
        class="btn btn-outline-info"><i class="bi bi-list-ol me-1"></i>Этапы</a>
