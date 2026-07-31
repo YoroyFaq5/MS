@@ -121,6 +121,61 @@ def _lock_tournament_fantasy_if_needed(game: Game) -> None:
     FantasyService.lock_drafts_for_tournament(game.tournament_id, commit=True)
 
 
+def _apply_player_reassignments(game: Game, form) -> str | None:
+    """
+    Reassigns GameSlot.player_id per submitted player_<slot.id> fields.
+    Shared by finish_game/reassign_seats/edit_game rather than duplicated
+    three times. Returns None on success (changes flushed, not committed —
+    caller commits), or an error message if nothing was touched.
+
+    Swapping two seats (A<->B) can't just be two plain UPDATEs in any
+    order: both SQLite and MySQL check a UNIQUE constraint immediately per
+    statement (not deferred to transaction end), so whichever seat updates
+    first would briefly hold the OTHER seat's still-unvacated value and
+    trip (game_id, player_id) — no_autoflush does NOT help here, since the
+    same collision recurs at the final flush/commit regardless. Fixed by
+    vacating every changing slot to a distinct, temporarily-borrowed
+    player (anyone else not already seated in this game) first, then
+    applying the real targets in a second pass — two collision-free passes
+    instead of one that can't be ordered safely.
+    """
+    changes: dict[GameSlot, int] = {}
+    for slot in game.slots:
+        pid_str = form.get(f"player_{slot.id}", "").strip()
+        if not pid_str:
+            continue
+        try:
+            new_pid = int(pid_str)
+        except ValueError:
+            continue
+        if new_pid and new_pid != slot.player_id and db.session.get(Player, new_pid):
+            changes[slot] = new_pid
+
+    if not changes:
+        return None
+
+    final_ids = [changes.get(s, s.player_id) for s in game.slots]
+    if len(set(final_ids)) != len(final_ids):
+        return "Один и тот же игрок не может занимать два места."
+
+    used_ids = set(final_ids) | {s.player_id for s in game.slots}
+    temp_ids = [
+        pid for (pid,) in
+        db.session.query(Player.id).filter(~Player.id.in_(used_ids)).limit(len(changes)).all()
+    ]
+    if len(temp_ids) < len(changes):
+        return "Недостаточно других игроков в базе для безопасной перестановки — попробуйте по одному месту за раз."
+
+    with db.session.no_autoflush:
+        for slot, temp_pid in zip(changes.keys(), temp_ids):
+            slot.player_id = temp_pid
+        db.session.flush()
+        for slot, new_pid in changes.items():
+            slot.player_id = new_pid
+        db.session.flush()
+    return None
+
+
 def _ensure_tournament_participants(tournament_id: int, player_ids) -> None:
     """
     Играть в турнирной игре — уже достаточное основание считаться
@@ -739,54 +794,52 @@ def finish_game(game_id: int):
         flash("Неверное значение победителя.", "danger")
         return redirect(url_for("games.game_detail", game_id=game_id))
 
-    # ── Apply all per-slot values from form ─────────────────────────────────
-    for slot in game.slots:
-        # Player (swap who's seated here — e.g. a substitute before the game
-        # is actually played). Same reassignment finish_game's post-hoc
-        # sibling edit_game() already allows for a FINISHED game.
-        pid_str = request.form.get(f"player_{slot.id}", "").strip()
-        if pid_str:
-            try:
-                new_pid = int(pid_str)
-            except ValueError:
-                new_pid = None
-            if new_pid and new_pid != slot.player_id and db.session.get(Player, new_pid):
-                slot.player_id = new_pid
+    # Player (swap who's seated here — e.g. a substitute before the game is
+    # actually played). Same reassignment finish_game's post-hoc sibling
+    # edit_game() already allows for a FINISHED game.
+    reassign_error = _apply_player_reassignments(game, request.form)
+    if reassign_error:
+        db.session.rollback()
+        flash(reassign_error, "danger")
+        return redirect(url_for("games.game_detail", game_id=game_id))
 
-        # Role (editable for generated games where all roles are placeholder)
-        role_val = request.form.get(f"role_{slot.id}", "").strip()
-        if role_val:
-            try:
-                slot.role = Role(role_val)
-            except ValueError:
-                pass
+    # ── Apply all remaining per-slot values from form ────────────────────────
+    with db.session.no_autoflush:
+        for slot in game.slots:
+            # Role (editable for generated games where all roles are placeholder)
+            role_val = request.form.get(f"role_{slot.id}", "").strip()
+            if role_val:
+                try:
+                    slot.role = Role(role_val)
+                except ValueError:
+                    pass
 
-        # Bonus score
-        val = request.form.get(f"bonus_{slot.id}", "0").strip()
-        try:
-            slot.bonus_score = float(val)
-        except ValueError:
-            slot.bonus_score = 0.0
-
-        # PU flag (Первый Убиенный)
-        slot.is_pu = bool(request.form.get(f"pu_{slot.id}"))
-        if slot.is_pu:
+            # Bonus score
+            val = request.form.get(f"bonus_{slot.id}", "0").strip()
             try:
-                slot.pu_mafia_count = max(0, min(3, int(
-                    request.form.get(f"pu_mafia_{slot.id}", 0)
-                )))
+                slot.bonus_score = float(val)
             except ValueError:
+                slot.bonus_score = 0.0
+
+            # PU flag (Первый Убиенный)
+            slot.is_pu = bool(request.form.get(f"pu_{slot.id}"))
+            if slot.is_pu:
+                try:
+                    slot.pu_mafia_count = max(0, min(3, int(
+                        request.form.get(f"pu_mafia_{slot.id}", 0)
+                    )))
+                except ValueError:
+                    slot.pu_mafia_count = 0
+            else:
                 slot.pu_mafia_count = 0
-        else:
-            slot.pu_mafia_count = 0
 
-        # Quality score (optional, -1..+1)
-        qs_val = request.form.get(f"quality_{slot.id}", "").strip()
-        if qs_val:
-            try:
-                slot.quality_score = max(-1.0, min(1.0, float(qs_val)))
-            except ValueError:
-                pass
+            # Quality score (optional, -1..+1)
+            qs_val = request.form.get(f"quality_{slot.id}", "").strip()
+            if qs_val:
+                try:
+                    slot.quality_score = max(-1.0, min(1.0, float(qs_val)))
+                except ValueError:
+                    pass
 
     # ── Validate role distribution ────────────────────────────────────────────
     from collections import Counter
@@ -796,11 +849,6 @@ def finish_game(game_id: int):
         return redirect(url_for("games.game_detail", game_id=game_id))
     if role_dist.get("mafia", 0) + role_dist.get("don", 0) == 0:
         flash("В игре должна быть хотя бы одна роль мафии (Мафия или Дон).", "danger")
-        return redirect(url_for("games.game_detail", game_id=game_id))
-
-    if len({s.player_id for s in game.slots}) != len(game.slots):
-        db.session.rollback()
-        flash("Один и тот же игрок не может занимать два места.", "danger")
         return redirect(url_for("games.game_detail", game_id=game_id))
 
     if game.tournament_id:
@@ -876,20 +924,10 @@ def reassign_seats(game_id: int):
         flash("Игра уже завершена — используйте редактирование игры.", "warning")
         return redirect(url_for("games.game_detail", game_id=game_id))
 
-    for slot in game.slots:
-        pid_str = request.form.get(f"player_{slot.id}", "").strip()
-        if not pid_str:
-            continue
-        try:
-            new_pid = int(pid_str)
-        except ValueError:
-            continue
-        if new_pid and new_pid != slot.player_id and db.session.get(Player, new_pid):
-            slot.player_id = new_pid
-
-    if len({s.player_id for s in game.slots}) != len(game.slots):
+    reassign_error = _apply_player_reassignments(game, request.form)
+    if reassign_error:
         db.session.rollback()
-        flash("Один и тот же игрок не может занимать два места.", "danger")
+        flash(reassign_error, "danger")
         return redirect(url_for("games.game_detail", game_id=game_id))
 
     if game.tournament_id:
@@ -942,46 +980,44 @@ def edit_game(game_id: int):
         except ValueError:
             pass
 
-    for slot in game.slots:
-        pid_str = request.form.get(f"player_{slot.id}", "").strip()
-        if pid_str:
-            try:
-                new_pid = int(pid_str)
-            except ValueError:
-                new_pid = None
-            if new_pid and new_pid != slot.player_id and db.session.get(Player, new_pid):
-                slot.player_id = new_pid
+    reassign_error = _apply_player_reassignments(game, request.form)
+    if reassign_error:
+        db.session.rollback()
+        flash(reassign_error, "danger")
+        return redirect(url_for("games.game_detail", game_id=game_id))
 
-        role_val = request.form.get(f"role_{slot.id}", "").strip()
-        if role_val:
-            try:
-                slot.role = Role(role_val)
-            except ValueError:
-                pass
+    with db.session.no_autoflush:
+        for slot in game.slots:
+            role_val = request.form.get(f"role_{slot.id}", "").strip()
+            if role_val:
+                try:
+                    slot.role = Role(role_val)
+                except ValueError:
+                    pass
 
-        val = request.form.get(f"bonus_{slot.id}", "0").strip()
-        try:
-            slot.bonus_score = float(val)
-        except ValueError:
-            slot.bonus_score = 0.0
-
-        slot.is_pu = bool(request.form.get(f"pu_{slot.id}"))
-        if slot.is_pu:
+            val = request.form.get(f"bonus_{slot.id}", "0").strip()
             try:
-                slot.pu_mafia_count = max(0, min(3, int(
-                    request.form.get(f"pu_mafia_{slot.id}", 0)
-                )))
+                slot.bonus_score = float(val)
             except ValueError:
+                slot.bonus_score = 0.0
+
+            slot.is_pu = bool(request.form.get(f"pu_{slot.id}"))
+            if slot.is_pu:
+                try:
+                    slot.pu_mafia_count = max(0, min(3, int(
+                        request.form.get(f"pu_mafia_{slot.id}", 0)
+                    )))
+                except ValueError:
+                    slot.pu_mafia_count = 0
+            else:
                 slot.pu_mafia_count = 0
-        else:
-            slot.pu_mafia_count = 0
 
-        qs_val = request.form.get(f"quality_{slot.id}", "").strip()
-        if qs_val:
-            try:
-                slot.quality_score = max(-1.0, min(1.0, float(qs_val)))
-            except ValueError:
-                pass
+            qs_val = request.form.get(f"quality_{slot.id}", "").strip()
+            if qs_val:
+                try:
+                    slot.quality_score = max(-1.0, min(1.0, float(qs_val)))
+                except ValueError:
+                    pass
 
     from collections import Counter
     role_dist = Counter(s.role.value for s in game.slots)
@@ -992,11 +1028,6 @@ def edit_game(game_id: int):
     if role_dist.get("mafia", 0) + role_dist.get("don", 0) == 0:
         db.session.rollback()
         flash("В игре должна быть хотя бы одна роль мафии (Мафия или Дон).", "danger")
-        return redirect(url_for("games.game_detail", game_id=game_id))
-
-    if len({s.player_id for s in game.slots}) != len(game.slots):
-        db.session.rollback()
-        flash("Один и тот же игрок не может занимать два места.", "danger")
         return redirect(url_for("games.game_detail", game_id=game_id))
 
     if game.tournament_id:
