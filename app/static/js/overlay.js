@@ -35,6 +35,26 @@
     };
   }
 
+  // Shrink-to-fit for the nameplate: rather than truncating long
+  // nicknames with an ellipsis, step the font-size down until the name
+  // actually fits on its one line. Cheap (≤10 elements, a handful of
+  // reflow checks each) and only runs right after a DOM swap, not on
+  // every poll.
+  function fitSeatNames() {
+    const names = root.querySelectorAll('.ms-seat-card__name');
+    const minPx = 12;
+    names.forEach((el) => {
+      el.style.fontSize = '';
+      let size = parseFloat(getComputedStyle(el).fontSize);
+      let guard = 0;
+      while (el.scrollWidth > el.clientWidth && size > minPx && guard < 20) {
+        size -= 1;
+        el.style.fontSize = size + 'px';
+        guard++;
+      }
+    });
+  }
+
   function startTicker() {
     if (tickerHandle) clearInterval(tickerHandle);
     const facts = Array.from(root.querySelectorAll('.ticker-fact'));
@@ -107,6 +127,7 @@
       root.appendChild(newRoot);
       currentSig = newSig;
       startTicker();
+      fitSeatNames();
     }
 
     if (newLastFinishedId !== lastFinishedId) {
@@ -123,5 +144,6 @@
   }
 
   startTicker();
+  fitSeatNames();
   setInterval(poll, POLL_MS);
 })();

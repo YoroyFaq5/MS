@@ -56,10 +56,10 @@ html, body {
    many seats there are (edge-to-edge, no horizontal scroll — a Browser
    Source can't be scrolled, so anything that overflowed used to just
    get silently clipped). Width is therefore fixed by seat count; the
-   only lever left for making the cards genuinely BIG is a tall
-   aspect-ratio, so this is deliberately closer to a trading-card portrait
-   (~9:16) than a squat thumbnail — that's what turns "10 small icons"
-   into "10 unmistakable faces" at a glance. */
+   only lever left for making the cards genuinely BIG is a taller-than-
+   square aspect-ratio (3:4) — tall enough to read as a portrait rather
+   than a squat thumbnail, without eating the whole lower third of the
+   screen the way an extreme 9:16 did. */
 
 .overlay-seat-strip {
   position: fixed;
@@ -92,12 +92,12 @@ html, body {
   pointer-events: auto;
   /* No max-width: flex:1 1 0 divides the full strip width evenly across
      however many seats there are, so the row of cards always reaches
-     edge-to-edge along the bottom border. A tall ratio (~9:16) is what
-     makes each card genuinely large in absolute pixels despite the width
-     being capped by "10 across" — see the section note above. */
+     edge-to-edge along the bottom border. 3:4 is the balance point
+     between "big enough to read a face from across the room" and "not
+     so tall it eats the whole lower third" — see the section note above. */
   flex: 1 1 0;
   min-width: 0;
-  aspect-ratio: 9 / 16;
+  aspect-ratio: 3 / 4;
   opacity: 0;
   animation: ms-card-in .65s cubic-bezier(.22,1,.36,1) both;
   animation-delay: var(--d, 0ms);
@@ -446,15 +446,22 @@ html, body {
 
 /* ── Section 3: rotating stats ticker ─────────────────────────────────── */
 
+/* Sized as a compact, roughly-square stat card (min-height ≈ width)
+   instead of a wide, mostly-empty bar — a single rotating fact (label +
+   name + number) just doesn't need landscape proportions. */
 .overlay-ticker {
   position: fixed;
   top: 1.1rem; right: 1.1rem;
   z-index: 2;
-  width: 270px;
+  width: 168px;
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--ovl-glass-bg, rgba(15,14,12,.6));
   border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
   border-radius: var(--ovl-radius-md, 14px);
-  padding: .65rem .85rem;
+  padding: .9rem .75rem;
   font-size: .78rem;
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
@@ -463,9 +470,16 @@ html, body {
 }
 
 .ticker-fact { display: none; }
-.ticker-fact.active { display: flex; flex-direction: column; gap: .1rem; animation: ticker-fade .4s ease; }
+.ticker-fact.active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: .3rem;
+  animation: ticker-fade .4s ease;
+}
 .ticker-fact__label { color: var(--ms-gold-light, #D4B06A); font-weight: 600; }
-.ticker-fact__value { font-weight: 700; }
+.ticker-fact__value { font-weight: 700; font-size: 1.05rem; }
 .ticker-fact__extra { color: var(--ms-muted, #8A8A8A); font-size: .7rem; }
 
 @keyframes ticker-fade {
