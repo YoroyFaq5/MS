@@ -76,15 +76,18 @@
   </div>
   {% endif %}
 
-  <!-- Player table -->
+  <!-- Player table — role/score/ELO only mean anything once the game is
+       actually finished; an unplayed game only has real seating to show. -->
   <table class="match-table">
     <thead>
       <tr>
         <th>#</th>
         <th>Игрок</th>
+        {% if game.is_finished %}
         <th>Роль</th>
         <th class="text-end">Балл</th>
         <th class="text-end">ELO</th>
+        {% endif %}
       </tr>
     </thead>
     <tbody>
@@ -96,6 +99,7 @@
           {% if has_mvp and slot.id == mvp.id %}<i class="bi bi-star-fill match-table__mvp-star" title="MVP матча"></i>{% endif %}
           {{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}
         </td>
+        {% if game.is_finished %}
         <td>
           <span class="match-role match-role--{{ slot.role.value }}">
             {% if slot.role.value == 'civilian' %}Мирный
@@ -109,6 +113,7 @@
         <td class="text-end tabular-nums {% if slot.elo_after and slot.elo_after > 1000 %}match-elo-up{% elif slot.elo_after and slot.elo_after < 1000 %}match-elo-down{% else %}match-elo-flat{% endif %}">
           {{ slot.elo_after|round|int if slot.elo_after is not none else '—' }}
         </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>
