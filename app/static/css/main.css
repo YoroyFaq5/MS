@@ -4545,3 +4545,219 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 @media (prefers-reduced-motion: reduce) {
   .msc-backdrop, .msc-card, .msc-btn { transition: none; }
 }
+
+/* ============================================================
+   Match card — shared by games/list.html and tournaments/games.html
+   (both render app/templates/games/_match_card.html's macro; the CSS
+   lives here once instead of duplicated per page).
+   ============================================================ */
+
+.matches-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+.match-card {
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius);
+  overflow: hidden;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.match-card:hover, .match-card:focus-within {
+  transform: translateY(-3px);
+  border-color: rgba(199,165,82,.28);
+  box-shadow: 0 16px 36px rgba(0,0,0,.45), 0 0 0 1px rgba(199,165,82,.1);
+}
+
+/* ── Match header ─────────────────────────────────────────────── */
+.match-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .85rem 1rem;
+  border-bottom: 1px solid var(--ms-border);
+  background: linear-gradient(135deg, rgba(199,165,82,.05), transparent 60%);
+}
+.match-card__header--mafia {
+  background: linear-gradient(135deg, rgba(142,28,28,.12), transparent 65%);
+}
+.match-card__header--city {
+  background: linear-gradient(135deg, rgba(199,165,82,.1), transparent 65%);
+}
+
+.match-card__result { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+
+.match-card__side-icon {
+  flex-shrink: 0;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-size: 1rem;
+  background: rgba(138,138,138,.12);
+  color: var(--ms-muted);
+}
+.match-card__header--city  .match-card__side-icon { background: rgba(199,165,82,.16); color: var(--ms-gold-light); }
+.match-card__header--mafia .match-card__side-icon { background: rgba(142,28,28,.18); color: var(--ms-wine-light); }
+
+.match-card__result-text {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.match-card__id {
+  flex-shrink: 0;
+  padding: .2rem .6rem;
+  border-radius: 99px;
+  background: rgba(199,165,82,.08);
+  border: 1px solid var(--ms-border);
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .01em;
+  color: var(--ms-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.match-card__datetime {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .35rem;
+}
+.match-card__time {
+  color: var(--ms-muted);
+  font-variant-numeric: tabular-nums;
+}
+.match-card__time::before {
+  content: "·";
+  margin-right: .35rem;
+  opacity: .6;
+}
+
+.match-card__subheader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem .65rem;
+  padding: .6rem 1rem;
+  font-size: .72rem;
+  color: var(--ms-muted);
+  border-bottom: 1px solid var(--ms-border);
+}
+.match-card__subheader i { margin-right: .3rem; opacity: .85; }
+
+.match-card__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: .12rem .5rem;
+  border-radius: 99px;
+  background: rgba(199,165,82,.1);
+  color: var(--ms-gold-light);
+  font-weight: 500;
+}
+.match-card__chip--muted { background: rgba(138,138,138,.1); color: var(--ms-muted); }
+
+/* ── Summary strip ────────────────────────────────────────────── */
+.match-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: .5rem;
+  padding: .75rem 1rem;
+  background: var(--ms-surface-raised);
+  border-bottom: 1px solid var(--ms-border);
+}
+.match-summary__item { display: flex; flex-direction: column; gap: .05rem; min-width: 0; }
+.match-summary__label {
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+}
+.match-summary__label i { color: var(--ms-gold-light); font-size: .68rem; }
+.match-summary__value {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--ms-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.match-summary__sub {
+  font-size: .68rem;
+  color: var(--ms-gold-light);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Player table ─────────────────────────────────────────────── */
+.match-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+.match-table th {
+  padding: .45rem .75rem;
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+  text-align: left;
+  border-bottom: 1px solid var(--ms-border);
+}
+.match-table td {
+  padding: .4rem .75rem;
+  border-top: 1px solid rgba(199,165,82,.06);
+  color: var(--ms-text-dim);
+  vertical-align: middle;
+}
+.match-table tbody tr { transition: background .15s ease; }
+.match-table tbody tr:hover { background: rgba(199,165,82,.045); }
+.match-table tbody tr:hover td { color: var(--ms-text); }
+
+.match-table__player { display: flex; align-items: center; gap: .3rem; color: var(--ms-text); font-weight: 500; }
+.match-table__pu-mark { cursor: help; opacity: .9; }
+.match-table__mvp-star { color: var(--ms-gold-light); font-size: .72rem; filter: drop-shadow(0 0 4px var(--ms-gold-glow)); }
+
+/* MVP row — same inset-accent language as the homepage leaderboard's top-3 */
+.match-table__row--mvp { background: rgba(199,165,82,.05); }
+.match-table__row--mvp td:first-child { box-shadow: inset 3px 0 0 var(--ms-gold-light); padding-left: .6rem; }
+
+/* PU (Первый Убиенный) row */
+.match-table__row--pu td:first-child { box-shadow: inset 2px 0 0 var(--ms-border); }
+
+/* Role color system — a signal, not decoration: neutral / cool / two
+   shades of red for the mafia side (Дон slightly deeper than Мафия). */
+.match-role { font-weight: 600; }
+.match-role--civilian { color: var(--ms-text-dim); font-weight: 500; }
+.match-role--sheriff   { color: var(--flavor-defense, #5B8DC9); }
+.match-role--mafia     { color: var(--ms-wine-light); }
+.match-role--don       { color: var(--ms-wine); }
+
+.match-elo-up   { color: var(--ms-gold-light); }
+.match-elo-down { color: var(--ms-wine-light); }
+.match-elo-flat { color: var(--ms-muted); }
+
+.match-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .4rem;
+  padding: .6rem 1rem;
+  border-top: 1px solid var(--ms-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-card { transition: none; }
+}
+
+@media (max-width: 480px) {
+  .matches-grid { gap: 14px; }
+  .match-card__header, .match-card__subheader, .match-summary, .match-table td, .match-table th, .match-card__actions {
+    padding-left: .7rem; padding-right: .7rem;
+  }
+}

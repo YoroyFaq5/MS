@@ -10,15 +10,17 @@
 <div class="match-card fade-in-up" style="--d:{{ delay_ms }}ms" tabindex="0" data-game-id="{{ game.id }}">
 
   <!-- Match header -->
-  <div class="match-card__header match-card__header--{{ win }}">
+  <div class="match-card__header {% if game.is_finished %}match-card__header--{{ win }}{% endif %}">
     <div class="match-card__result">
       <span class="match-card__side-icon">
-        {% if win == 'city' %}<i class="bi bi-shield-fill"></i>
+        {% if not game.is_finished %}<i class="bi bi-people-fill"></i>
+        {% elif win == 'city' %}<i class="bi bi-shield-fill"></i>
         {% elif win == 'mafia' %}<i class="bi bi-mask"></i>
         {% else %}<i class="bi bi-dash-circle"></i>{% endif %}
       </span>
       <span class="match-card__result-text">
-        {% if win == 'city' %}Победа города
+        {% if not game.is_finished %}Рассадка
+        {% elif win == 'city' %}Победа города
         {% elif win == 'mafia' %}Победа мафии
         {% else %}Ничья{% endif %}
       </span>

@@ -11,6 +11,7 @@ from flask import (
     url_for, flash, abort, jsonify
 )
 from sqlalchemy import func
+from flask_login import current_user
 
 from app import db
 from app.models import (
@@ -504,10 +505,16 @@ def generate_games(tournament_id: int):
 def tournament_games(tournament_id: int):
     t = _get_tournament_or_404(tournament_id)
     games = sorted(t.games, key=lambda g: g.id)
+    slots_by_game = {g.id: sorted(g.slots, key=lambda s: s.seat_number) for g in games}
+    player_ids = {s.player_id for slots in slots_by_game.values() for s in slots}
+    equipped_bulk = ShopService.get_equipped_bulk(list(player_ids))
     return render_template(
         "tournaments/games.html",
         tournament=t,
         games=games,
+        slots_by_game=slots_by_game,
+        equipped_bulk=equipped_bulk,
+        is_admin=current_user.is_authenticated and current_user.is_admin,
     )
 
 
