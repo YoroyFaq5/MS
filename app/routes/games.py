@@ -93,6 +93,34 @@ def _lock_series_fantasy_if_needed(stage_id: int | None) -> None:
         FantasyService.lock_drafts_for_series(series.id, commit=True)
 
 
+def _lock_tournament_fantasy_if_needed(game: Game) -> None:
+    """
+    Regular (non-series) tournament drafts lock on the FIRST game that
+    actually finishes — not on tournament activation. Activation can
+    happen well before any real result is known (games get created and
+    played over time), so locking there froze picks earlier than
+    necessary; locking on first result is the same "this competition's
+    outcome has started to reveal itself" signal that series-tournaments
+    already use at game-creation time (see _lock_series_fantasy_if_needed).
+
+    Must NOT fire for series-tournament games: FantasyDraft.tournament_id
+    is set even for series-scoped drafts (tournament_series_id just
+    narrows further), so calling lock_drafts_for_tournament on a
+    series-wrapped tournament would prematurely lock a DIFFERENT, not-yet-
+    started series sharing the same parent tournament. Series-tournament
+    locking stays exclusively _lock_series_fantasy_if_needed's job.
+    Idempotent: locking already-locked drafts is a no-op.
+    """
+    if not game.tournament_id:
+        return
+    if game.stage_id:
+        from app.models import TournamentSeries
+        if db.session.query(TournamentSeries).filter_by(stage_id=game.stage_id).first():
+            return
+    from app.services.fantasy_service import FantasyService
+    FantasyService.lock_drafts_for_tournament(game.tournament_id, commit=True)
+
+
 def _ensure_tournament_participants(tournament_id: int, player_ids) -> None:
     """
     Играть в турнирной игре — уже достаточное основание считаться
@@ -760,6 +788,7 @@ def finish_game(game_id: int):
 
     game.is_finished = True
     db.session.flush()
+    _lock_tournament_fantasy_if_needed(game)
 
     from app.services.orchestrator import PostGameOrchestrator
     orch = PostGameOrchestrator.run(game)

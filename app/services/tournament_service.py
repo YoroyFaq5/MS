@@ -135,15 +135,13 @@ class TournamentService:
 
         db.session.commit()
 
-        # Fantasy picks must freeze once the tournament actually starts —
-        # otherwise users could keep editing drafts while results are
-        # already known. (Bug: this used to only happen at tournament
-        # finish, so drafts stayed editable for the whole active phase.)
-        try:
-            from app.services.fantasy_service import FantasyService
-            FantasyService.lock_drafts_for_tournament(tournament_id, commit=True)
-        except Exception:
-            logger.exception(f"Failed to lock fantasy drafts for tournament #{tournament_id}")
+        # Fantasy picks intentionally do NOT freeze here anymore — activation
+        # can happen well before any real result is known (games get created
+        # and played over time after this). Drafts lock instead on the first
+        # game that actually finishes (see games.py::_lock_tournament_fantasy_if_needed),
+        # the same "results have started" signal series-tournaments already
+        # use at game-creation time. PostTournamentOrchestrator still locks
+        # any remaining OPEN drafts as a safety net when the tournament finishes.
 
         return ServiceResult.success(f"Турнир «{t.name}» запущен.", data=t)
 
