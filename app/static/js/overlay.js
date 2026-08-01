@@ -35,19 +35,32 @@
     };
   }
 
-  // Shrink-to-fit for the nameplate: rather than truncating long
-  // nicknames with an ellipsis, step the font-size down until the name
-  // actually fits on its one line. Cheap (≤10 elements, a handful of
-  // reflow checks each) and only runs right after a DOM swap, not on
-  // every poll.
+  // Nameplate fit strategy, in order — rather than jumping straight to
+  // an ellipsis or a tiny shrunk font for every long nickname:
+  //   1. One line at normal size (the common case — leave it alone).
+  //   2. Doesn't fit? Allow wrapping to 2 lines at normal size — handles
+  //      names with a natural break ("Опасный Малый") cleanly.
+  //   3. Still doesn't fit in 2 lines (a long single word like
+  //      "Непридумал", or just a very long name)? Shrink the font down
+  //      to a readable floor. Ellipsis only kicks in if it's still too
+  //      long at the floor size.
+  // Cheap (≤10 elements, a few reflow reads each) and only runs right
+  // after a DOM swap, not on every poll.
   function fitSeatNames() {
     const names = root.querySelectorAll('.ms-seat-card__name');
     const minPx = 12;
     names.forEach((el) => {
       el.style.fontSize = '';
+      el.classList.remove('ms-seat-card__name--wrap');
+
+      if (el.scrollWidth <= el.clientWidth) return; // fits on one line already
+
+      el.classList.add('ms-seat-card__name--wrap');
+      if (el.scrollHeight <= el.clientHeight + 1) return; // fits wrapped over 2 lines
+
       let size = parseFloat(getComputedStyle(el).fontSize);
       let guard = 0;
-      while (el.scrollWidth > el.clientWidth && size > minPx && guard < 20) {
+      while (el.scrollHeight > el.clientHeight + 1 && size > minPx && guard < 20) {
         size -= 1;
         el.style.fontSize = size + 'px';
         guard++;

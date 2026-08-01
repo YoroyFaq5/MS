@@ -23,6 +23,12 @@ html, body {
   --ovl-radius-lg: 18px;
   --ovl-radius-md: 14px;
   --ovl-glass-bg: rgba(15,14,12,.6);
+  /* Used by the two "spotlight" panels (last-game reveal, full standings)
+     — they're read as a focal moment over whatever's happening in the
+     video behind them, so they need to stay legible regardless of how
+     bright/busy that footage is, not just tint it like the small corner
+     panels do. */
+  --ovl-glass-bg-strong: rgba(10,9,8,.92);
   --ovl-glass-blur: blur(16px) saturate(160%);
   --ovl-border-gold: rgba(199,165,82,.4);
   --ovl-shadow-ambient: 0 24px 48px -16px rgba(0,0,0,.65);
@@ -232,6 +238,13 @@ html, body {
   -webkit-backdrop-filter: blur(8px) saturate(160%);
 }
 
+/* Fit strategy applied by overlay.js's fitSeatNames(), in order: (1) one
+   line at normal size — the common case; (2) if it doesn't fit, wrap to
+   2 lines at normal size via .ms-seat-card__name--wrap (handles names
+   with a natural break like "Опасный Малый" cleanly); (3) if it STILL
+   doesn't fit in 2 lines, shrink the font down to a readable floor.
+   Ellipsis is the last-resort safety net at the floor size, not the
+   first response to a long name. */
 .ms-seat-card__name {
   font-weight: 700;
   font-size: 1rem;
@@ -241,6 +254,15 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   text-shadow: 0 1px 4px rgba(0,0,0,.9);
+}
+
+.ms-seat-card__name--wrap {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 /* Eliminated player — ONLY the photo layer desaturates/dims/darkens and
@@ -321,7 +343,7 @@ html, body {
   width: min(720px, 90vw);
   max-height: 62vh;
   overflow-y: auto;
-  background: var(--ovl-glass-bg, rgba(15,14,12,.6));
+  background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
   border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
   border-radius: var(--ovl-radius-lg, 18px);
   padding: 1rem 1.25rem;
@@ -529,7 +551,7 @@ html, body {
   width: min(560px, 85vw);
   max-height: 70vh;
   overflow-y: auto;
-  background: var(--ovl-glass-bg, rgba(15,14,12,.6));
+  background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
   border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
   border-radius: var(--ovl-radius-lg, 18px);
   padding: 1rem 1.25rem;
