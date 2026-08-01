@@ -26,13 +26,14 @@
   let currentSig = root.firstElementChild ? root.firstElementChild.dataset.sig : null;
   let lastFinishedId = root.firstElementChild ? root.firstElementChild.dataset.lastFinishedId : '';
   let currentCtl = root.firstElementChild ? parseCtl(root.firstElementChild.dataset.ctl) : null;
+  let currentTimerStartedAt = currentCtl ? currentCtl.timerStartedAt : null;
   let revealTimeoutHandle = null;
   let tickerHandle = null;
   let emberHandle = null;
 
   function parseCtl(str) {
     const parts = {};
-    (str || 'tk=1|sh=1|sm=top5|rv=auto').split('|').forEach((pair) => {
+    (str || 'tk=1|sh=1|sm=top5|rv=auto|sc=live|td=900|ts=0').split('|').forEach((pair) => {
       const [key, value] = pair.split('=');
       parts[key] = value;
     });
@@ -41,6 +42,11 @@
       showSeats: parts.sh !== '0', // default to visible if the field is ever missing
       standingsMode: parts.sm || 'top5',
       revealOverride: parts.rv || 'auto',
+      // Broadcast scene (Starting Soon/Live/BRB/Ending) + its countdown —
+      // see app/services/broadcast_scene_service.py and broadcast-scenes.js.
+      scene: parts.sc || 'live',
+      timerDuration: parseFloat(parts.td || '0'),
+      timerStartedAt: parseFloat(parts.ts || '0') || null,
     };
   }
 
@@ -269,6 +275,8 @@
     if (ctl.revealOverride === 'on') triggerReveal(true);
     else if (ctl.revealOverride === 'off') hideReveal();
     // 'auto' — leave whatever the lastFinishedId-driven trigger already set.
+
+    if (window.MSBroadcastScenes) window.MSBroadcastScenes.setActive(ctl.scene);
   }
 
   async function poll() {
@@ -297,6 +305,7 @@
       startTicker();
       fitSeatNames();
       spawnCardEntranceBursts();
+      if (window.MSBroadcastScenes) window.MSBroadcastScenes.init();
     }
 
     if (newLastFinishedId !== lastFinishedId) {
@@ -307,14 +316,21 @@
     if (!currentCtl || currentCtl.ticker !== newCtl.ticker
         || currentCtl.showSeats !== newCtl.showSeats
         || currentCtl.standingsMode !== newCtl.standingsMode
-        || currentCtl.revealOverride !== newCtl.revealOverride) {
+        || currentCtl.revealOverride !== newCtl.revealOverride
+        || currentCtl.scene !== newCtl.scene) {
       applyCtl(newCtl);
       currentCtl = newCtl;
+    }
+
+    if (window.MSBroadcastScenes && currentTimerStartedAt !== newCtl.timerStartedAt) {
+      window.MSBroadcastScenes.setTimer(newCtl.timerDuration, newCtl.timerStartedAt);
+      currentTimerStartedAt = newCtl.timerStartedAt;
     }
   }
 
   startTicker();
   fitSeatNames();
   spawnCardEntranceBursts();
+  if (window.MSBroadcastScenes) window.MSBroadcastScenes.init();
   setInterval(poll, POLL_MS);
 })();

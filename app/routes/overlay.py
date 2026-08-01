@@ -23,6 +23,7 @@ from app.models import (
 from app.services.rating_service import RatingService, RoleTournamentStats
 from app.services.shop_service import ShopService
 from app.services.overlay_control_service import OverlayControlService
+from app.services.broadcast_scene_service import BroadcastSceneService
 from app.services.series_tournament_service import SeriesTournamentService
 from app.auth_decorators import admin_required
 
@@ -50,15 +51,21 @@ def _build_sig(tournament: Tournament, current_game, last_game, standings_scope:
     return f"cg={cg_part}|lg={lg_part}|hs={int(tournament.hide_standings)}|sc={standings_scope}"
 
 
-def _build_ctl_sig(control) -> str:
+def _build_ctl_sig(control, broadcast_state: dict) -> str:
     """Separate, small change-detection string for admin-controlled panel
     visibility — deliberately NOT folded into `_build_sig()`. That sig
     drives a full DOM replace in overlay.js; this one is diffed on its own
     and applied as a class toggle on the already-existing panel elements,
-    so show/hide animates instead of snapping on every unrelated poll."""
+    so show/hide animates instead of snapping on every unrelated poll.
+    sc/td/ts (scene, timer duration, timer started-at) come from
+    BroadcastSceneService, not OverlayControl — see that module for why
+    they're in-memory rather than a DB column."""
+    started_at = broadcast_state["timer_started_at"]
     return (
         f"tk={int(control.show_ticker)}|sh={int(control.show_seats)}"
         f"|sm={control.standings_mode}|rv={control.reveal_override or 'auto'}"
+        f"|sc={broadcast_state['scene']}|td={broadcast_state['timer_duration']}"
+        f"|ts={started_at if started_at else 0}"
     )
 
 
@@ -130,6 +137,7 @@ def _build_overlay_context(tournament_id: int) -> dict:
             hot_streak_rating = ratings_by_pid.get(pid)
 
     control = OverlayControlService.get_control(tournament_id)
+    broadcast_state = BroadcastSceneService.get(tournament_id)
     series_tournament, current_series = _resolve_series_context(tournament_id, current_game, last_game)
 
     # ── Privacy gate ─────────────────────────────────────────────────────
@@ -195,9 +203,9 @@ def _build_overlay_context(tournament_id: int) -> dict:
         hot_streak_rating=hot_streak_rating, hot_streak_count=hot_streak_count,
         can_show_standings=can_show_standings, top_ratings=top_ratings,
         full_ratings=full_ratings, standings_title=standings_title,
-        control=control,
+        control=control, broadcast_state=broadcast_state,
         sig=_build_sig(tournament, current_game, last_game, standings_scope),
-        ctl_sig=_build_ctl_sig(control),
+        ctl_sig=_build_ctl_sig(control, broadcast_state),
     )
 
 
@@ -218,11 +226,13 @@ def overlay_fragment(tournament_id: int):
 def overlay_control(tournament_id: int):
     tournament = db.session.get(Tournament, tournament_id) or abort(404)
     control = OverlayControlService.get_control(tournament_id)
+    broadcast_state = BroadcastSceneService.get(tournament_id)
     series_tournament = db.session.query(SeriesTournament).filter_by(tournament_id=tournament_id).first()
     return render_template(
         "overlay/control.html",
         tournament=tournament,
         control=control,
+        broadcast_state=broadcast_state,
         series_tournament=series_tournament,
     )
 
@@ -270,4 +280,26 @@ def overlay_set_reveal_override(tournament_id: int):
     control = OverlayControlService.set_reveal_override(tournament_id, override)
     labels = {None: "Авто", "on": "Всегда показан", "off": "Скрыт"}
     flash(f"Реванш последней игры: {labels.get(control.reveal_override, control.reveal_override)}.", "success")
+    return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/control/scene", methods=["POST"])
+@admin_required
+def overlay_set_scene(tournament_id: int):
+    scene = request.form.get("scene", "live")
+    state = BroadcastSceneService.set_scene(tournament_id, scene)
+    labels = {"starting_soon": "Starting Soon", "live": "Live", "brb": "BRB (скоро вернёмся)", "ending": "Ending"}
+    flash(f"Сцена трансляции: {labels.get(state['scene'], state['scene'])}.", "success")
+    return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/control/timer", methods=["POST"])
+@admin_required
+def overlay_start_timer(tournament_id: int):
+    try:
+        minutes = float(request.form.get("minutes", "15"))
+    except ValueError:
+        minutes = 15.0
+    BroadcastSceneService.start_timer(tournament_id, round(minutes * 60))
+    flash(f"Таймер Starting Soon запущен заново: {minutes:g} мин.", "success")
     return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))

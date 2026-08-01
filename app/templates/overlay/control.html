@@ -25,6 +25,38 @@
 
   <div class="col-md-4">
     <div class="card h-100">
+      <div class="card-header fw-semibold">🎬 Сцена трансляции</div>
+      <div class="card-body">
+        <p class="text-muted small">Полноэкранные сцены до/после эфира — переключаются на этой же странице оверлея, без второго источника в OBS.</p>
+        <div class="d-flex flex-column gap-2">
+          {% for scene, label in [('starting_soon', 'Starting Soon'), ('live', 'Live'), ('brb', 'BRB'), ('ending', 'Ending')] %}
+          <form method="POST" action="{{ url_for('overlay.overlay_set_scene', tournament_id=tournament.id) }}">
+            <input type="hidden" name="scene" value="{{ scene }}">
+            <button type="submit" class="btn w-100 {{ 'btn-success' if broadcast_state.scene == scene else 'btn-outline-secondary' }}">
+              {{ label }}{{ ' ✓' if broadcast_state.scene == scene else '' }}
+            </button>
+          </form>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">⏱ Таймер — Starting Soon</div>
+      <div class="card-body">
+        <p class="text-muted small">Обратный отсчёт на сцене Starting Soon. Запуск сбрасывает его на заданную длительность прямо сейчас.</p>
+        <form method="POST" action="{{ url_for('overlay.overlay_start_timer', tournament_id=tournament.id) }}" class="d-flex gap-2">
+          <input type="number" name="minutes" min="0" step="1" value="15" class="form-control" style="max-width:100px">
+          <button type="submit" class="btn btn-outline-secondary flex-grow-1">Запустить</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100">
       <div class="card-header fw-semibold">🃏 Полоса игроков</div>
       <div class="card-body">
         <p class="text-muted small">Карточки с фото/ником текущей игры внизу оверлея.</p>

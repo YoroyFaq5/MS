@@ -17,3 +17,6 @@ legacy_export_test/
 
 # Загруженные пользователями аватары — файлы на диске сервера, не в git.
 app/static/uploads/
+
+# Standalone OBS broadcast package (own git repo, not part of MS history)
+broadcast/

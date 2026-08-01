@@ -6,6 +6,7 @@
   <title>Оверлей — {{ tournament.name }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/overlay.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/broadcast-scenes.css') }}">
 </head>
 <body>
   <div id="overlay-root"
@@ -15,6 +16,7 @@
        data-ticker-interval-ms="8000">
     {% include "overlay/_fragment.html" %}
   </div>
+  <script src="{{ url_for('static', filename='js/broadcast-scenes.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/overlay.js') }}" defer></script>
 </body>
 </html>
