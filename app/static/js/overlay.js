@@ -48,7 +48,7 @@
   // after a DOM swap, not on every poll.
   function fitSeatNames() {
     const names = root.querySelectorAll('.ms-seat-card__name');
-    const minPx = 12;
+    const minPx = 8;
     names.forEach((el) => {
       el.style.fontSize = '';
       el.classList.remove('ms-seat-card__name--wrap');
