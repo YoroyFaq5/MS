@@ -195,9 +195,19 @@ class OverlayControl(db.Model):
     )
 
     show_ticker = Column(Boolean, default=True, nullable=False)
+    # Bottom seat-card strip — independent of standings_mode/reveal, since
+    # a caster may want to hide the players' faces (e.g. during a sponsor
+    # break) without touching the ticker/standings/reveal state at all.
+    show_seats = Column(Boolean, default=True, nullable=False)
     # top5 | full | hidden — Tournament.hide_standings still wins over this
     # regardless of value (privacy beats any broadcast-control convenience).
     standings_mode = Column(String(10), default="top5", nullable=False)
+    # For a series tournament only (see SeriesTournament — a series is just
+    # one Tournament row whose evenings are TournamentStage/TournamentSeries
+    # children): "evening" scopes the standings panels to whichever evening
+    # is currently being played, "series" shows the whole series-tournament
+    # overall standings instead. Meaningless/ignored for a plain Tournament.
+    standings_scope = Column(String(10), default="evening", nullable=False)
     # None (auto — the existing ~25s on-finish timer) | "on" (pinned open) |
     # "off" (suppressed even during the normal auto window).
     reveal_override = Column(String(10), nullable=True)
@@ -213,7 +223,9 @@ class OverlayControl(db.Model):
         return {
             "tournament_id": self.tournament_id,
             "show_ticker": self.show_ticker,
+            "show_seats": self.show_seats,
             "standings_mode": self.standings_mode,
+            "standings_scope": self.standings_scope,
             "reveal_override": self.reveal_override,
             "updated_at": self.updated_at.isoformat(),
         }

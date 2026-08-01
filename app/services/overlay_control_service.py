@@ -9,6 +9,7 @@ from app import db
 from app.models import OverlayControl
 
 STANDINGS_MODES = ("top5", "full", "hidden")
+STANDINGS_SCOPES = ("evening", "series")
 REVEAL_OVERRIDES = (None, "on", "off")
 
 
@@ -35,11 +36,27 @@ class OverlayControlService:
         return control
 
     @staticmethod
+    def toggle_seats(tournament_id: int) -> OverlayControl:
+        control = OverlayControlService.get_control(tournament_id)
+        control.show_seats = not control.show_seats
+        db.session.commit()
+        return control
+
+    @staticmethod
     def set_standings_mode(tournament_id: int, mode: str) -> OverlayControl:
         if mode not in STANDINGS_MODES:
             mode = "top5"
         control = OverlayControlService.get_control(tournament_id)
         control.standings_mode = mode
+        db.session.commit()
+        return control
+
+    @staticmethod
+    def set_standings_scope(tournament_id: int, scope: str) -> OverlayControl:
+        if scope not in STANDINGS_SCOPES:
+            scope = "evening"
+        control = OverlayControlService.get_control(tournament_id)
+        control.standings_scope = scope
         db.session.commit()
         return control
 

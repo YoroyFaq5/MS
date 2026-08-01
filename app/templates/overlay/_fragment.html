@@ -38,7 +38,7 @@
        is_finished=False by the query in overlay.py, so there's nothing to
        accidentally leak while the game is still being played. -->
   {% if current_game %}
-  <div class="overlay-seat-strip">
+  <div class="overlay-seat-strip {{ '' if control.show_seats else 'is-hidden' }}">
     {% for slot in current_slots %}
     <div class="ms-seat-card {{ 'dead' if slot.is_eliminated else '' }}" style="--d:{{ loop.index0 * 70 }}ms">
       <div class="ms-seat-card__inner">
@@ -52,7 +52,7 @@
     {% endfor %}
   </div>
   {% else %}
-  <div class="overlay-seat-strip overlay-seat-strip--empty">
+  <div class="overlay-seat-strip overlay-seat-strip--empty {{ '' if control.show_seats else 'is-hidden' }}">
     <span class="fade-in-up">Ожидание начала игры — {{ tournament.name }}</span>
   </div>
   {% endif %}
@@ -146,7 +146,7 @@
        of panels abruptly appearing/disappearing. -->
   {% if can_show_standings and top_ratings %}
   <div class="overlay-mini-standings {{ '' if control.standings_mode == 'top5' else 'is-hidden' }}">
-    <div class="overlay-mini-standings__title">Топ-5 · {{ tournament.name }}</div>
+    <div class="overlay-mini-standings__title">Топ-5 · {{ standings_title }}</div>
     <table>
       {% for r in top_ratings %}
       <tr>
@@ -161,7 +161,7 @@
 
   {% if can_show_standings and full_ratings %}
   <div class="overlay-full-standings {{ '' if control.standings_mode == 'full' else 'is-hidden' }}">
-    <div class="overlay-full-standings__title">Турнирная таблица · {{ tournament.name }}</div>
+    <div class="overlay-full-standings__title">Турнирная таблица · {{ standings_title }}</div>
     <table>
       {% for r in full_ratings %}
       <tr>

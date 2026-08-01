@@ -25,6 +25,20 @@
 
   <div class="col-md-4">
     <div class="card h-100">
+      <div class="card-header fw-semibold">🃏 Полоса игроков</div>
+      <div class="card-body">
+        <p class="text-muted small">Карточки с фото/ником текущей игры внизу оверлея.</p>
+        <form method="POST" action="{{ url_for('overlay.overlay_toggle_seats', tournament_id=tournament.id) }}">
+          <button type="submit" class="btn w-100 {{ 'btn-success' if control.show_seats else 'btn-outline-secondary' }}">
+            {% if control.show_seats %}👁 Видна — нажмите, чтобы скрыть{% else %}🙈 Скрыта — нажмите, чтобы показать{% endif %}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100">
       <div class="card-header fw-semibold">📊 Тикер статистики</div>
       <div class="card-body">
         <p class="text-muted small">Ротация MVP/лучших по ролям/серии побед в углу оверлея.</p>
@@ -81,6 +95,34 @@
       </div>
     </div>
   </div>
+
+  {% if series_tournament %}
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">📅 Зачёт (серийный турнир)</div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Этот турнир серийный — таблица на оверлее может считаться либо
+          только по текущей серии (вечеру), либо по всему турниру целиком.
+        </p>
+        <div class="d-flex flex-column gap-2">
+          {% for scope, label in [('evening', 'Эта серия (вечер)'), ('series', 'Весь турнир целиком')] %}
+          <form method="POST" action="{{ url_for('overlay.overlay_set_standings_scope', tournament_id=tournament.id) }}">
+            <input type="hidden" name="scope" value="{{ scope }}">
+            <button type="submit" class="btn w-100 {{ 'btn-success' if control.standings_scope == scope else 'btn-outline-secondary' }}">
+              {{ label }}{{ ' ✓' if control.standings_scope == scope else '' }}
+            </button>
+          </form>
+          {% endfor %}
+        </div>
+        <div class="form-text mt-2">
+          Влияет и на топ-5, и на полную таблицу; тикер и очки на
+          карточках игроков всегда считаются по всему турниру.
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
 </div>
 {% endblock %}

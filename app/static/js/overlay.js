@@ -24,12 +24,13 @@
 
   function parseCtl(str) {
     const parts = {};
-    (str || 'tk=1|sm=top5|rv=auto').split('|').forEach((pair) => {
+    (str || 'tk=1|sh=1|sm=top5|rv=auto').split('|').forEach((pair) => {
       const [key, value] = pair.split('=');
       parts[key] = value;
     });
     return {
       ticker: parts.tk === '1',
+      showSeats: parts.sh !== '0', // default to visible if the field is ever missing
       standingsMode: parts.sm || 'top5',
       revealOverride: parts.rv || 'auto',
     };
@@ -105,6 +106,9 @@
     const ticker = root.querySelector('.overlay-ticker');
     if (ticker) ticker.classList.toggle('is-hidden', !ctl.ticker);
 
+    const seats = root.querySelector('.overlay-seat-strip');
+    if (seats) seats.classList.toggle('is-hidden', !ctl.showSeats);
+
     const top5 = root.querySelector('.overlay-mini-standings');
     if (top5) top5.classList.toggle('is-hidden', ctl.standingsMode !== 'top5');
 
@@ -149,6 +153,7 @@
     }
 
     if (!currentCtl || currentCtl.ticker !== newCtl.ticker
+        || currentCtl.showSeats !== newCtl.showSeats
         || currentCtl.standingsMode !== newCtl.standingsMode
         || currentCtl.revealOverride !== newCtl.revealOverride) {
       applyCtl(newCtl);
