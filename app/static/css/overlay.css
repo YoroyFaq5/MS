@@ -2,7 +2,15 @@
    to sit over live video capture. Loaded together with main.css so the
    player cosmetics system (fx-frame-*/fx-nick-*, .avatar-circle) renders
    identically to the rest of the site; everything below is overlay-only
-   layout/animation on top of that. */
+   layout/animation on top of that.
+
+   MOTION LANGUAGE — every broadcast element below was given its own
+   distinct entrance/secondary/idle vocabulary on purpose (iris reveals,
+   split-flap flips, HUD boot-wipes, metallic conic-gradient rings, camera
+   focus-pulls, particle convergence) instead of one shared
+   opacity+translate recipe reused everywhere. Full rationale for each is
+   in the project chat, not repeated here — comments below cover the
+   non-obvious HOW (why a technique was chosen), not the WHAT. */
 
 html, body {
   background: transparent;
@@ -11,6 +19,24 @@ html, body {
   height: 100%;
   font-family: 'Inter', -apple-system, sans-serif;
   color: var(--ms-text, #F3E9D2);
+}
+
+/* Custom properties fed into conic-gradient()/mask() angles and percentages
+   need to be *registered* with a concrete syntax before the browser will
+   smoothly interpolate them frame-by-frame — without this, animating them
+   would just hard-jump between values instead of producing a real spinning
+   gradient / sweeping mask. This is what makes the metallic card ring and
+   the reveal-panel "chasing light" trace read as continuous motion instead
+   of a flicker. */
+@property --frame-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@property --ovl-trace-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
 }
 
 /* Shared "broadcast glass" recipe for every floating panel on this page
@@ -23,17 +49,16 @@ html, body {
   --ovl-radius-lg: 18px;
   --ovl-radius-md: 14px;
   --ovl-glass-bg: rgba(15,14,12,.6);
-  /* Used by the two "spotlight" panels (last-game reveal, full standings)
-     — they're read as a focal moment over whatever's happening in the
-     video behind them, so they need to stay legible regardless of how
-     bright/busy that footage is, not just tint it like the small corner
-     panels do. */
   --ovl-glass-bg-strong: rgba(10,9,8,.92);
   --ovl-glass-blur: blur(16px) saturate(160%);
   --ovl-border-gold: rgba(199,165,82,.4);
   --ovl-shadow-ambient: 0 24px 48px -16px rgba(0,0,0,.65);
   --ovl-shadow-rim: inset 0 1px 0 rgba(255,255,255,.05);
   --ovl-shadow-glow: 0 0 0 1px var(--ovl-border-gold), 0 0 28px rgba(199,165,82,.16);
+  /* Cheap tiled film-grain texture reused by every "grain" layer below —
+     one turbulence filter, painted small and tiled, instead of a shipped
+     image asset. */
+  --ovl-grain-uri: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
 }
 
 #overlay-root {
@@ -47,25 +72,68 @@ html, body {
   inset: 0;
 }
 
-/* ── Section 1: seat strip — broadcast-style portrait player cards ───────
-   Rebuilt around one rule: the FACE is the card. Everything else (name,
-   seat number) is a small annotation on top of the photo, not content
-   competing with it for space. Modeled on modern esports lower-thirds
-   (BLAST/PGL/Valorant Champions/LEC player reveals): a tall, generous
-   photo with a thin glass caption — never a photo squeezed to make room
-   for a text block. Built entirely from the site's own tokens
-   (--ms-gold/--ms-surface/--ms-text + the --ovl-* composite tokens
-   defined on #overlay-root above, shared with the ticker/standings/
-   reveal panels so the whole broadcast surface reads as one UI kit).
+/* ── Shared particle system ───────────────────────────────────────────────
+   One tiny DOM-based "spark" primitive reused for three different jobs
+   (card-lock burst, reveal-card convergence, drifting embers) via CSS
+   custom properties set inline by overlay.js per-spawn (--sp-tx/--sp-ty
+   trajectory, --sp-dur, --sp-delay, --sp-size). No canvas/WebGL — plain
+   absolutely-positioned divs, short-lived, removed on animationend. */
+.ovl-spark {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: var(--sp-size, 3px); height: var(--sp-size, 3px);
+  margin-top: calc(var(--sp-size, 3px) / -2);
+  margin-left: calc(var(--sp-size, 3px) / -2);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff5da 0%, var(--ms-gold-light, #D4B06A) 55%, transparent 76%);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.ovl-spark--burst {
+  animation: ovl-spark-burst var(--sp-dur, .9s) cubic-bezier(.15,.7,.3,1) var(--sp-delay, 0ms) both;
+}
+.ovl-spark--converge {
+  animation: ovl-spark-converge var(--sp-dur, .8s) cubic-bezier(.3,.1,.2,1) var(--sp-delay, 0ms) both;
+}
+.ovl-spark--ember {
+  animation: ovl-spark-ember var(--sp-dur, 2.4s) ease-out var(--sp-delay, 0ms) both;
+}
+@keyframes ovl-spark-burst {
+  0%   { opacity: 0; transform: translate(0,0) scale(.4); }
+  15%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--sp-tx, 20px), var(--sp-ty, -20px)) scale(1); }
+}
+@keyframes ovl-spark-converge {
+  0%   { opacity: 0; transform: translate(var(--sp-tx, 20px), var(--sp-ty, -20px)) scale(1.5); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(0,0) scale(.2); }
+}
+@keyframes ovl-spark-ember {
+  0%   { opacity: 0; transform: translate(0,0) scale(1); }
+  12%  { opacity: .9; }
+  100% { opacity: 0; transform: translate(var(--sp-tx, 0), var(--sp-ty, -70px)) scale(.3); }
+}
 
-   Sizing: flex:1 1 0 divides the strip's width evenly across however
-   many seats there are (edge-to-edge, no horizontal scroll — a Browser
-   Source can't be scrolled, so anything that overflowed used to just
-   get silently clipped). Width is therefore fixed by seat count; the
-   only lever left for making the cards genuinely BIG is a taller-than-
-   square aspect-ratio (3:4) — tall enough to read as a portrait rather
-   than a squat thumbnail, without eating the whole lower third of the
-   screen the way an extreme 9:16 did. */
+.ovl-embers {
+  position: fixed;
+  inset: 0;
+  z-index: 16;
+  pointer-events: none;
+}
+
+/* Shared "populate from alternating edges" row wipe, reused by both
+   standings tables — see §5/§6. */
+@keyframes ovl-row-wipe-l { 0% { opacity: 0; clip-path: inset(0 100% 0 0); } 100% { opacity: 1; clip-path: inset(0 0 0 0); } }
+@keyframes ovl-row-wipe-r { 0% { opacity: 0; clip-path: inset(0 0 0 100%); } 100% { opacity: 1; clip-path: inset(0 0 0 0); } }
+
+/* ═══ SECTION 1: seat strip — "stage lights igniting a lower-third" ═════
+   The strip doesn't just slide up. A thin gold filament ignites along the
+   bottom edge first (like a stage electrician bringing up a light strip),
+   then the whole backdrop rises behind it via a curtain wipe (clip-path,
+   not translateY — so it reads as fabric lifting off the bottom edge of
+   frame rather than an object flying in), and only then do individual
+   cards materialize on top of it (§2 — every card owns its own entrance,
+   this container is just the stage). */
 
 .overlay-seat-strip {
   position: fixed;
@@ -76,33 +144,32 @@ html, body {
   gap: .8rem;
   padding: 0 1rem 1.1rem;
   background: linear-gradient(to top, rgba(13,13,13,.88) 0%, rgba(13,13,13,.4) 55%, transparent 100%);
-  animation: ovl-strip-in .6s cubic-bezier(.22,1.3,.36,1) both;
+  clip-path: inset(100% 0 0 0);
+  animation: ovl-curtain-rise .5s cubic-bezier(.3,.75,.25,1) .15s both;
 }
 
-/* Admin-controlled show/hide (control.show_seats) — a proper keyframe
-   swoop instead of a plain fade, since it's pinned to the bottom edge
-   (a plain fade would leave a "ghost" gap where it used to be legible
-   mid-transition). Works by switching which named animation applies:
-   removing .is-hidden changes animation-name from ovl-strip-out to
-   ovl-strip-in, which is enough for the browser to (re)play it from
-   scratch — no JS timing needed. Same "stays in the DOM, class-only
-   toggle" pattern as the ticker/standings panels, driven by data-ctl. */
+.overlay-seat-strip__ignite {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  z-index: 2;
+  background: linear-gradient(90deg, transparent, rgba(255,241,199,.95), var(--ms-gold, #C7A552), transparent);
+  transform-origin: left center;
+  box-shadow: 0 0 18px 2px rgba(199,165,82,.7);
+  animation: ovl-ignite-sweep .7s cubic-bezier(.3,.8,.2,1) both, ovl-ignite-fade .5s ease-in .7s both;
+}
+@keyframes ovl-curtain-rise { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes ovl-ignite-sweep { 0% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
+@keyframes ovl-ignite-fade  { 0% { opacity: 1; } 100% { opacity: 0; } }
+
 .overlay-seat-strip.is-hidden {
-  opacity: 0;
+  opacity: 1;
   pointer-events: none;
-  transform: translateY(100%);
-  animation: ovl-strip-out .4s cubic-bezier(.4,0,1,1) both;
+  animation: ovl-curtain-drop .35s cubic-bezier(.4,0,1,1) both;
 }
-
-@keyframes ovl-strip-in {
-  0%   { opacity: 0; transform: translateY(80px); }
-  55%  { opacity: 1; transform: translateY(-10px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes ovl-strip-out {
-  0%   { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(80px); }
+@keyframes ovl-curtain-drop {
+  0%   { clip-path: inset(0 0 0 0); }
+  100% { clip-path: inset(100% 0 0 0); }
 }
 
 .overlay-seat-strip--empty {
@@ -114,37 +181,32 @@ html, body {
   text-shadow: 0 1px 4px rgba(0,0,0,.8);
 }
 
-/* Outer element: entrance animation + hover lift live here. Kept separate
-   from __inner (which owns the idle "breathing" scale) so the two
-   transforms compose instead of fighting over the same property. */
+/* ═══ SECTION 2: the player card — the hero object ═══════════════════════
+   Not a div with a photo. Seven independent layers, each with its own
+   job and its own timing:
+     __glow    ambient bloom behind the card (light, lives behind glass)
+     __inner   the glass slab itself — owns the 3D "materialize" entrance
+     __media   the portrait + its __sheen specular layer
+     __grain   film-grain texture (mix-blend-mode overlay)
+     __frame   a rotating conic-gradient metallic ring (masked to a ring,
+               not a plain border — see the --frame-angle custom property
+               above)
+     __plate   nameplate — its own "camera focus pull" entrance
+     __slotchip small "rubber stamp" pop for the seat number             */
+
 .ms-seat-card {
   position: relative;
-  /* #overlay-root disables pointer-events wholesale (there's no cursor in
-     an OBS Browser Source), but hover should still work if this page is
-     ever opened in a plain browser tab — re-enable just on the cards. */
   pointer-events: auto;
-  /* No max-width: flex:1 1 0 divides the full strip width evenly across
-     however many seats there are, so the row of cards always reaches
-     edge-to-edge along the bottom border. 3:4 is the balance point
-     between "big enough to read a face from across the room" and "not
-     so tall it eats the whole lower third" — see the section note above. */
   flex: 1 1 0;
   min-width: 0;
   aspect-ratio: 3 / 4;
-  opacity: 0;
-  animation: ms-card-in .65s cubic-bezier(.22,1,.36,1) both;
-  animation-delay: var(--d, 0ms);
   transition: transform .35s cubic-bezier(.22,1,.36,1);
 }
 
-/* Hover only ever fires when this page happens to be opened in a regular
-   browser (e.g. while setting up the OBS source) — harmless in OBS itself
-   since Browser Source never dispatches pointer events. */
 .ms-seat-card:hover {
   transform: translateY(-8px) scale(1.035);
   z-index: 3;
 }
-
 .ms-seat-card:hover .ms-seat-card__inner {
   border-color: var(--ms-gold-light, #D4B06A);
   box-shadow: var(--ovl-shadow-rim),
@@ -152,19 +214,44 @@ html, body {
     0 0 0 1px var(--ms-gold-light, #D4B06A),
     0 0 34px color-mix(in srgb, var(--ms-gold, #C7A552) 45%, transparent);
 }
-
 .ms-seat-card:hover .ms-seat-card__img { transform: scale(1.1); }
 
-@keyframes ms-card-in {
-  0%   { opacity: 0; transform: translateY(28px) scale(.92); }
-  60%  { opacity: 1; transform: translateY(-4px) scale(1.015); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+/* Ambient bloom — blooms outward once as the card locks in, then settles
+   into a slow *pan* of its own gradient position (never a scale pulse —
+   scale-breathing was explicitly the thing to avoid; a panning light
+   patch behind glass reads as "alive" without any object visibly moving
+   size). */
+.ms-seat-card__glow {
+  position: absolute;
+  inset: -18% -10% -6% -10%;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 999px;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255,224,158,.55), transparent 55%),
+    radial-gradient(circle at 70% 80%, rgba(199,165,82,.4), transparent 60%);
+  background-size: 200% 200%;
+  animation:
+    ms-glow-bloom .9s cubic-bezier(.2,.8,.2,1) var(--d, 0ms) both,
+    ms-glow-drift 17s ease-in-out calc(var(--d, 0ms) + .9s) infinite alternate;
+}
+@keyframes ms-glow-bloom {
+  0%   { opacity: 0; filter: blur(6px);  transform: scale(.4); }
+  50%  { opacity: .9; filter: blur(30px); transform: scale(1.25); }
+  100% { opacity: .55; filter: blur(22px); transform: scale(1); }
+}
+@keyframes ms-glow-drift {
+  0%   { background-position: 20% 10%, 80% 90%; }
+  100% { background-position: 55% 40%, 45% 60%; }
 }
 
-/* Inner element: the actual visible "glass card" surface — clips the
-   photo to the rounded corners, carries the depth (ambient shadow + gold
-   rim glow) and a barely-there idle breathing pulse so the whole strip
-   reads as quietly alive rather than a static screenshot. */
+/* The glass slab. Entrance = "materialize": the card turns to face camera
+   (rotateY, functional perspective() so no shared parent perspective is
+   needed) while an iris (clip-path circle) opens from its center and
+   motion-blur (filter: blur) resolves out of the fast part of the turn —
+   three techniques compounded into one read: "this object assembled
+   itself out of light, in 3D, fast". */
 .ms-seat-card__inner {
   position: relative;
   width: 100%;
@@ -174,14 +261,19 @@ html, body {
   background: var(--ms-surface-raised, #242424);
   border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
   box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
-  animation: ms-card-breathe 6.5s ease-in-out infinite;
-  animation-delay: var(--d, 0ms);
   transition: box-shadow .35s ease, border-color .35s ease;
+  opacity: 0;
+  will-change: transform, opacity, filter;
+  animation: ms-card-materialize .82s cubic-bezier(.16,.84,.32,1) var(--d, 0ms) both;
 }
-
-@keyframes ms-card-breathe {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.012); }
+@keyframes ms-card-materialize {
+  0%   { opacity: 0; transform: perspective(900px) rotateY(-108deg) translateZ(-60px) scale(.88);
+         clip-path: circle(0% at 50% 45%); filter: blur(9px) brightness(1.6); }
+  38%  { opacity: 1; filter: blur(4px) brightness(1.3); clip-path: circle(70% at 50% 45%); }
+  70%  { transform: perspective(900px) rotateY(8deg) translateZ(6px) scale(1.02);
+         filter: blur(0) brightness(1.05); clip-path: circle(100% at 50% 45%); }
+  100% { opacity: 1; transform: perspective(900px) rotateY(0deg) translateZ(0) scale(1);
+         filter: blur(0) brightness(1); clip-path: circle(100% at 50% 45%); }
 }
 
 .ms-seat-card__media {
@@ -194,13 +286,14 @@ html, body {
 .ms-seat-card__img {
   width: 100%; height: 100%;
   object-fit: cover;
-  /* Faces are typically framed in the upper portion of a portrait photo —
-     biasing the crop toward the top keeps the face the focal point even
-     on a very tall card instead of centering on the chest. */
   object-position: 50% 18%;
   display: block;
-  transform: scale(1.04);
   transition: transform .6s cubic-bezier(.22,1,.36,1), filter .3s ease;
+  animation: ms-img-parallax 14s ease-in-out infinite alternate;
+}
+@keyframes ms-img-parallax {
+  0%   { transform: scale(1.06) translate(0, 0); }
+  100% { transform: scale(1.09) translate(-1.5%, -1%); }
 }
 
 .ms-seat-card__placeholder {
@@ -216,20 +309,89 @@ html, body {
   transition: filter .3s ease, opacity .3s ease;
 }
 
-/* Equipped avatar-frame cosmetic, re-expressed as a ring around the
-   rectangular media box instead of avatar_circle()'s circular border —
-   the full fx-frame-theme-* animation set is geometrically tuned for
-   circles, so themed/rainbow frames get a simple gold glow ring here
-   rather than reproducing every theme's bespoke geometry. */
+/* Specular sheen: one confident diagonal pass right as the card wakes up,
+   then — instead of looping continuously (which reads cheap) — a single
+   brief pass roughly every 9s, like a studio light sweeping past. Idle
+   life should be *rare and deliberate*, not constant shimmer. */
+.ms-seat-card__sheen {
+  position: absolute; inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(75deg, transparent 40%, rgba(255,255,255,.55) 48%, rgba(255,241,199,.15) 52%, transparent 60%);
+  opacity: 0;
+  transform: translateX(-140%) skewX(-12deg);
+  animation:
+    ms-sheen-wake .7s ease-out calc(var(--d, 0ms) + .55s) both,
+    ms-sheen-idle 9s ease-in-out calc(var(--d, 0ms) + 3s) infinite;
+}
+@keyframes ms-sheen-wake {
+  0%   { opacity: 0; transform: translateX(-140%) skewX(-12deg); }
+  30%  { opacity: 1; }
+  60%  { opacity: .8; }
+  100% { opacity: 0; transform: translateX(140%) skewX(-12deg); }
+}
+@keyframes ms-sheen-idle {
+  0%, 90% { opacity: 0; transform: translateX(-140%) skewX(-12deg); }
+  95%     { opacity: .5; transform: translateX(10%) skewX(-12deg); }
+  100%    { opacity: 0; transform: translateX(140%) skewX(-12deg); }
+}
+
+/* Film grain — mix-blend-mode overlay at very low opacity, drifting in
+   discrete steps (steps(6), not a smooth glide) so it reads as texture
+   jitter rather than a sliding image. */
+.ms-seat-card__grain {
+  position: absolute; inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: .05;
+  mix-blend-mode: overlay;
+  background-image: var(--ovl-grain-uri);
+  background-size: 140px 140px;
+  animation: ms-grain-drift 9s steps(6) infinite;
+}
+@keyframes ms-grain-drift {
+  0%   { transform: translate(0, 0); }
+  100% { transform: translate(-70px, -50px); }
+}
+
+/* Metallic ring: a conic-gradient masked down to a thin stroke (padding
+   trick, mask-composite: exclude — the same "ring via double mask" recipe
+   used again below for the reveal panel's trace). Idle life is the
+   gradient's own --frame-angle rotating very slowly — brushed-metal catching
+   changing light — while entrance is a brightness/opacity ignition, kept
+   as a *separate* animation so the two never fight over the same property. */
+.ms-seat-card__frame {
+  position: absolute; inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  padding: 2px;
+  pointer-events: none;
+  opacity: 0;
+  background: conic-gradient(from var(--frame-angle, 0deg),
+    rgba(212,176,106,.15), rgba(255,241,199,.95) 8%, rgba(212,176,106,.25) 20%,
+    rgba(199,165,82,.1) 45%, rgba(255,241,199,.8) 60%, rgba(199,165,82,.15) 75%,
+    rgba(212,176,106,.15) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation:
+    ovl-frame-idle-rotate 42s linear infinite,
+    ovl-frame-ignite .9s cubic-bezier(.2,.8,.2,1) var(--d, 0ms) both;
+  animation-delay: 0ms, calc(var(--d, 0ms) + 260ms);
+}
+@keyframes ovl-frame-idle-rotate { from { --frame-angle: 0deg; } to { --frame-angle: 360deg; } }
+@keyframes ovl-frame-ignite {
+  0%   { opacity: 0; filter: brightness(1) saturate(1); }
+  55%  { opacity: 1; filter: brightness(2.6) saturate(1.4); }
+  100% { opacity: 1; filter: brightness(1) saturate(1); }
+}
+
 .ms-seat-card__media--framed {
   box-shadow: inset 0 0 0 3px var(--frame-color, var(--ms-gold-light, #D4B06A)),
               inset 0 0 22px rgba(199,165,82,.35);
 }
 
-/* Seat number — a small corner chip sitting ON the photo, never in the
-   nameplate's flow, so it can never visually compete with the name.
-   Purely a quiet reference detail (per feedback: it must not become the
-   card's dominant element). */
 .ms-seat-card__slotchip {
   position: absolute;
   top: .55rem; left: .55rem;
@@ -245,16 +407,18 @@ html, body {
   border: 1px solid rgba(199,165,82,.35);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  animation: ms-chip-stamp .35s cubic-bezier(.3,1.6,.4,1) calc(var(--d, 0ms) + .68s) both;
+}
+@keyframes ms-chip-stamp {
+  0%   { opacity: 0; transform: scale(2.2) rotate(-14deg); }
+  70%  { opacity: 1; transform: scale(.9) rotate(3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 
-/* The nameplate — a thin frosted glass caption floating OVER the very
-   bottom edge of the photo (backdrop-filter blurs the photo pixels
-   behind it; the gradient on top darkens just enough for legibility),
-   sized to fit exactly one line of text and nothing more. The photo
-   fills the entire rest of the card — this is the single biggest change
-   from earlier drafts: no separate info block stealing height from the
-   photo, no second line, no stats competing for the eye. Name first,
-   everything else is secondary. */
+/* Nameplate — its own "camera focus pull" (blur→sharp) rather than a
+   slide, landing just after the card itself locks in, like a rack-focus
+   settling onto the subject's name once the shot is framed. */
 .ms-seat-card__plate {
   position: absolute;
   left: 0; right: 0; bottom: 0;
@@ -263,15 +427,14 @@ html, body {
   background: linear-gradient(180deg, rgba(13,12,10,0) 0%, rgba(13,12,10,.6) 55%, rgba(13,12,10,.9) 100%);
   backdrop-filter: blur(8px) saturate(160%);
   -webkit-backdrop-filter: blur(8px) saturate(160%);
+  opacity: 0;
+  animation: ms-plate-focus .5s ease-out calc(var(--d, 0ms) + .5s) both;
+}
+@keyframes ms-plate-focus {
+  0%   { opacity: 0; filter: blur(5px); transform: translateY(5px); }
+  100% { opacity: 1; filter: blur(0); transform: translateY(0); }
 }
 
-/* Fit strategy applied by overlay.js's fitSeatNames(), in order: (1) one
-   line at normal size — the common case; (2) if it doesn't fit, wrap to
-   2 lines at normal size via .ms-seat-card__name--wrap (handles names
-   with a natural break like "Опасный Малый" cleanly); (3) if it STILL
-   doesn't fit in 2 lines, shrink the font down to a readable floor.
-   Ellipsis is the last-resort safety net at the floor size, not the
-   first response to a long name. */
 .ms-seat-card__name {
   font-weight: 700;
   font-size: 1rem;
@@ -282,7 +445,6 @@ html, body {
   text-overflow: ellipsis;
   text-shadow: 0 1px 4px rgba(0,0,0,.9);
 }
-
 .ms-seat-card__name--wrap {
   white-space: normal;
   word-break: break-word;
@@ -292,38 +454,51 @@ html, body {
   -webkit-box-orient: vertical;
 }
 
-/* Eliminated player — ONLY the photo layer desaturates/dims/darkens and
-   gets a diagonal "out" mark; the nameplate and seat chip are never
-   touched, so the nickname stays perfectly legible (never hide who it
-   is, just that they're out). Toggled by whatever sets
-   GameSlot.is_eliminated server-side; a plain class add/remove, so it's
-   trivial to flip from JS if a live "mark eliminated" control is ever
-   wired up too. */
+/* Eliminated player — a quick "power-down" flicker (steps(), not smooth
+   easing, for an electronic rather than photographic feel) instead of a
+   static desaturated state appearing instantly, then the diagonal "out"
+   mark wipes on rather than just being present. Nameplate/seat chip are
+   never touched — the name stays perfectly legible. */
 .ms-seat-card.dead .ms-seat-card__img,
 .ms-seat-card.dead .ms-seat-card__placeholder {
-  filter: grayscale(1) brightness(.5) saturate(.2);
-  opacity: .8;
+  animation: ms-card-powerdown .5s steps(5) both;
 }
-
+@keyframes ms-card-powerdown {
+  0%   { filter: grayscale(0) brightness(1) saturate(1);   opacity: 1; }
+  20%  { filter: grayscale(.6) brightness(1.4) saturate(.5); opacity: .4; }
+  40%  { filter: grayscale(.2) brightness(.6) saturate(.8); opacity: 1; }
+  60%  { filter: grayscale(.8) brightness(1.1) saturate(.3); opacity: .5; }
+  100% { filter: grayscale(1) brightness(.5) saturate(.2);  opacity: .8; }
+}
 .ms-seat-card.dead .ms-seat-card__media::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
+  clip-path: inset(0 100% 0 0);
   background:
     linear-gradient(115deg, transparent calc(50% - 1.5px),
       rgba(196,42,42,.9) calc(50% - 1.5px), rgba(196,42,42,.9) calc(50% + 1.5px),
       transparent calc(50% + 1.5px)),
     linear-gradient(180deg, transparent 50%, rgba(123,15,15,.4) 100%);
+  animation: ms-slash-wipe .4s ease-out .15s both;
 }
+@keyframes ms-slash-wipe { to { clip-path: inset(0 0 0 0); } }
 
-/* ── Section 2: last-game results reveal ──────────────────────────────── */
-/* "Totem of Undying"-style impact: a full-screen radial flash burst fires
-   once, then the results panel pops in with an overshoot bounce + glow,
-   and each seat card punches into place staggered by --d. Triggered by
-   overlay.js adding .reveal-active to the .overlay-fragment root (not the
-   panel itself) so the full-viewport flash and the panel react together. */
+/* ═══ SECTION 3: last-game results reveal — the climax ═══════════════════
+   Five synchronized phases instead of one flash+bounce:
+     A. Ignition   — RGB-split "sensor hit" flash + expanding shockwave ring
+     B. Aperture   — the panel opens through a literal camera-iris
+                     (clip-path circle) with a chasing metallic trace
+                     igniting its border as it opens
+     C. Assembly   — title draws itself, callouts drop in like trophies,
+                     each seat result resolves out of a burst of converging
+                     gold dust (see overlay.js spawnParticles)
+     D. Settle     — a slow ember stream drifts up out of the panel for as
+                     long as it's on screen (residual energy)
+     E. Exit       — the iris closes (a CSS transition on the base rule,
+                     not a keyframe — see comment below)                  */
 
 .totem-flash {
   position: fixed;
@@ -332,30 +507,25 @@ html, body {
   pointer-events: none;
   opacity: 0;
 }
-
 .totem-flash::before,
 .totem-flash::after {
   content: "";
   position: absolute;
   inset: 0;
 }
-
 .totem-flash::before {
   background: radial-gradient(circle at 50% 45%,
     rgba(255,255,255,.95) 0%, rgba(255,215,120,.6) 16%,
     rgba(199,165,82,.2) 38%, transparent 68%);
 }
-
 .totem-flash::after {
   background: repeating-conic-gradient(from 0deg,
     rgba(255,230,160,.4) 0deg 5deg, transparent 5deg 20deg);
   mix-blend-mode: screen;
 }
-
 .overlay-fragment.reveal-active .totem-flash {
   animation: totem-flash-burst .8s cubic-bezier(.2,.8,.3,1) both;
 }
-
 @keyframes totem-flash-burst {
   0%   { opacity: 0;   transform: scale(.15) rotate(0deg); }
   12%  { opacity: 1;   transform: scale(1)   rotate(5deg); }
@@ -363,6 +533,56 @@ html, body {
   100% { opacity: 0;   transform: scale(2.4) rotate(20deg); }
 }
 
+/* Shockwave ring — a physically-expanding border, distinct from the soft
+   gradient bloom above it, to sell "impact" rather than just "brightness". */
+.totem-flash__ring {
+  position: absolute;
+  left: 50%; top: 45%;
+  width: 10px; height: 10px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 8px solid rgba(255,238,190,.9);
+  mix-blend-mode: screen;
+  opacity: 0;
+}
+.overlay-fragment.reveal-active .totem-flash__ring {
+  animation: totem-ring-expand .7s cubic-bezier(.15,.7,.25,1) both;
+}
+@keyframes totem-ring-expand {
+  0%   { width: 10px; height: 10px; opacity: 0; border-width: 10px; }
+  15%  { opacity: 1; }
+  100% { width: 130vmax; height: 130vmax; opacity: 0; border-width: 1px; }
+}
+
+/* RGB-split "sensor hit" — three tinted, mix-blend-mode:screen layers
+   snapping from a small chromatic offset back to perfect alignment in
+   ~300ms. This is the single detail most likely to read as "how is this
+   done" — it borrows the visual grammar of a camera sensor overloading,
+   not a UI transition. */
+.totem-flash__chroma { position: absolute; inset: 0; opacity: 0; }
+.totem-flash__chroma-r, .totem-flash__chroma-g, .totem-flash__chroma-b {
+  position: absolute; inset: 0;
+  mix-blend-mode: screen;
+}
+.totem-flash__chroma-r { background: rgba(255,40,40,.5); }
+.totem-flash__chroma-g { background: rgba(255,241,199,.35); }
+.totem-flash__chroma-b { background: rgba(70,140,255,.5); }
+.overlay-fragment.reveal-active .totem-flash__chroma       { animation: totem-chroma-in .3s steps(1) both; }
+.overlay-fragment.reveal-active .totem-flash__chroma-r     { animation: totem-chroma-r .35s cubic-bezier(.2,.8,.2,1) both; }
+.overlay-fragment.reveal-active .totem-flash__chroma-g     { animation: totem-chroma-g .35s cubic-bezier(.2,.8,.2,1) both; }
+.overlay-fragment.reveal-active .totem-flash__chroma-b     { animation: totem-chroma-b .35s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes totem-chroma-in { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes totem-chroma-r  { 0% { transform: translate(-10px, 2px);  opacity: .9; } 100% { transform: translate(0,0); opacity: 0; } }
+@keyframes totem-chroma-g  { 0% { transform: translate(0, -4px);     opacity: .6; } 100% { transform: translate(0,0); opacity: 0; } }
+@keyframes totem-chroma-b  { 0% { transform: translate(10px, -2px);  opacity: .9; } 100% { transform: translate(0,0); opacity: 0; } }
+
+/* The panel: rests fully closed (a zero-radius iris, tilted back slightly
+   in 3D) and *opens* through that iris rather than scaling up from
+   nothing. On close, note there's deliberately no keyframe animation on
+   this base rule — just a transition. When .reveal-active is removed the
+   element falls back to these closed values and the transition animates
+   the iris shutting on its own; the entrance keyframe only needs to run
+   forward, never in reverse. */
 .results-reveal-panel {
   position: fixed;
   top: 50%; left: 50%;
@@ -376,43 +596,83 @@ html, body {
   padding: 1rem 1.25rem;
   opacity: 0;
   visibility: hidden;
-  transform: translate(-50%, -50%) scale(.4);
-  transition: opacity .4s ease, visibility 0s linear .4s;
+  clip-path: circle(0% at 50% 45%);
+  transform: translate(-50%, -50%) perspective(1400px) rotateX(-9deg) scale(.9);
+  transition: clip-path .4s cubic-bezier(.4,0,1,1), transform .4s cubic-bezier(.4,0,1,1),
+              opacity .35s ease .05s, visibility 0s linear .4s;
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient);
+  will-change: clip-path, transform;
 }
-
 .overlay-fragment.reveal-active .results-reveal-panel {
   opacity: 1;
   visibility: visible;
   transition: opacity .1s ease;
-  animation: totem-panel-in .6s cubic-bezier(.34,1.56,.64,1) both;
+  animation: totem-iris-open .85s cubic-bezier(.16,.9,.2,1) .18s both;
+}
+@keyframes totem-iris-open {
+  0%   { clip-path: circle(0% at 50% 45%);
+         transform: translate(-50%, -50%) perspective(1400px) rotateX(-9deg) scale(.9);
+         box-shadow: 0 0 0 rgba(199,165,82,0); }
+  55%  { clip-path: circle(62% at 50% 45%); }
+  100% { clip-path: circle(100% at 50% 45%);
+         transform: translate(-50%, -50%) perspective(1400px) rotateX(0deg) scale(1);
+         box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), 0 0 40px rgba(199,165,82,.4); }
 }
 
-@keyframes totem-panel-in {
-  0%   { transform: translate(-50%, -50%) scale(.3); box-shadow: 0 0 0 rgba(199,165,82,0); }
-  55%  { transform: translate(-50%, -50%) scale(1.08); box-shadow: 0 0 60px rgba(199,165,82,.55); }
-  100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 25px rgba(199,165,82,.25); }
-}
-
-/* The reveal panel can be wide enough to graze the corner ticker/standings
-   at narrower viewport widths — dim them out during the reveal instead of
-   fighting for space, since the reveal is meant to be the focal moment. */
 .overlay-fragment.reveal-active .overlay-ticker,
 .overlay-fragment.reveal-active .overlay-mini-standings {
-  opacity: .12;
+  /* !important: both panels hold their own entrance animation's end state
+     via fill-mode "both", which — per the cascade — outranks a plain
+     author rule. Dimming them during the reveal has to win that fight
+     explicitly. */
+  opacity: .12 !important;
 }
-
-/* Both the reveal panel and the full-table panel are "center stage"
-   elements — if an admin forces the reveal open while standings_mode is
-   "full", let the reveal win outright rather than visually overlapping. */
 .overlay-fragment.reveal-active .overlay-full-standings {
   opacity: 0 !important;
   pointer-events: none;
 }
 
+/* Border "trace" — the same ring-via-double-mask technique as the card's
+   __frame, but instead of a static rotating ring, a bright comet chases
+   once fast around it as the iris opens (the border "igniting itself
+   into existence"), then keeps chasing slowly for as long as the panel
+   is on screen — the panel's own idle life. */
+.results-reveal-panel__iris-trace {
+  position: absolute; inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: 1.5px;
+  opacity: 0;
+  background: conic-gradient(from var(--ovl-trace-angle, 0deg),
+    rgba(199,165,82,0) 0%, rgba(255,241,199,.95) 8%, rgba(199,165,82,.15) 30%,
+    rgba(199,165,82,0) 50%, rgba(255,241,199,.7) 78%, rgba(199,165,82,0) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+.overlay-fragment.reveal-active .results-reveal-panel__iris-trace {
+  animation:
+    totem-trace-chase 1.1s cubic-bezier(.2,.8,.2,1) .18s 1 both,
+    totem-trace-idle 6s linear 1.3s infinite;
+}
+@keyframes totem-trace-chase {
+  0%   { opacity: 0; --ovl-trace-angle: -120deg; }
+  20%  { opacity: 1; }
+  100% { opacity: .8; --ovl-trace-angle: 360deg; }
+}
+@keyframes totem-trace-idle {
+  from { --ovl-trace-angle: 360deg; }
+  to   { --ovl-trace-angle: 720deg; }
+}
+
+/* Title — a plotter-style wipe with a bright leading caret, like the
+   headline is being drawn rather than fading in. */
 .results-reveal-panel__header {
+  position: relative;
+  overflow: hidden;
   font-family: 'Playfair Display', Georgia, serif;
   font-weight: 700;
   font-size: 1.3rem;
@@ -422,16 +682,22 @@ html, body {
   padding-bottom: .5rem;
   margin-bottom: .5rem;
   border-bottom: 1px solid rgba(199,165,82,.3);
+  clip-path: inset(0 100% 0 0);
+  animation: totem-header-wipe .55s cubic-bezier(.65,0,.15,1) .55s both;
 }
-
-.results-reveal-panel__header--city {
-  color: var(--ms-gold-light, #D4B06A);
+.results-reveal-panel__header::after {
+  content: "";
+  position: absolute; top: 0; bottom: 0; left: 0;
+  width: 3px;
+  background: linear-gradient(180deg, transparent, rgba(255,241,199,.95), transparent);
+  box-shadow: 0 0 12px 2px rgba(255,241,199,.8);
+  animation: totem-header-caret .55s cubic-bezier(.65,0,.15,1) .55s both;
 }
+@keyframes totem-header-wipe  { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes totem-header-caret { from { left: 0%; opacity: 1; } to { left: 100%; opacity: 0; } }
 
-.results-reveal-panel__header--mafia {
-  color: var(--ms-wine-light, #C75A5A);
-}
-
+.results-reveal-panel__header--city  { color: var(--ms-gold-light, #D4B06A); }
+.results-reveal-panel__header--mafia { color: var(--ms-wine-light, #C75A5A); }
 .results-reveal-panel__game-id {
   font-size: .75rem;
   font-weight: 400;
@@ -445,6 +711,8 @@ html, body {
   margin-bottom: .75rem;
 }
 
+/* Callouts drop in like a trophy being placed on a podium — an overshoot
+   landing rather than a fade, staggered by DOM position. */
 .callout {
   display: flex;
   flex-direction: column;
@@ -452,8 +720,17 @@ html, body {
   border-radius: 8px;
   padding: .3rem .6rem;
   font-size: .78rem;
+  opacity: 0;
+  animation: totem-callout-drop .5s cubic-bezier(.34,1.7,.4,1) both;
 }
-
+.results-reveal-panel__callouts .callout:nth-child(1) { animation-delay: .78s; }
+.results-reveal-panel__callouts .callout:nth-child(2) { animation-delay: .86s; }
+.results-reveal-panel__callouts .callout:nth-child(3) { animation-delay: .94s; }
+@keyframes totem-callout-drop {
+  0%   { opacity: 0; transform: translateY(-22px) scale(.7); }
+  60%  { opacity: 1; transform: translateY(4px) scale(1.05); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
 .callout__label { color: var(--ms-muted, #8A8A8A); font-size: .68rem; }
 .callout__value { font-weight: 700; }
 
@@ -461,10 +738,23 @@ html, body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: .4rem;
-  perspective: 800px;
 }
 
+.reveal-card { position: relative; }
+.reveal-card__particles {
+  position: absolute; inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* Each seat card *resolves out of energy* rather than scaling in — high
+   brightness/blur settling to normal, timed to land exactly as its
+   converging dust motes (spawned by overlay.js into __particles) finish
+   collapsing into it. */
 .reveal-card__inner {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: .15rem;
@@ -473,31 +763,33 @@ html, body {
   padding: .4rem .5rem;
   font-size: .72rem;
   opacity: 0;
-  animation: totem-card-in .5s cubic-bezier(.34,1.56,.64,1) both;
-  animation-delay: var(--d, 0ms);
+  will-change: transform, filter, opacity;
+  animation: totem-resolve .55s cubic-bezier(.2,.8,.2,1) both;
+  animation-delay: calc(var(--d, 0ms) + 1.05s);
+}
+@keyframes totem-resolve {
+  0%   { opacity: 0; filter: blur(7px) brightness(2.4) saturate(1.6); transform: scale(.85); }
+  55%  { opacity: 1; filter: blur(2px) brightness(1.6) saturate(1.2); transform: scale(1.03); }
+  100% { opacity: 1; filter: blur(0) brightness(1) saturate(1);       transform: scale(1); }
 }
 
 .reveal-card__seat { color: var(--ms-gold-light, #D4B06A); font-weight: 600; }
 .reveal-card__name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reveal-card__score { color: var(--ms-text-dim, #D9D2C1); }
-
 .reveal-card__role { font-weight: 700; }
 .reveal-card__role--civilian { color: var(--ms-text-dim, #D9D2C1); }
 .reveal-card__role--sheriff   { color: var(--ms-gold-light, #D4B06A); }
 .reveal-card__role--don       { color: #E0463F; }
 .reveal-card__role--mafia     { color: var(--ms-wine-light, #C75A5A); }
 
-@keyframes totem-card-in {
-  0%   { opacity: 0; transform: scale(.3) translateY(8px); filter: brightness(2.4); }
-  60%  { opacity: 1; transform: scale(1.08) translateY(0); filter: brightness(1.5); }
-  100% { opacity: 1; transform: scale(1) translateY(0); filter: brightness(1); }
-}
+/* ═══ SECTION 4: rotating stats ticker — "a small show, every time" ═════
+   The panel itself arrives via a camera-focus pull (3D tilt + blur→sharp,
+   distinct from the card's iris-flip and the standings' HUD-wipe). Each
+   fact change is a miniature split-flap board flip (rotateX with a
+   darkening "flap shadow" pseudo-element) rather than a plain crossfade,
+   finished off with a gold sweep across the value and numeric stats
+   counting up (see overlay.js animateTickerValue). */
 
-/* ── Section 3: rotating stats ticker ─────────────────────────────────── */
-
-/* Sized as a compact, roughly-square stat card (min-height ≈ width)
-   instead of a wide, mostly-empty bar — a single rotating fact (label +
-   name + number) just doesn't need landscape proportions. */
 .overlay-ticker {
   position: fixed;
   top: 1.1rem; right: 1.1rem;
@@ -515,28 +807,118 @@ html, body {
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
-  animation: ovl-corner-in .55s cubic-bezier(.22,1.3,.36,1) both;
+  opacity: 0;
+  transform: perspective(600px) rotateX(-25deg) scale(.9);
+  filter: blur(6px);
+  animation: ovl-ticker-focus .5s cubic-bezier(.22,.85,.25,1) both;
+}
+@keyframes ovl-ticker-focus {
+  0%   { opacity: 0; filter: blur(9px); transform: perspective(600px) rotateX(-25deg) scale(.9); }
+  100% { opacity: 1; filter: blur(0);   transform: perspective(600px) rotateX(0deg) scale(1); }
+}
+.overlay-ticker.is-hidden {
+  pointer-events: none;
+  animation: ovl-ticker-unfocus .3s cubic-bezier(.4,0,1,1) both;
+}
+@keyframes ovl-ticker-unfocus {
+  0%   { opacity: 1; filter: blur(0); transform: perspective(600px) rotateX(0deg) scale(1); }
+  100% { opacity: 0; filter: blur(8px); transform: perspective(600px) rotateX(18deg) scale(.92); }
 }
 
-.ticker-fact { display: none; }
-.ticker-fact.active {
+.overlay-ticker__stage {
+  position: relative;
+  width: 100%; height: 100%;
+  perspective: 500px;
+}
+
+.ticker-fact {
+  position: absolute; inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   text-align: center;
   gap: .3rem;
-  animation: ticker-fade .4s ease;
+  opacity: 0;
+  visibility: hidden;
+  backface-visibility: hidden;
+  transform-origin: 50% 100%;
 }
-.ticker-fact__label { color: var(--ms-gold-light, #D4B06A); font-weight: 600; }
-.ticker-fact__value { font-weight: 700; font-size: 1.05rem; }
-.ticker-fact__extra { color: var(--ms-muted, #8A8A8A); font-size: .7rem; }
-
-@keyframes ticker-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+.ticker-fact::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.5), transparent 60%);
+  opacity: 0;
+  pointer-events: none;
+}
+.ticker-fact.active { opacity: 1; visibility: visible; transform: rotateX(0deg); }
+.ticker-fact.is-leaving {
+  visibility: visible;
+  animation: ovl-flap-out .5s cubic-bezier(.5,0,.75,0) both;
+}
+.ticker-fact.is-leaving::before { animation: ovl-flap-shade .5s ease both; }
+.ticker-fact.is-entering {
+  visibility: visible;
+  animation: ovl-flap-in .5s cubic-bezier(.25,1,.4,1) .1s both;
+}
+@keyframes ovl-flap-out {
+  0%   { opacity: 1; transform: rotateX(0deg);   filter: blur(0) brightness(1); }
+  60%  { opacity: 1; transform: rotateX(-80deg); filter: blur(3px) brightness(.6); }
+  100% { opacity: 0; transform: rotateX(-100deg); filter: blur(4px) brightness(.4); }
+}
+@keyframes ovl-flap-shade { 0% { opacity: 0; } 55% { opacity: .7; } 100% { opacity: 0; } }
+@keyframes ovl-flap-in {
+  0%   { opacity: 0; transform: rotateX(90deg); filter: blur(4px) brightness(1.8); }
+  45%  { opacity: 1; filter: blur(1px) brightness(1.3); }
+  100% { opacity: 1; transform: rotateX(0deg);  filter: blur(0) brightness(1); }
 }
 
-/* ── Section 4: mini standings ─────────────────────────────────────────── */
+.ticker-fact__label {
+  position: relative;
+  padding-bottom: 2px;
+  color: var(--ms-gold-light, #D4B06A);
+  font-weight: 600;
+}
+.ticker-fact__label::after {
+  content: "";
+  position: absolute; left: 25%; right: 25%; bottom: -2px; height: 1px;
+  background: var(--ms-gold-light, #D4B06A);
+  opacity: .35;
+  animation: ovl-label-breathe 4s ease-in-out infinite;
+}
+@keyframes ovl-label-breathe {
+  0%, 100% { left: 25%; right: 25%; opacity: .35; }
+  50%      { left: 10%; right: 10%; opacity: .7; }
+}
+
+.ticker-fact__value {
+  position: relative;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.ticker-fact.is-entering .ticker-fact__value::after {
+  content: "";
+  position: absolute; inset: -2px -6px;
+  background: linear-gradient(100deg, transparent 30%, rgba(255,241,199,.8) 48%, transparent 66%);
+  animation: ovl-value-sweep .5s ease-out .45s both;
+}
+@keyframes ovl-value-sweep {
+  0%   { transform: translateX(-120%); opacity: 0; }
+  25%  { opacity: 1; }
+  100% { transform: translateX(120%); opacity: 0; }
+}
+.ticker-fact__extra {
+  color: var(--ms-muted, #8A8A8A);
+  font-size: .7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══ SECTION 5: mini standings — a HUD, not a card ═══════════════════════
+   Corner brackets snap on like a targeting reticle locking on, the panel
+   boots via a horizontal scan wipe with a bright leading scanline (which
+   then keeps sweeping, faintly, forever — classic HUD idle tell), and an
+   uneven double-blip border flicker every ~7s reads as "electronic",
+   never as a smooth pulse. */
 
 .overlay-mini-standings {
   position: fixed;
@@ -551,7 +933,71 @@ html, body {
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
-  animation: ovl-corner-in .55s cubic-bezier(.22,1.3,.36,1) both;
+  overflow: hidden;
+  clip-path: inset(0 100% 0 0);
+  animation:
+    ovl-hud-boot .5s cubic-bezier(.65,0,.15,1) both,
+    ovl-hud-flicker 7s linear 1s infinite;
+}
+@keyframes ovl-hud-boot {
+  0%   { clip-path: inset(0 100% 0 0); opacity: .4; }
+  70%  { clip-path: inset(0 0 0 0); opacity: 1; }
+  100% { clip-path: inset(0 0 0 0); opacity: 1; }
+}
+@keyframes ovl-hud-flicker {
+  0%, 92%, 100% { border-color: var(--ovl-border-gold, rgba(199,165,82,.4)); }
+  93%           { border-color: rgba(255,241,199,.9); }
+  94%           { border-color: var(--ovl-border-gold, rgba(199,165,82,.4)); }
+  96%           { border-color: rgba(255,241,199,.7); }
+  97%           { border-color: var(--ovl-border-gold, rgba(199,165,82,.4)); }
+}
+.overlay-mini-standings.is-hidden {
+  opacity: 1;
+  pointer-events: none;
+  animation: ovl-hud-shutdown .3s cubic-bezier(.4,0,1,1) both;
+}
+@keyframes ovl-hud-shutdown {
+  0%   { clip-path: inset(0 0 0 0); opacity: 1; }
+  100% { clip-path: inset(0 100% 0 0); opacity: 0; }
+}
+
+.overlay-mini-standings__scan {
+  position: absolute; left: 0; right: 0; top: 0; height: 14px;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(212,176,106,.9), transparent);
+  animation:
+    ovl-hud-scan-boot .5s cubic-bezier(.65,0,.15,1) both,
+    ovl-hud-scan-idle 5.5s linear .6s infinite;
+}
+@keyframes ovl-hud-scan-boot {
+  0%   { top: 0; opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+@keyframes ovl-hud-scan-idle {
+  0%   { top: -10%; opacity: 0; }
+  4%   { opacity: .35; }
+  50%  { top: 100%; opacity: .12; }
+  54%  { opacity: 0; }
+  100% { opacity: 0; top: -10%; }
+}
+
+.ovl-hud-bracket {
+  position: absolute;
+  width: 14px; height: 14px;
+  z-index: 4;
+  pointer-events: none;
+  border: 2px solid var(--ms-gold-light, #D4B06A);
+  opacity: 0;
+  filter: drop-shadow(0 0 4px rgba(212,176,106,.7));
+  animation: ovl-hud-bracket-snap .3s cubic-bezier(.3,1.6,.4,1) .15s both;
+}
+.ovl-hud-bracket--tl { top: -1px; left: -1px; border-right: 0; border-bottom: 0; transform-origin: top left; }
+.ovl-hud-bracket--br { bottom: -1px; right: -1px; border-left: 0; border-top: 0; transform-origin: bottom right; }
+@keyframes ovl-hud-bracket-snap {
+  0%   { opacity: 0; transform: scale(1.8); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 .overlay-mini-standings__title {
@@ -559,17 +1005,25 @@ html, body {
   color: var(--ms-gold-light, #D4B06A);
   margin-bottom: .3rem;
 }
-
 .overlay-mini-standings table { width: 100%; border-collapse: collapse; }
 .overlay-mini-standings td { padding: .12rem 0; }
+.overlay-mini-standings tr {
+  opacity: 0;
+  animation: ovl-row-wipe-l .35s ease-out both;
+  animation-delay: calc(var(--d, 0ms) + .55s);
+}
 .overlay-mini-standings__rank { color: var(--ms-muted, #8A8A8A); width: 1.2rem; }
 .overlay-mini-standings__name { font-weight: 600; }
 .overlay-mini-standings__score { text-align: right; color: var(--ms-text-dim, #D9D2C1); }
 
-/* ── Section 5: full standings panel (admin "full table" mode) ─────────── */
-/* Same chrome as .results-reveal-panel (centered, gold border, blur) since
-   it's the same kind of "spotlight" moment — just listing every ranked
-   participant instead of one game's recap. */
+/* ═══ SECTION 6: full standings — "cut to the main analytics screen" ═════
+   A hard scene change: the panel unfolds up out of flat via a 3D rotateX
+   hinge (like a briefcase lid, or a broadcast graphics package swapping
+   scenes) rather than scaling in, rows populate from *alternating* edges
+   (odd from the left, even from the right — a different stagger identity
+   than the mini standings' uniform left wipe), and a barely-there
+   diagonal light sweep drifts across the glass forever, suggesting studio
+   light on a physical surface without ever distracting from the numbers. */
 
 .overlay-full-standings {
   position: fixed;
@@ -577,7 +1031,7 @@ html, body {
   z-index: 14;
   width: min(560px, 85vw);
   max-height: 70vh;
-  overflow-y: auto;
+  overflow: hidden auto;
   background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
   border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
   border-radius: var(--ovl-radius-lg, 18px);
@@ -585,11 +1039,42 @@ html, body {
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
-  transform: translate(-50%, -50%);
-  animation: ovl-center-in .55s cubic-bezier(.22,1.3,.36,1) both;
+  opacity: 0;
+  transform-origin: 50% 100%;
+  transform: translate(-50%, -50%) perspective(1200px) rotateX(-90deg);
+  animation: ovl-standings-unfold .65s cubic-bezier(.22,.85,.25,1) both;
+}
+@keyframes ovl-standings-unfold {
+  0%   { opacity: 0; transform: translate(-50%, -50%) perspective(1200px) rotateX(-90deg); }
+  60%  { opacity: 1; transform: translate(-50%, -50%) perspective(1200px) rotateX(12deg); }
+  100% { opacity: 1; transform: translate(-50%, -50%) perspective(1200px) rotateX(0deg); }
+}
+.overlay-full-standings.is-hidden {
+  opacity: 1;
+  pointer-events: none;
+  animation: ovl-standings-fold .4s cubic-bezier(.4,0,1,1) both;
+}
+@keyframes ovl-standings-fold {
+  0%   { opacity: 1; transform: translate(-50%, -50%) perspective(1200px) rotateX(0deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) perspective(1200px) rotateX(-70deg); }
+}
+
+.overlay-full-standings__sweep {
+  position: absolute; inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.05) 48%, rgba(255,255,255,.08) 52%, transparent 70%);
+  mix-blend-mode: soft-light;
+  animation: ovl-glass-drift 22s linear infinite;
+}
+@keyframes ovl-glass-drift {
+  0%   { transform: translateX(-30%); }
+  100% { transform: translateX(30%); }
 }
 
 .overlay-full-standings__title {
+  position: relative;
+  z-index: 1;
   font-family: 'Playfair Display', Georgia, serif;
   font-weight: 700;
   font-size: 1.1rem;
@@ -598,94 +1083,71 @@ html, body {
   margin-bottom: .5rem;
   border-bottom: 1px solid rgba(199,165,82,.3);
 }
+.overlay-full-standings__title::after {
+  content: "";
+  position: absolute; left: 0; bottom: -1px; height: 1px; width: 100%;
+  background: linear-gradient(90deg, var(--ms-gold-light, #D4B06A), transparent);
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: ovl-underline-draw .5s cubic-bezier(.4,0,.2,1) .5s both;
+}
+@keyframes ovl-underline-draw { to { transform: scaleX(1); } }
 
-.overlay-full-standings table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.overlay-full-standings table { position: relative; z-index: 1; width: 100%; border-collapse: collapse; font-size: .85rem; }
 .overlay-full-standings td { padding: .3rem 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+.overlay-full-standings tr {
+  opacity: 0;
+  animation: ovl-row-wipe-l .4s ease-out both;
+  animation-delay: calc(var(--d, 0ms) + .55s);
+}
+.overlay-full-standings tr:nth-child(even) {
+  animation-name: ovl-row-wipe-r;
+}
 .overlay-full-standings__rank { color: var(--ms-muted, #8A8A8A); width: 2rem; }
 .overlay-full-standings__name { font-weight: 600; }
 .overlay-full-standings__games { color: var(--ms-muted, #8A8A8A); text-align: center; width: 4rem; }
 .overlay-full-standings__score { text-align: right; color: var(--ms-text-dim, #D9D2C1); font-weight: 600; }
 
-/* ── Admin-controlled show/hide (ticker / top-5 / full table) ───────────
-   Panel stays in the DOM whenever the underlying data exists; only this
-   class (toggled directly on the persisted element by overlay.js, driven
-   by data-ctl — see poll()/applyCtl()) controls visibility, so switching
-   modes/toggling from the control page animates instead of the panel
-   just appearing/disappearing with the next full data refresh.
-
-   The show/hide itself is a proper keyframe pop (overshoot + a gold
-   glow flash on the way in), not a plain fade — removing .is-hidden
-   changes the computed animation-name (e.g. ovl-corner-out ->
-   ovl-corner-in), which is enough on its own to make the browser
-   (re)play the entrance animation fresh, no JS timing required. */
-.overlay-ticker.is-hidden,
-.overlay-mini-standings.is-hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-12px) scale(.94);
-  animation: ovl-corner-out .4s cubic-bezier(.4,0,1,1) both;
-}
-
-.overlay-full-standings.is-hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, -50%) translateY(-12px) scale(.94);
-  animation: ovl-center-out .4s cubic-bezier(.4,0,1,1) both;
-}
-
-@keyframes ovl-corner-in {
-  0%   { opacity: 0; transform: translateY(-26px) scale(.82);
-         box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), 0 0 0 rgba(199,165,82,0); }
-  55%  { opacity: 1; transform: translateY(5px) scale(1.05);
-         box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), 0 0 34px rgba(199,165,82,.6); }
-  100% { opacity: 1; transform: translateY(0) scale(1);
-         box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow); }
-}
-
-@keyframes ovl-corner-out {
-  0%   { opacity: 1; transform: translateY(0) scale(1); }
-  100% { opacity: 0; transform: translateY(-18px) scale(.9); }
-}
-
-@keyframes ovl-center-in {
-  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.55);
-         box-shadow: 0 0 0 rgba(199,165,82,0); }
-  55%  { opacity: 1; transform: translate(-50%, -50%) scale(1.06);
-         box-shadow: 0 0 60px rgba(199,165,82,.55); }
-  100% { opacity: 1; transform: translate(-50%, -50%) scale(1);
-         box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow); }
-}
-
-@keyframes ovl-center-out {
-  0%   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(.85); }
-}
-
+/* ── Reduced motion: every animation above collapses to an instant,
+   fully-settled state — nothing spins, sweeps, drifts, or flickers. ── */
 @media (prefers-reduced-motion: reduce) {
-  .fade-in-up, .reveal-card__inner, .ticker-fact.active, .totem-flash,
-  .results-reveal-panel, .ms-seat-card, .ms-seat-card__inner, .ms-seat-card__img {
+  *, *::before, *::after {
     animation: none !important;
+    transition: none !important;
+  }
+  .fade-in-up,
+  .ms-seat-card__inner, .ms-seat-card__glow, .ms-seat-card__grain, .ms-seat-card__sheen,
+  .ms-seat-card__frame, .ms-seat-card__plate, .ms-seat-card__slotchip, .ms-seat-card__img,
+  .ms-seat-card.dead .ms-seat-card__img, .ms-seat-card.dead .ms-seat-card__placeholder,
+  .ms-seat-card.dead .ms-seat-card__media::after,
+  .overlay-seat-strip, .overlay-seat-strip__ignite,
+  .totem-flash, .totem-flash__ring, .totem-flash__chroma, .totem-flash__chroma-r,
+  .totem-flash__chroma-g, .totem-flash__chroma-b,
+  .results-reveal-panel, .results-reveal-panel__iris-trace, .results-reveal-panel__header,
+  .results-reveal-panel__header::after, .callout, .reveal-card__inner,
+  .overlay-ticker, .ticker-fact, .ticker-fact.active, .ticker-fact__label::after,
+  .overlay-mini-standings, .overlay-mini-standings__scan, .ovl-hud-bracket, .overlay-mini-standings tr,
+  .overlay-full-standings, .overlay-full-standings__sweep, .overlay-full-standings__title::after,
+  .overlay-full-standings tr,
+  .ovl-spark {
     opacity: 1 !important;
+    visibility: visible !important;
     transform: none !important;
     filter: none !important;
+    clip-path: none !important;
   }
   .results-reveal-panel { transform: translate(-50%, -50%) !important; }
+  .overlay-full-standings { transform: translate(-50%, -50%) !important; }
   .ms-seat-card:hover, .ms-seat-card:hover .ms-seat-card__img { transform: none !important; }
+  .ovl-embers, .ovl-hud-bracket { opacity: 0 !important; }
 
-  /* Ticker/standings/seat-strip show-hide is animation-driven (see
-     ovl-corner-in/out, ovl-center-in/out, ovl-strip-in/out above) —
-     under reduced motion, skip the pop/glow/swoop entirely and just
-     toggle opacity instantly. */
-  .overlay-ticker, .overlay-mini-standings, .overlay-seat-strip {
-    animation: none !important; opacity: 1 !important; transform: none !important;
+  .overlay-ticker.is-hidden, .overlay-mini-standings.is-hidden, .overlay-seat-strip.is-hidden,
+  .totem-flash {
+    opacity: 0 !important;
   }
-  .overlay-full-standings {
-    animation: none !important; opacity: 1 !important; transform: translate(-50%, -50%) !important;
-  }
-  .overlay-ticker.is-hidden, .overlay-mini-standings.is-hidden, .overlay-seat-strip.is-hidden {
-    animation: none !important; opacity: 0 !important; transform: none !important;
-  }
-  .overlay-full-standings.is-hidden {
-    animation: none !important; opacity: 0 !important; transform: translate(-50%, -50%) !important;
-  }
+  .overlay-full-standings.is-hidden { opacity: 0 !important; transform: translate(-50%, -50%) !important; }
+  .overlay-fragment.reveal-active .overlay-ticker,
+  .overlay-fragment.reveal-active .overlay-mini-standings { opacity: .12 !important; }
+  .overlay-fragment.reveal-active .overlay-full-standings { opacity: 0 !important; }
+  .overlay-fragment.reveal-active .results-reveal-panel { opacity: 1 !important; visibility: visible !important; }
 }

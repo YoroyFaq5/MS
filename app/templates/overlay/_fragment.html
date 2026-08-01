@@ -21,6 +21,7 @@
   {% else %}
     <div class="ms-seat-card__placeholder">{{ player.display_name[0]|upper }}</div>
   {% endif %}
+  <div class="ms-seat-card__sheen" aria-hidden="true"></div>
 </div>
 {% endmacro %}
 
@@ -30,8 +31,25 @@
 
   <!-- Full-viewport flash burst for the results reveal (Totem-of-Undying
        style impact) — always present, empty, purely CSS-animated when
-       overlay.js adds .reveal-active to this same root element. -->
-  <div class="totem-flash"></div>
+       overlay.js adds .reveal-active to this same root element. Three
+       independent layers: ::before/::after on .totem-flash (radial bloom +
+       rotating ray burst, see overlay.css), .totem-flash__ring (an
+       expanding shockwave border), and .totem-flash__chroma (a 3-channel
+       RGB-split "sensor hit" flash — three tinted layers snapping back
+       into alignment). -->
+  <div class="totem-flash">
+    <div class="totem-flash__ring" aria-hidden="true"></div>
+    <div class="totem-flash__chroma" aria-hidden="true">
+      <span class="totem-flash__chroma-r"></span>
+      <span class="totem-flash__chroma-g"></span>
+      <span class="totem-flash__chroma-b"></span>
+    </div>
+  </div>
+
+  <!-- Ambient ember stream — populated/emptied by overlay.js only while
+       .reveal-active, drifting embers rising from the reveal panel as
+       "residual energy" for as long as the results stay on screen. -->
+  <div class="ovl-embers" aria-hidden="true"></div>
 
   <!-- SECTION 1: seat strip (bottom bar) — current in-progress game only.
        Roles are intentionally never rendered here: current_game is always
@@ -39,11 +57,15 @@
        accidentally leak while the game is still being played. -->
   {% if current_game %}
   <div class="overlay-seat-strip {{ '' if control.show_seats else 'is-hidden' }}">
+    <div class="overlay-seat-strip__ignite" aria-hidden="true"></div>
     {% for slot in current_slots %}
-    <div class="ms-seat-card {{ 'dead' if slot.is_eliminated else '' }}" style="--d:{{ loop.index0 * 70 }}ms">
+    <div class="ms-seat-card {{ 'dead' if slot.is_eliminated else '' }}" style="--d:{{ loop.index0 * 70 }}ms; --seed:{{ loop.index0 }}">
+      <div class="ms-seat-card__glow" aria-hidden="true"></div>
       <div class="ms-seat-card__inner">
         <span class="ms-seat-card__slotchip" title="Место {{ slot.seat_number }}">{{ slot.seat_number }}</span>
         {{ seat_card_media(slot.player, equipped_bulk.get(slot.player_id, {})) }}
+        <div class="ms-seat-card__grain" aria-hidden="true"></div>
+        <div class="ms-seat-card__frame" aria-hidden="true"></div>
         <div class="ms-seat-card__plate">
           <div class="ms-seat-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}</div>
         </div>
@@ -68,6 +90,7 @@
   {% set don_slot = (last_slots | selectattr('role.value', 'equalto', 'don') | list | first) if last_slots else none %}
   {% set win = last_game.win_side.value %}
   <div class="results-reveal-panel">
+    <div class="results-reveal-panel__iris-trace" aria-hidden="true"></div>
     <div class="results-reveal-panel__header results-reveal-panel__header--{{ win }}">
       {% if win == 'city' %}🏙 Победа города
       {% elif win == 'mafia' %}🔫 Победа мафии
@@ -99,6 +122,7 @@
     <div class="results-reveal-panel__seats">
       {% for slot in last_slots %}
       <div class="reveal-card" style="--d:{{ loop.index0 * 90 }}ms">
+        <div class="reveal-card__particles" aria-hidden="true"></div>
         <div class="reveal-card__inner">
           <span class="reveal-card__seat">#{{ slot.seat_number }}</span>
           <span class="reveal-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}</span>
@@ -122,13 +146,16 @@
   {% if hot_streak_rating and hot_streak_count >= 2 %}{% set _ = facts.append({'label': '🔥 Серия побед', 'rating': hot_streak_rating, 'value': hot_streak_count}) %}{% endif %}
   {% if facts %}
   <div class="overlay-ticker {{ '' if control.show_ticker else 'is-hidden' }}">
-    {% for fact in facts %}
-    <div class="ticker-fact {{ 'active' if loop.first }}">
-      <span class="ticker-fact__label">{{ fact.label }}</span>
-      <span class="ticker-fact__value">{{ player_name(fact.rating, equipped_bulk.get(fact.rating.player_id, {})) }}</span>
-      <span class="ticker-fact__extra">{{ fact.value|round(2) if fact.value is number else fact.value }}</span>
+    <div class="overlay-ticker__stage">
+      {% for fact in facts %}
+      {% set is_num = fact.value is number %}
+      <div class="ticker-fact {{ 'active' if loop.first }}">
+        <span class="ticker-fact__label">{{ fact.label }}</span>
+        <span class="ticker-fact__value">{{ player_name(fact.rating, equipped_bulk.get(fact.rating.player_id, {})) }}</span>
+        <span class="ticker-fact__extra" {% if is_num %}data-count-to="{{ fact.value|round(2) }}"{% endif %}>{{ fact.value|round(2) if is_num else fact.value }}</span>
+      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
   </div>
   {% endif %}
 
@@ -146,10 +173,13 @@
        of panels abruptly appearing/disappearing. -->
   {% if can_show_standings and top_ratings %}
   <div class="overlay-mini-standings {{ '' if control.standings_mode == 'top5' else 'is-hidden' }}">
+    <span class="ovl-hud-bracket ovl-hud-bracket--tl" aria-hidden="true"></span>
+    <span class="ovl-hud-bracket ovl-hud-bracket--br" aria-hidden="true"></span>
+    <div class="overlay-mini-standings__scan" aria-hidden="true"></div>
     <div class="overlay-mini-standings__title">Топ-5 · {{ standings_title }}</div>
     <table>
       {% for r in top_ratings %}
-      <tr>
+      <tr style="--d:{{ loop.index0 * 55 }}ms">
         <td class="overlay-mini-standings__rank">{{ r.rank }}</td>
         <td class="overlay-mini-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
         <td class="overlay-mini-standings__score">{{ r.total_score|round(2) }}</td>
@@ -161,10 +191,11 @@
 
   {% if can_show_standings and full_ratings %}
   <div class="overlay-full-standings {{ '' if control.standings_mode == 'full' else 'is-hidden' }}">
+    <div class="overlay-full-standings__sweep" aria-hidden="true"></div>
     <div class="overlay-full-standings__title">Турнирная таблица · {{ standings_title }}</div>
     <table>
       {% for r in full_ratings %}
-      <tr>
+      <tr style="--d:{{ loop.index0 * 40 }}ms">
         <td class="overlay-full-standings__rank">{{ r.rank }}</td>
         <td class="overlay-full-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
         <td class="overlay-full-standings__games">{{ r.games_played }} игр</td>
