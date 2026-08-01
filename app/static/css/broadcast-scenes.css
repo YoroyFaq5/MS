@@ -1,6 +1,6 @@
 /* Broadcast full-screen scenes (Starting Soon / BRB / Ending) for
-   /overlay/<tournament_id> — loaded after overlay.css, reuses its --ms-*/
-   --ovl-* tokens so this reads as the SAME UI kit, not a bolted-on skin.
+   /overlay/<tournament_id> — loaded after overlay.css, reuses its
+   --ms-* / --ovl-* tokens so this reads as the SAME UI kit, not a bolted-on skin.
    Switched via #overlay-root [data-scene-panel] + .is-active, driven from
    app/static/js/overlay.js (poll/applyCtl) + broadcast-scenes.js (canvas +
    timer + the actual class toggle). See app/services/broadcast_scene_service.py
