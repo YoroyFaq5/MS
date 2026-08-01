@@ -30,7 +30,7 @@ from app.auth_decorators import admin_required
 overlay_bp = Blueprint("overlay", __name__)
 
 
-def _build_sig(tournament: Tournament, current_game, last_game, standings_scope: str, idle_content: str, layout_mode: str) -> str:
+def _build_sig(tournament: Tournament, current_game, last_game, standings_scope: str, layout_mode: str) -> str:
     """Cheap change-detection string for the client poller — not a hash,
     never shown to viewers. A new finished game always changes this sig,
     so 'DOM replaced' and 'a game just finished' are the same poll cycle
@@ -41,23 +41,24 @@ def _build_sig(tournament: Tournament, current_game, last_game, standings_scope:
     deliberate admin decision, not something toggled every few seconds
     like standings_mode, so a full redraw on change is an acceptable
     trade-off for not having to keep 2x the standings markup in the DOM
-    at all times. idle_content (logo/standings/last_game/ticker — which
-    of several structurally different markups fills the commentators-
-    layout hero) and layout_mode (commentators/game — which of those two
+    at all times. layout_mode (commentators/game — which of those two
     structurally different layouts is shown at all, admin-picked rather
-    than derived from current_game) are the same kind of rare admin
-    decision, so both are folded in here too rather than getting their
-    own ctl_sig class-toggle machinery."""
+    than derived from current_game) is the same kind of rare admin
+    decision, so it's folded in here too. idle_content is deliberately
+    NOT here (see _build_ctl_sig) — switching it is common enough while
+    casting that a full DOM replace on every change was visibly janky
+    (the whole page flashed), so it gets the same class-toggle treatment
+    as ticker/standings-mode instead."""
     if current_game:
         seat_pids = tuple(s.player_id for s in sorted(current_game.slots, key=lambda s: s.seat_number))
         cg_part = f"{current_game.id}:{seat_pids}"
     else:
         cg_part = "none"
     lg_part = str(last_game.id) if last_game else "none"
-    return f"cg={cg_part}|lg={lg_part}|hs={int(tournament.hide_standings)}|sc={standings_scope}|ic={idle_content}|lm={layout_mode}"
+    return f"cg={cg_part}|lg={lg_part}|hs={int(tournament.hide_standings)}|sc={standings_scope}|lm={layout_mode}"
 
 
-def _build_ctl_sig(control, broadcast_state: dict) -> str:
+def _build_ctl_sig(control, broadcast_state: dict, effective_idle_content: str) -> str:
     """Separate, small change-detection string for admin-controlled panel
     visibility — deliberately NOT folded into `_build_sig()`. That sig
     drives a full DOM replace in overlay.js; this one is diffed on its own
@@ -65,13 +66,18 @@ def _build_ctl_sig(control, broadcast_state: dict) -> str:
     so show/hide animates instead of snapping on every unrelated poll.
     sc/td/ts (scene, timer duration, timer started-at) come from
     BroadcastSceneService, not OverlayControl — see that module for why
-    they're in-memory rather than a DB column."""
+    they're in-memory rather than a DB column. effective_idle_content is
+    control.idle_content with the same data-availability fallback to
+    'logo' the template itself uses (see _build_overlay_context) — all
+    four idle-hero center variants are always in the DOM (like the
+    ticker/standings panels), this just says which one currently has
+    the .is-active class."""
     started_at = broadcast_state["timer_started_at"]
     return (
         f"tk={int(control.show_ticker)}|sh={int(control.show_seats)}"
         f"|sm={control.standings_mode}|rv={control.reveal_override or 'auto'}"
         f"|sc={broadcast_state['scene']}|td={broadcast_state['timer_duration']}"
-        f"|ts={started_at if started_at else 0}"
+        f"|ts={started_at if started_at else 0}|ic={effective_idle_content}"
     )
 
 
@@ -200,6 +206,22 @@ def _build_overlay_context(tournament_id: int) -> dict:
     )
     equipped_bulk = ShopService.get_equipped_bulk(list(all_player_ids))
 
+    # Mirrors the has-data checks the template itself uses to gate each
+    # idle-hero slot — see effective_idle_content's docstring in
+    # _build_ctl_sig for why this needs to exist in Python too.
+    has_facts = bool(
+        superlatives.get("mvp") or superlatives.get("don") or superlatives.get("sheriff")
+        or superlatives.get("civilian") or superlatives.get("mafia")
+        or (hot_streak_rating and hot_streak_count >= 2)
+    )
+    effective_idle_content = control.idle_content
+    if effective_idle_content == "standings" and not (can_show_standings and full_ratings):
+        effective_idle_content = "logo"
+    elif effective_idle_content == "last_game" and not last_game:
+        effective_idle_content = "logo"
+    elif effective_idle_content == "ticker" and not has_facts:
+        effective_idle_content = "logo"
+
     return dict(
         tournament=tournament,
         current_game=current_game, current_slots=current_slots,
@@ -210,8 +232,9 @@ def _build_overlay_context(tournament_id: int) -> dict:
         can_show_standings=can_show_standings, top_ratings=top_ratings,
         full_ratings=full_ratings, standings_title=standings_title,
         control=control, broadcast_state=broadcast_state,
-        sig=_build_sig(tournament, current_game, last_game, standings_scope, control.idle_content, control.layout_mode),
-        ctl_sig=_build_ctl_sig(control, broadcast_state),
+        effective_idle_content=effective_idle_content,
+        sig=_build_sig(tournament, current_game, last_game, standings_scope, control.layout_mode),
+        ctl_sig=_build_ctl_sig(control, broadcast_state, effective_idle_content),
     )
 
 

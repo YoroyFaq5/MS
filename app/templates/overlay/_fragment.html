@@ -132,45 +132,63 @@
       <span class="overlay-idle-hero__slot-label">Комментатор</span>
     </div>
 
+    <!-- All four variants are always in the DOM at once (same reasoning
+         as the ticker/standings corner panels below) — only the one
+         matching effective_idle_content carries .is-active; overlay.js
+         toggles this via ctl_sig (data-ctl's `ic=` field) on every poll,
+         same mechanism as show_ticker/standings_mode, so switching which
+         one is visible is a CSS opacity crossfade instead of the full
+         page replace a data-sig change would cause (that used to make
+         the whole page visibly flash on every click in the control
+         panel). -->
     <div class="overlay-idle-hero__center">
-      {% if control.idle_content == 'standings' and can_show_standings and full_ratings %}
-      <div class="overlay-idle-hero__panel overlay-idle-hero__panel--standings">
-        <div class="overlay-idle-hero__panel-title">Турнирная таблица · {{ standings_title }}</div>
-        <table>
-          {% for r in full_ratings %}
-          <tr style="--d:{{ loop.index0 * 40 }}ms">
-            <td class="overlay-full-standings__rank">{{ r.rank }}</td>
-            <td class="overlay-full-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
-            <td class="overlay-full-standings__games">{{ r.games_played }} игр</td>
-            <td class="overlay-full-standings__score">{{ r.total_score|round(2) }}</td>
-          </tr>
-          {% endfor %}
-        </table>
-      </div>
-
-      {% elif control.idle_content == 'last_game' and last_game %}
-      <div class="overlay-idle-hero__panel overlay-idle-hero__panel--last-game">
-        {{ render_match_card(last_game, last_slots, equipped_bulk) }}
-      </div>
-
-      {% elif control.idle_content == 'ticker' and facts %}
-      <div class="overlay-idle-hero__panel overlay-idle-hero__panel--ticker">
-        {% for fact in facts %}
-        {% set is_num = fact.value is number %}
-        <div class="overlay-idle-hero__fact" style="--d:{{ loop.index0 * 60 }}ms">
-          <span class="ticker-fact__label">{{ fact.label }}</span>
-          <span class="ticker-fact__value">{{ player_name(fact.rating, equipped_bulk.get(fact.rating.player_id, {})) }}</span>
-          <span class="ticker-fact__extra">{{ fact.value|round(2) if is_num else fact.value }}</span>
+      <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'logo' else '' }}" data-idle-slot="logo">
+        <div class="overlay-idle-hero__logo">
+          <img src="{{ url_for('static', filename='img/MS_1_.png') }}" alt="Mafia Style" class="overlay-idle-hero__logo-img">
         </div>
-        {% endfor %}
+        <h1 class="overlay-idle-hero__wordmark">MAFIA STYLE</h1>
+        <p class="overlay-idle-hero__tagline">{{ tournament.name }}</p>
       </div>
 
-      {% else %}
-      <div class="overlay-idle-hero__logo">
-        <img src="{{ url_for('static', filename='img/MS_1_.png') }}" alt="Mafia Style" class="overlay-idle-hero__logo-img">
+      {% if can_show_standings and full_ratings %}
+      <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'standings' else '' }}" data-idle-slot="standings">
+        <div class="overlay-idle-hero__panel overlay-idle-hero__panel--standings">
+          <div class="overlay-idle-hero__panel-title">Турнирная таблица · {{ standings_title }}</div>
+          <table>
+            {% for r in full_ratings %}
+            <tr style="--d:{{ loop.index0 * 40 }}ms">
+              <td class="overlay-full-standings__rank">{{ r.rank }}</td>
+              <td class="overlay-full-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
+              <td class="overlay-full-standings__games">{{ r.games_played }} игр</td>
+              <td class="overlay-full-standings__score">{{ r.total_score|round(2) }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
       </div>
-      <h1 class="overlay-idle-hero__wordmark">MAFIA STYLE</h1>
-      <p class="overlay-idle-hero__tagline">{{ tournament.name }}</p>
+      {% endif %}
+
+      {% if last_game %}
+      <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'last_game' else '' }}" data-idle-slot="last_game">
+        <div class="overlay-idle-hero__panel overlay-idle-hero__panel--last-game">
+          {{ render_match_card(last_game, last_slots, equipped_bulk) }}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if facts %}
+      <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'ticker' else '' }}" data-idle-slot="ticker">
+        <div class="overlay-idle-hero__panel overlay-idle-hero__panel--ticker">
+          {% for fact in facts %}
+          {% set is_num = fact.value is number %}
+          <div class="overlay-idle-hero__fact" style="--d:{{ loop.index0 * 60 }}ms">
+            <span class="ticker-fact__label">{{ fact.label }}</span>
+            <span class="ticker-fact__value">{{ player_name(fact.rating, equipped_bulk.get(fact.rating.player_id, {})) }}</span>
+            <span class="ticker-fact__extra">{{ fact.value|round(2) if is_num else fact.value }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
       {% endif %}
     </div>
 

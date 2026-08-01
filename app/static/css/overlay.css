@@ -1175,14 +1175,34 @@ html, body {
   text-transform: uppercase;
 }
 
+/* Fixed box so swapping which slot is active doesn't reflow/resize the
+   center column (a table is much taller than the logo block) — each
+   slot is absolutely positioned to fill it and crossfades via opacity,
+   see .overlay-idle-hero__slot below. */
 .overlay-idle-hero__center {
+  position: relative;
+  width: 100%;
+  height: min(72vh, 660px);
+  min-width: 0;
+}
+
+.overlay-idle-hero__slot {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   gap: 16px;
-  min-width: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .3s ease, visibility 0s linear .3s;
+}
+.overlay-idle-hero__slot.is-active {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity .3s ease, visibility 0s linear 0s;
 }
 
 .overlay-idle-hero__logo { width: 150px; margin-bottom: 4px; }
@@ -1208,7 +1228,7 @@ html, body {
 
 .overlay-idle-hero__panel {
   width: 100%;
-  max-height: 78vh;
+  max-height: 100%;
   overflow: hidden auto;
   background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
   border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));

@@ -33,7 +33,7 @@
 
   function parseCtl(str) {
     const parts = {};
-    (str || 'tk=1|sh=1|sm=top5|rv=auto|sc=live|td=900|ts=0').split('|').forEach((pair) => {
+    (str || 'tk=1|sh=1|sm=top5|rv=auto|sc=live|td=900|ts=0|ic=logo').split('|').forEach((pair) => {
       const [key, value] = pair.split('=');
       parts[key] = value;
     });
@@ -47,6 +47,9 @@
       scene: parts.sc || 'live',
       timerDuration: parseFloat(parts.td || '0'),
       timerStartedAt: parseFloat(parts.ts || '0') || null,
+      // Which of the (always-in-DOM) idle-hero center slots is active —
+      // see app/routes/overlay.py's effective_idle_content.
+      idleContent: parts.ic || 'logo',
     };
   }
 
@@ -272,6 +275,10 @@
     const full = root.querySelector('.overlay-full-standings');
     if (full) full.classList.toggle('is-hidden', ctl.standingsMode !== 'full');
 
+    root.querySelectorAll('[data-idle-slot]').forEach((slot) => {
+      slot.classList.toggle('is-active', slot.dataset.idleSlot === ctl.idleContent);
+    });
+
     if (ctl.revealOverride === 'on') triggerReveal(true);
     else if (ctl.revealOverride === 'off') hideReveal();
     // 'auto' — leave whatever the lastFinishedId-driven trigger already set.
@@ -317,7 +324,8 @@
         || currentCtl.showSeats !== newCtl.showSeats
         || currentCtl.standingsMode !== newCtl.standingsMode
         || currentCtl.revealOverride !== newCtl.revealOverride
-        || currentCtl.scene !== newCtl.scene) {
+        || currentCtl.scene !== newCtl.scene
+        || currentCtl.idleContent !== newCtl.idleContent) {
       applyCtl(newCtl);
       currentCtl = newCtl;
     }
