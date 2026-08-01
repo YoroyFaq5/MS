@@ -12,6 +12,7 @@ STANDINGS_MODES = ("top5", "full", "hidden")
 STANDINGS_SCOPES = ("evening", "series")
 REVEAL_OVERRIDES = (None, "on", "off")
 IDLE_CONTENT_MODES = ("logo", "standings", "last_game", "ticker")
+LAYOUT_MODES = ("game", "commentators")
 
 
 class OverlayControlService:
@@ -76,5 +77,14 @@ class OverlayControlService:
             mode = "logo"
         control = OverlayControlService.get_control(tournament_id)
         control.idle_content = mode
+        db.session.commit()
+        return control
+
+    @staticmethod
+    def set_layout_mode(tournament_id: int, mode: str) -> OverlayControl:
+        if mode not in LAYOUT_MODES:
+            mode = "game"
+        control = OverlayControlService.get_control(tournament_id)
+        control.layout_mode = mode
         db.session.commit()
         return control

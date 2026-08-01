@@ -211,13 +211,20 @@ class OverlayControl(db.Model):
     # None (auto — the existing ~25s on-finish timer) | "on" (pinned open) |
     # "off" (suppressed even during the normal auto window).
     reveal_override = Column(String(10), nullable=True)
-    # What the centered "waiting for the game" hero (see overlay/_fragment.html,
-    # only rendered while current_game is None) shows in its middle slot:
-    # logo | standings | last_game | ticker. Independent of standings_mode/
-    # show_ticker — those govern the corner panels during actual gameplay,
-    # this is a separate, bigger, centered presentation for the dead air
-    # before the first game of a session starts.
+    # What the centered "waiting for the game" hero (see overlay/_fragment.html)
+    # shows in its middle slot: logo | standings | last_game | ticker.
+    # Independent of standings_mode/show_ticker — those govern the corner
+    # panels during actual gameplay, this is a separate, bigger, centered
+    # presentation for the commentators-layout hero (see layout_mode below).
     idle_content = Column(String(10), default="logo", nullable=False)
+    # Admin-picked, NOT auto-derived from current_game: "commentators" shows
+    # the idle hero (cam/chat placeholder frames + the switchable idle_content
+    # center panel) and hides the seat strip entirely; "game" shows the plain
+    # seat-card strip (current game, or the "waiting" bar if none) and hides
+    # the hero/placeholders — full width/attention for gameplay, no reserved
+    # cam/chat real estate. The corner ticker/standings are unaffected by
+    # this either way — they're independent panels, not part of either layout.
+    layout_mode = Column(String(12), default="game", nullable=False)
 
     updated_at = Column(
         DateTime(timezone=True),
@@ -235,6 +242,7 @@ class OverlayControl(db.Model):
             "standings_scope": self.standings_scope,
             "reveal_override": self.reveal_override,
             "idle_content": self.idle_content,
+            "layout_mode": self.layout_mode,
             "updated_at": self.updated_at.isoformat(),
         }
 

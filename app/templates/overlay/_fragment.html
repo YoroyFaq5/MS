@@ -80,10 +80,15 @@
        "residual energy" for as long as the results stay on screen. -->
   <div class="ovl-embers" aria-hidden="true"></div>
 
-  <!-- SECTION 1: seat strip (bottom bar) — current in-progress game only.
-       Roles are intentionally never rendered here: current_game is always
-       is_finished=False by the query in overlay.py, so there's nothing to
-       accidentally leak while the game is still being played. -->
+  <!-- SECTION 1: seat strip (bottom bar) — only in "game" layout_mode
+       (admin-picked, see control.html — NOT derived from current_game;
+       "commentators" mode below hides this entirely regardless of
+       whether a game is actually running). Current in-progress game
+       only when there is one. Roles are intentionally never rendered
+       here: current_game is always is_finished=False by the query in
+       overlay.py, so there's nothing to accidentally leak while the
+       game is still being played. -->
+  {% if control.layout_mode == 'game' %}
   {% if current_game %}
   <div class="overlay-seat-strip {{ '' if control.show_seats else 'is-hidden' }}">
     <div class="overlay-seat-strip__ignite" aria-hidden="true"></div>
@@ -107,17 +112,20 @@
     <span class="fade-in-up">Ожидание начала игры — {{ tournament.name }}</span>
   </div>
   {% endif %}
+  {% endif %}
 
-  <!-- IDLE HERO: only while there's no current game — reserves screen
-       space for the caster's own webcam (left) and Twitch chat (right;
-       both are separate OBS Browser/Video Capture Sources positioned to
-       match these frames, not rendered by this page) and shows one of
-       several things in the middle, switched from the control page
-       (control.idle_content): the tournament logo (default), the full
-       standings, the last game's results, or the ticker's facts — all
-       reusing the exact same markup/classes as their "normal" corner/
-       reveal-panel counterparts so they inherit that styling for free. -->
-  {% if not current_game %}
+  <!-- IDLE HERO: only in "commentators" layout_mode (admin-picked,
+       independent of whether a game is currently running) — reserves
+       screen space for the caster's own webcam (left) and Twitch chat
+       (right; both are separate OBS Browser/Video Capture Sources
+       positioned to match these frames, not rendered by this page) and
+       shows one of several things in the middle, switched from the
+       control page (control.idle_content): the tournament logo
+       (default), the full standings, the last game's results, or the
+       ticker's facts — all reusing the exact same markup/classes as
+       their "normal" corner/reveal-panel counterparts so they inherit
+       that styling for free. -->
+  {% if control.layout_mode == 'commentators' %}
   <div class="overlay-idle-hero">
     <div class="overlay-idle-hero__cam" aria-hidden="false">
       <span class="overlay-idle-hero__slot-icon" aria-hidden="true">🎙️</span>

@@ -44,6 +44,30 @@
 
   <div class="col-md-4">
     <div class="card h-100">
+      <div class="card-header fw-semibold">🎙 Режим эфира (Live)</div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Переключается вручную, не зависит от того, идёт ли сейчас игра.
+          «С комментаторами» — плейсхолдеры под камеру/чат Twitch и
+          переключаемый центральный блок (см. карточку ниже). «Игра» —
+          обычная полоса карточек игроков, без плейсхолдеров.
+        </p>
+        <div class="d-flex flex-column gap-2">
+          {% for mode, label in [('commentators', 'С комментаторами'), ('game', 'Игра')] %}
+          <form method="POST" action="{{ url_for('overlay.overlay_set_layout_mode', tournament_id=tournament.id) }}">
+            <input type="hidden" name="mode" value="{{ mode }}">
+            <button type="submit" class="btn w-100 {{ 'btn-success' if control.layout_mode == mode else 'btn-outline-secondary' }}">
+              {{ label }}{{ ' ✓' if control.layout_mode == mode else '' }}
+            </button>
+          </form>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100">
       <div class="card-header fw-semibold">⏱ Таймер — Starting Soon</div>
       <div class="card-body">
         <p class="text-muted small">Обратный отсчёт на сцене Starting Soon. Запуск сбрасывает его на заданную длительность прямо сейчас.</p>
@@ -130,12 +154,12 @@
 
   <div class="col-md-4">
     <div class="card h-100">
-      <div class="card-header fw-semibold">⏳ Экран ожидания (Live, игры ещё нет)</div>
+      <div class="card-header fw-semibold">⏳ Центр экрана «С комментаторами»</div>
       <div class="card-body">
         <p class="text-muted small">
-          Пока не идёт ни одна игра, по центру оверлея — крупный блок;
-          слева и справа зарезервировано место под квадрат комментатора
-          и чат Twitch (сами источники добавляются в OBS отдельно).
+          Что показывать по центру, пока включён режим эфира
+          «С комментаторами» (см. карточку выше) — не зависит от того,
+          идёт ли сейчас игра.
         </p>
         <div class="d-flex flex-column gap-2">
           {% for mode, label in [('logo', 'Лого турнира'), ('standings', 'Турнирная таблица'), ('last_game', 'Прошлая игра'), ('ticker', 'Интересные факты')] %}

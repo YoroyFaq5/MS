@@ -30,7 +30,7 @@ from app.auth_decorators import admin_required
 overlay_bp = Blueprint("overlay", __name__)
 
 
-def _build_sig(tournament: Tournament, current_game, last_game, standings_scope: str, idle_content: str) -> str:
+def _build_sig(tournament: Tournament, current_game, last_game, standings_scope: str, idle_content: str, layout_mode: str) -> str:
     """Cheap change-detection string for the client poller — not a hash,
     never shown to viewers. A new finished game always changes this sig,
     so 'DOM replaced' and 'a game just finished' are the same poll cycle
@@ -42,16 +42,19 @@ def _build_sig(tournament: Tournament, current_game, last_game, standings_scope:
     like standings_mode, so a full redraw on change is an acceptable
     trade-off for not having to keep 2x the standings markup in the DOM
     at all times. idle_content (logo/standings/last_game/ticker — which
-    of several structurally different markups fills the no-game-yet hero)
-    is the same kind of rare admin decision, so it's folded in here too
-    rather than getting its own ctl_sig class-toggle machinery."""
+    of several structurally different markups fills the commentators-
+    layout hero) and layout_mode (commentators/game — which of those two
+    structurally different layouts is shown at all, admin-picked rather
+    than derived from current_game) are the same kind of rare admin
+    decision, so both are folded in here too rather than getting their
+    own ctl_sig class-toggle machinery."""
     if current_game:
         seat_pids = tuple(s.player_id for s in sorted(current_game.slots, key=lambda s: s.seat_number))
         cg_part = f"{current_game.id}:{seat_pids}"
     else:
         cg_part = "none"
     lg_part = str(last_game.id) if last_game else "none"
-    return f"cg={cg_part}|lg={lg_part}|hs={int(tournament.hide_standings)}|sc={standings_scope}|ic={idle_content}"
+    return f"cg={cg_part}|lg={lg_part}|hs={int(tournament.hide_standings)}|sc={standings_scope}|ic={idle_content}|lm={layout_mode}"
 
 
 def _build_ctl_sig(control, broadcast_state: dict) -> str:
@@ -207,7 +210,7 @@ def _build_overlay_context(tournament_id: int) -> dict:
         can_show_standings=can_show_standings, top_ratings=top_ratings,
         full_ratings=full_ratings, standings_title=standings_title,
         control=control, broadcast_state=broadcast_state,
-        sig=_build_sig(tournament, current_game, last_game, standings_scope, control.idle_content),
+        sig=_build_sig(tournament, current_game, last_game, standings_scope, control.idle_content, control.layout_mode),
         ctl_sig=_build_ctl_sig(control, broadcast_state),
     )
 
@@ -293,6 +296,16 @@ def overlay_set_idle_content(tournament_id: int):
     control = OverlayControlService.set_idle_content(tournament_id, mode)
     labels = {"logo": "Лого турнира", "standings": "Турнирная таблица", "last_game": "Прошлая игра", "ticker": "Интересные факты"}
     flash(f"Экран ожидания (без игры): {labels.get(control.idle_content, control.idle_content)}.", "success")
+    return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/control/layout-mode", methods=["POST"])
+@admin_required
+def overlay_set_layout_mode(tournament_id: int):
+    mode = request.form.get("mode", "game")
+    control = OverlayControlService.set_layout_mode(tournament_id, mode)
+    labels = {"commentators": "С комментаторами", "game": "Игра"}
+    flash(f"Режим эфира: {labels.get(control.layout_mode, control.layout_mode)}.", "success")
     return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
 
 
