@@ -587,13 +587,13 @@ html, body {
   position: fixed;
   top: 50%; left: 50%;
   z-index: 15;
-  width: min(940px, 90vw);
+  width: min(1220px, 90vw);
   max-height: 62vh;
   overflow-y: auto;
   background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
   border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
   border-radius: var(--ovl-radius-lg, 18px);
-  padding: 1.3rem 1.6rem;
+  padding: 1.7rem 2.1rem;
   opacity: 0;
   visibility: hidden;
   clip-path: circle(0% at 50% 45%);
@@ -675,7 +675,7 @@ html, body {
   overflow: hidden;
   font-family: 'Playfair Display', Georgia, serif;
   font-weight: 700;
-  font-size: 1.7rem;
+  font-size: 2.2rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -699,7 +699,7 @@ html, body {
 .results-reveal-panel__header--city  { color: var(--ms-gold-light, #D4B06A); }
 .results-reveal-panel__header--mafia { color: var(--ms-wine-light, #C75A5A); }
 .results-reveal-panel__game-id {
-  font-size: .95rem;
+  font-size: 1.25rem;
   font-weight: 400;
   color: var(--ms-muted, #8A8A8A);
 }
@@ -718,8 +718,8 @@ html, body {
   flex-direction: column;
   background: rgba(199,165,82,.08);
   border-radius: 8px;
-  padding: .4rem .8rem;
-  font-size: 1rem;
+  padding: .55rem 1.05rem;
+  font-size: 1.3rem;
   opacity: 0;
   animation: totem-callout-drop .5s cubic-bezier(.34,1.7,.4,1) both;
 }
@@ -731,13 +731,13 @@ html, body {
   60%  { opacity: 1; transform: translateY(4px) scale(1.05); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.callout__label { color: var(--ms-muted, #8A8A8A); font-size: .9rem; }
+.callout__label { color: var(--ms-muted, #8A8A8A); font-size: 1.2rem; }
 .callout__value { font-weight: 700; }
 
 .results-reveal-panel__seats {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
-  gap: .5rem;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: .65rem;
 }
 
 .reveal-card { position: relative; }
@@ -760,8 +760,8 @@ html, body {
   gap: .15rem;
   background: rgba(255,255,255,.04);
   border-radius: 8px;
-  padding: .5rem .65rem;
-  font-size: .95rem;
+  padding: .65rem .85rem;
+  font-size: 1.25rem;
   opacity: 0;
   will-change: transform, filter, opacity;
   animation: totem-resolve .55s cubic-bezier(.2,.8,.2,1) both;
@@ -802,16 +802,16 @@ html, body {
   position: fixed;
   top: 1.1rem; right: 1.1rem;
   z-index: 2;
-  width: clamp(180px, 11.4vw, 470px);
-  min-height: clamp(155px, 10.15vw, 415px);
+  width: clamp(235px, 14.8vw, 610px);
+  min-height: clamp(200px, 13.2vw, 540px);
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--ovl-glass-bg, rgba(15,14,12,.6));
   border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
   border-radius: var(--ovl-radius-md, 14px);
-  padding: clamp(.85rem, .975vw, 2.45rem) clamp(.65rem, .8vw, 2.1rem);
-  font-size: clamp(.9rem, .845vw, 2.15rem);
+  padding: clamp(1.1rem, 1.27vw, 3.2rem) clamp(.85rem, 1.04vw, 2.75rem);
+  font-size: clamp(1.17rem, 1.1vw, 2.8rem);
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
@@ -902,7 +902,7 @@ html, body {
 .ticker-fact__value {
   position: relative;
   font-weight: 700;
-  font-size: clamp(1.25rem, 1.14vw, 2.85rem);
+  font-size: clamp(1.63rem, 1.48vw, 3.7rem);
 }
 .ticker-fact.is-entering .ticker-fact__value::after {
   content: "";
@@ -917,7 +917,7 @@ html, body {
 }
 .ticker-fact__extra {
   color: var(--ms-muted, #8A8A8A);
-  font-size: clamp(.85rem, .76vw, 1.95rem);
+  font-size: clamp(1.1rem, .99vw, 2.55rem);
   font-variant-numeric: tabular-nums;
 }
 
@@ -935,12 +935,12 @@ html, body {
   position: fixed;
   top: 1.1rem; left: 1.1rem;
   z-index: 2;
-  width: clamp(245px, 16.9vw, 690px);
+  width: clamp(320px, 22vw, 900px);
   background: var(--ovl-glass-bg, rgba(15,14,12,.6));
   border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
   border-radius: var(--ovl-radius-md, 14px);
-  padding: clamp(.7rem, .7vw, 1.8rem) clamp(.8rem, .81vw, 2.1rem);
-  font-size: clamp(.85rem, .78vw, 2rem);
+  padding: clamp(.91rem, .91vw, 2.35rem) clamp(1.05rem, 1.05vw, 2.75rem);
+  font-size: clamp(1.1rem, 1.01vw, 2.6rem);
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
@@ -1046,14 +1046,14 @@ html, body {
   position: fixed;
   top: 50%; left: 50%;
   z-index: 14;
-  width: clamp(470px, 37.9vw, 1560px);
+  width: clamp(610px, 49.3vw, 2030px);
   max-height: 70vh;
   overflow: hidden auto;
   background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
   border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
   border-radius: var(--ovl-radius-lg, 18px);
-  padding: clamp(1.1rem, 1.08vw, 2.75rem) clamp(1.3rem, 1.35vw, 3.45rem);
-  font-size: clamp(1.05rem, .92vw, 2.35rem);
+  padding: clamp(1.43rem, 1.4vw, 3.58rem) clamp(1.7rem, 1.76vw, 4.5rem);
+  font-size: clamp(1.37rem, 1.2vw, 3.06rem);
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
@@ -1095,7 +1095,7 @@ html, body {
   z-index: 1;
   font-family: 'Playfair Display', Georgia, serif;
   font-weight: 700;
-  font-size: clamp(1.3rem, 1.19vw, 3rem);
+  font-size: clamp(1.7rem, 1.55vw, 3.9rem);
   color: var(--ms-gold-light, #D4B06A);
   padding-bottom: .5rem;
   margin-bottom: .5rem;
@@ -1111,7 +1111,7 @@ html, body {
 }
 @keyframes ovl-underline-draw { to { transform: scaleX(1); } }
 
-.overlay-full-standings table { position: relative; z-index: 1; width: 100%; border-collapse: collapse; font-size: clamp(1.02rem, .92vw, 2.35rem); }
+.overlay-full-standings table { position: relative; z-index: 1; width: 100%; border-collapse: collapse; font-size: clamp(1.33rem, 1.2vw, 3.06rem); }
 .overlay-full-standings td { padding: .3rem 0; border-bottom: 1px solid rgba(255,255,255,.05); }
 .overlay-full-standings tr {
   opacity: 0;

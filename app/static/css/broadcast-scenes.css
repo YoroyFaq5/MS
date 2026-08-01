@@ -58,8 +58,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 15px;
-  padding: 68px 94px 57px;
+  gap: 20px;
+  padding: 88px 122px 74px;
   border-radius: 18px;
   background: var(--ovl-glass-bg, rgba(15, 14, 12, .6));
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
@@ -76,7 +76,7 @@
 .bc-wordmark {
   font-family: 'Playfair Display', Georgia, serif;
   font-weight: 600;
-  font-size: 3.4rem;
+  font-size: 4.4rem;
   color: var(--ms-text, #F3E9D2);
   margin: 0;
 }
@@ -86,7 +86,7 @@
 
 .bc-tagline {
   font-family: 'Inter', sans-serif;
-  font-size: 1.1rem;
+  font-size: 1.4rem;
   color: var(--ms-muted, #8A8A8A);
   margin: 0;
 }
@@ -100,7 +100,7 @@
 }
 .bc-timer__label {
   font-family: 'Inter', sans-serif;
-  font-size: .95rem;
+  font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -108,7 +108,7 @@
 }
 .bc-timer__value {
   font-family: 'Playfair Display', Georgia, serif;
-  font-size: 4.4rem;
+  font-size: 5.7rem;
   color: var(--ms-text, #F3E9D2);
   text-shadow: 0 0 32px var(--ms-gold-glow, rgba(199, 165, 82, .16));
 }
@@ -147,12 +147,12 @@
       like it's catching the metal, not sliding over a rectangle. */
 .bc-logo-3d {
   position: relative;
-  width: 172px;
+  width: 224px;
   perspective: 900px;
   margin-bottom: 4px;
 }
 .bc-logo-3d--small {
-  width: 140px;
+  width: 182px;
 }
 .bc-logo-3d__mark {
   display: block;
