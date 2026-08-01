@@ -39,12 +39,16 @@
   // Nameplate fit strategy, in order — rather than jumping straight to
   // an ellipsis or a tiny shrunk font for every long nickname:
   //   1. One line at normal size (the common case — leave it alone).
-  //   2. Doesn't fit? Allow wrapping to 2 lines at normal size — handles
-  //      names with a natural break ("Опасный Малый") cleanly.
-  //   3. Still doesn't fit in 2 lines (a long single word like
-  //      "Непридумал", or just a very long name)? Shrink the font down
-  //      to a readable floor. Ellipsis only kicks in if it's still too
-  //      long at the floor size.
+  //   2. Doesn't fit AND the name has a space ("Опасный Малый")? Wrap to
+  //      2 lines at normal size — clean break at the word boundary.
+  //   3. Doesn't fit and has NO space ("Непридумал", "Интеграл") — a
+  //      single word wrapped mid-word just produces an orphaned letter
+  //      or two on the second line, which reads worse than a smaller
+  //      single line. Skip wrapping entirely for these and shrink the
+  //      font (single line) down to a readable floor instead.
+  //   4. Still doesn't fit at the floor size (2-line case) or floor width
+  //      (1-line case)? Ellipsis is the last-resort safety net, not the
+  //      first response to a long name.
   // Cheap (≤10 elements, a few reflow reads each) and only runs right
   // after a DOM swap, not on every poll.
   function fitSeatNames() {
@@ -56,12 +60,19 @@
 
       if (el.scrollWidth <= el.clientWidth) return; // fits on one line already
 
-      el.classList.add('ms-seat-card__name--wrap');
-      if (el.scrollHeight <= el.clientHeight + 1) return; // fits wrapped over 2 lines
+      const hasNaturalBreak = /\s/.test(el.textContent || '');
+      if (hasNaturalBreak) {
+        el.classList.add('ms-seat-card__name--wrap');
+        if (el.scrollHeight <= el.clientHeight + 1) return; // fits wrapped over 2 lines
+      }
+
+      const overflows = () => (hasNaturalBreak
+        ? el.scrollHeight > el.clientHeight + 1
+        : el.scrollWidth > el.clientWidth);
 
       let size = parseFloat(getComputedStyle(el).fontSize);
       let guard = 0;
-      while (el.scrollHeight > el.clientHeight + 1 && size > minPx && guard < 20) {
+      while (overflows() && size > minPx && guard < 20) {
         size -= 1;
         el.style.fontSize = size + 'px';
         guard++;
