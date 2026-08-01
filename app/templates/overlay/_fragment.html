@@ -1,4 +1,5 @@
 {% from "_macros.html" import player_name %}
+{% from "games/_match_card.html" import render_match_card %}
 
 {# Broadcast-style portrait seat card — the photo is a full-bleed background
    layer (ms-seat-card__media), with a frosted glass nameplate overlaid on
@@ -141,46 +142,7 @@
 
       {% elif control.idle_content == 'last_game' and last_game %}
       <div class="overlay-idle-hero__panel overlay-idle-hero__panel--last-game">
-        <div class="results-reveal-panel__header results-reveal-panel__header--{{ win }}">
-          {% if win == 'city' %}🏙 Победа города
-          {% elif win == 'mafia' %}🔫 Победа мафии
-          {% else %}🤝 Ничья{% endif %}
-          <span class="results-reveal-panel__game-id">Игра №{{ last_game.id }}</span>
-        </div>
-        {% if has_mvp or sheriff_slot or don_slot %}
-        <div class="results-reveal-panel__callouts">
-          {% if has_mvp %}
-          <div class="callout callout--mvp">
-            <span class="callout__label">⭐ MVP</span>
-            <span class="callout__value">{{ player_name(mvp.player, equipped_bulk.get(mvp.player_id, {})) if mvp.player else '?' }}</span>
-          </div>
-          {% endif %}
-          {% if sheriff_slot %}
-          <div class="callout callout--sheriff">
-            <span class="callout__label">🔍 Шериф</span>
-            <span class="callout__value">{{ player_name(sheriff_slot.player, equipped_bulk.get(sheriff_slot.player_id, {})) if sheriff_slot.player else '?' }}</span>
-          </div>
-          {% endif %}
-          {% if don_slot %}
-          <div class="callout callout--don">
-            <span class="callout__label">👑 Дон</span>
-            <span class="callout__value">{{ player_name(don_slot.player, equipped_bulk.get(don_slot.player_id, {})) if don_slot.player else '?' }}</span>
-          </div>
-          {% endif %}
-        </div>
-        {% endif %}
-        <div class="results-reveal-panel__seats">
-          {% for slot in last_slots %}
-          <div class="reveal-card">
-            <div class="reveal-card__inner">
-              <span class="reveal-card__seat">#{{ slot.seat_number }}</span>
-              <span class="reveal-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}</span>
-              <span class="reveal-card__role reveal-card__role--{{ slot.role.value }}">{{ role_labels[slot.role.value] }}</span>
-              <span class="reveal-card__score">{{ slot.total_score|round(2) }}</span>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
+        {{ render_match_card(last_game, last_slots, equipped_bulk) }}
       </div>
 
       {% elif control.idle_content == 'ticker' and facts %}
