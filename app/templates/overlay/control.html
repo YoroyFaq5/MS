@@ -128,6 +128,29 @@
     </div>
   </div>
 
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">⏳ Экран ожидания (Live, игры ещё нет)</div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Пока не идёт ни одна игра, по центру оверлея — крупный блок;
+          слева и справа зарезервировано место под квадрат комментатора
+          и чат Twitch (сами источники добавляются в OBS отдельно).
+        </p>
+        <div class="d-flex flex-column gap-2">
+          {% for mode, label in [('logo', 'Лого турнира'), ('standings', 'Турнирная таблица'), ('last_game', 'Прошлая игра'), ('ticker', 'Интересные факты')] %}
+          <form method="POST" action="{{ url_for('overlay.overlay_set_idle_content', tournament_id=tournament.id) }}">
+            <input type="hidden" name="mode" value="{{ mode }}">
+            <button type="submit" class="btn w-100 {{ 'btn-success' if control.idle_content == mode else 'btn-outline-secondary' }}">
+              {{ label }}{{ ' ✓' if control.idle_content == mode else '' }}
+            </button>
+          </form>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
   {% if series_tournament %}
   <div class="col-md-4">
     <div class="card h-100">

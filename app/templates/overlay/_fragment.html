@@ -27,6 +27,26 @@
 
 {% set role_labels = {'civilian': 'Мирный', 'sheriff': 'Шериф', 'don': 'Дон', 'mafia': 'Мафия'} %}
 
+{# Moved up from SECTION 3 below so it's already available to the
+   no-game-yet idle hero (which can show these same facts as its center
+   content — see idle_content == 'ticker' further down) as well as to
+   the ticker itself. #}
+{% set facts = [] %}
+{% if superlatives.mvp %}{% set _ = facts.append({'label': '🏆 MVP турнира', 'rating': superlatives.mvp.rating, 'value': superlatives.mvp.value}) %}{% endif %}
+{% if superlatives.don %}{% set _ = facts.append({'label': '👑 Лучший Дон', 'rating': superlatives.don.rating, 'value': superlatives.don.value}) %}{% endif %}
+{% if superlatives.sheriff %}{% set _ = facts.append({'label': '🔍 Лучший Шериф', 'rating': superlatives.sheriff.rating, 'value': superlatives.sheriff.value}) %}{% endif %}
+{% if superlatives.civilian %}{% set _ = facts.append({'label': '🔴 Лучший Мирный', 'rating': superlatives.civilian.rating, 'value': superlatives.civilian.value}) %}{% endif %}
+{% if superlatives.mafia %}{% set _ = facts.append({'label': '⚫ Лучший Чёрный', 'rating': superlatives.mafia.rating, 'value': superlatives.mafia.value}) %}{% endif %}
+{% if hot_streak_rating and hot_streak_count >= 2 %}{% set _ = facts.append({'label': '🔥 Серия побед', 'rating': hot_streak_rating, 'value': hot_streak_count}) %}{% endif %}
+
+{# Same reasoning — last-game callouts, moved up so the idle hero's
+   'last_game' mode can reuse them alongside the normal reveal panel. #}
+{% set mvp = (last_slots | sort(attribute='total_score', reverse=true) | list | first) if last_slots else none %}
+{% set has_mvp = mvp and mvp.total_score > 0 %}
+{% set sheriff_slot = (last_slots | selectattr('role.value', 'equalto', 'sheriff') | list | first) if last_slots else none %}
+{% set don_slot = (last_slots | selectattr('role.value', 'equalto', 'don') | list | first) if last_slots else none %}
+{% set win = last_game.win_side.value if last_game else none %}
+
 <div class="overlay-fragment" data-sig="{{ sig }}" data-last-finished-id="{{ last_game.id if last_game else '' }}" data-ctl="{{ ctl_sig }}">
 
   {# ── Live scene: everything that already existed before broadcast scenes
@@ -87,16 +107,115 @@
   </div>
   {% endif %}
 
+  <!-- IDLE HERO: only while there's no current game — reserves screen
+       space for the caster's own webcam (left) and Twitch chat (right;
+       both are separate OBS Browser/Video Capture Sources positioned to
+       match these frames, not rendered by this page) and shows one of
+       several things in the middle, switched from the control page
+       (control.idle_content): the tournament logo (default), the full
+       standings, the last game's results, or the ticker's facts — all
+       reusing the exact same markup/classes as their "normal" corner/
+       reveal-panel counterparts so they inherit that styling for free. -->
+  {% if not current_game %}
+  <div class="overlay-idle-hero">
+    <div class="overlay-idle-hero__cam" aria-hidden="false">
+      <span class="overlay-idle-hero__slot-icon" aria-hidden="true">🎙️</span>
+      <span class="overlay-idle-hero__slot-label">Комментатор</span>
+    </div>
+
+    <div class="overlay-idle-hero__center">
+      {% if control.idle_content == 'standings' and can_show_standings and full_ratings %}
+      <div class="overlay-idle-hero__panel overlay-idle-hero__panel--standings">
+        <div class="overlay-idle-hero__panel-title">Турнирная таблица · {{ standings_title }}</div>
+        <table>
+          {% for r in full_ratings %}
+          <tr style="--d:{{ loop.index0 * 40 }}ms">
+            <td class="overlay-full-standings__rank">{{ r.rank }}</td>
+            <td class="overlay-full-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
+            <td class="overlay-full-standings__games">{{ r.games_played }} игр</td>
+            <td class="overlay-full-standings__score">{{ r.total_score|round(2) }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+
+      {% elif control.idle_content == 'last_game' and last_game %}
+      <div class="overlay-idle-hero__panel overlay-idle-hero__panel--last-game">
+        <div class="results-reveal-panel__header results-reveal-panel__header--{{ win }}">
+          {% if win == 'city' %}🏙 Победа города
+          {% elif win == 'mafia' %}🔫 Победа мафии
+          {% else %}🤝 Ничья{% endif %}
+          <span class="results-reveal-panel__game-id">Игра №{{ last_game.id }}</span>
+        </div>
+        {% if has_mvp or sheriff_slot or don_slot %}
+        <div class="results-reveal-panel__callouts">
+          {% if has_mvp %}
+          <div class="callout callout--mvp">
+            <span class="callout__label">⭐ MVP</span>
+            <span class="callout__value">{{ player_name(mvp.player, equipped_bulk.get(mvp.player_id, {})) if mvp.player else '?' }}</span>
+          </div>
+          {% endif %}
+          {% if sheriff_slot %}
+          <div class="callout callout--sheriff">
+            <span class="callout__label">🔍 Шериф</span>
+            <span class="callout__value">{{ player_name(sheriff_slot.player, equipped_bulk.get(sheriff_slot.player_id, {})) if sheriff_slot.player else '?' }}</span>
+          </div>
+          {% endif %}
+          {% if don_slot %}
+          <div class="callout callout--don">
+            <span class="callout__label">👑 Дон</span>
+            <span class="callout__value">{{ player_name(don_slot.player, equipped_bulk.get(don_slot.player_id, {})) if don_slot.player else '?' }}</span>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+        <div class="results-reveal-panel__seats">
+          {% for slot in last_slots %}
+          <div class="reveal-card">
+            <div class="reveal-card__inner">
+              <span class="reveal-card__seat">#{{ slot.seat_number }}</span>
+              <span class="reveal-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}</span>
+              <span class="reveal-card__role reveal-card__role--{{ slot.role.value }}">{{ role_labels[slot.role.value] }}</span>
+              <span class="reveal-card__score">{{ slot.total_score|round(2) }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% elif control.idle_content == 'ticker' and facts %}
+      <div class="overlay-idle-hero__panel overlay-idle-hero__panel--ticker">
+        {% for fact in facts %}
+        {% set is_num = fact.value is number %}
+        <div class="overlay-idle-hero__fact" style="--d:{{ loop.index0 * 60 }}ms">
+          <span class="ticker-fact__label">{{ fact.label }}</span>
+          <span class="ticker-fact__value">{{ player_name(fact.rating, equipped_bulk.get(fact.rating.player_id, {})) }}</span>
+          <span class="ticker-fact__extra">{{ fact.value|round(2) if is_num else fact.value }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% else %}
+      <div class="overlay-idle-hero__logo">
+        <img src="{{ url_for('static', filename='img/MS_1_.png') }}" alt="Mafia Style" class="overlay-idle-hero__logo-img">
+      </div>
+      <h1 class="overlay-idle-hero__wordmark">MAFIA STYLE</h1>
+      <p class="overlay-idle-hero__tagline">{{ tournament.name }}</p>
+      {% endif %}
+    </div>
+
+    <div class="overlay-idle-hero__chat" aria-hidden="false">
+      <span class="overlay-idle-hero__slot-icon" aria-hidden="true">💬</span>
+      <span class="overlay-idle-hero__slot-label">Чат Twitch</span>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- SECTION 2: last-game results reveal — always rendered when a game has
        finished; visibility/timing is controlled client-side (overlay.js
        toggles .reveal-active for a limited duration whenever
        data-last-finished-id changes). -->
   {% if last_game %}
-  {% set mvp = (last_slots | sort(attribute='total_score', reverse=true) | list | first) if last_slots else none %}
-  {% set has_mvp = mvp and mvp.total_score > 0 %}
-  {% set sheriff_slot = (last_slots | selectattr('role.value', 'equalto', 'sheriff') | list | first) if last_slots else none %}
-  {% set don_slot = (last_slots | selectattr('role.value', 'equalto', 'don') | list | first) if last_slots else none %}
-  {% set win = last_game.win_side.value %}
   <div class="results-reveal-panel">
     <div class="results-reveal-panel__iris-trace" aria-hidden="true"></div>
     <div class="results-reveal-panel__header results-reveal-panel__header--{{ win }}">
@@ -143,15 +262,10 @@
   </div>
   {% endif %}
 
-  <!-- SECTION 3: rotating stats ticker — all facts rendered server-side,
-       JS only toggles which .ticker-fact has .active every ~8s. -->
-  {% set facts = [] %}
-  {% if superlatives.mvp %}{% set _ = facts.append({'label': '🏆 MVP турнира', 'rating': superlatives.mvp.rating, 'value': superlatives.mvp.value}) %}{% endif %}
-  {% if superlatives.don %}{% set _ = facts.append({'label': '👑 Лучший Дон', 'rating': superlatives.don.rating, 'value': superlatives.don.value}) %}{% endif %}
-  {% if superlatives.sheriff %}{% set _ = facts.append({'label': '🔍 Лучший Шериф', 'rating': superlatives.sheriff.rating, 'value': superlatives.sheriff.value}) %}{% endif %}
-  {% if superlatives.civilian %}{% set _ = facts.append({'label': '🔴 Лучший Мирный', 'rating': superlatives.civilian.rating, 'value': superlatives.civilian.value}) %}{% endif %}
-  {% if superlatives.mafia %}{% set _ = facts.append({'label': '⚫ Лучший Чёрный', 'rating': superlatives.mafia.rating, 'value': superlatives.mafia.value}) %}{% endif %}
-  {% if hot_streak_rating and hot_streak_count >= 2 %}{% set _ = facts.append({'label': '🔥 Серия побед', 'rating': hot_streak_rating, 'value': hot_streak_count}) %}{% endif %}
+  <!-- SECTION 3: rotating stats ticker — all facts rendered server-side
+       (computed near the top of this file, shared with the idle hero's
+       'ticker' mode below), JS only toggles which .ticker-fact has
+       .active every ~8s. -->
   {% if facts %}
   <div class="overlay-ticker {{ '' if control.show_ticker else 'is-hidden' }}">
     <div class="overlay-ticker__stage">

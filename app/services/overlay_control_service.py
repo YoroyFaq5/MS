@@ -11,6 +11,7 @@ from app.models import OverlayControl
 STANDINGS_MODES = ("top5", "full", "hidden")
 STANDINGS_SCOPES = ("evening", "series")
 REVEAL_OVERRIDES = (None, "on", "off")
+IDLE_CONTENT_MODES = ("logo", "standings", "last_game", "ticker")
 
 
 class OverlayControlService:
@@ -66,5 +67,14 @@ class OverlayControlService:
             value = None
         control = OverlayControlService.get_control(tournament_id)
         control.reveal_override = value
+        db.session.commit()
+        return control
+
+    @staticmethod
+    def set_idle_content(tournament_id: int, mode: str) -> OverlayControl:
+        if mode not in IDLE_CONTENT_MODES:
+            mode = "logo"
+        control = OverlayControlService.get_control(tournament_id)
+        control.idle_content = mode
         db.session.commit()
         return control

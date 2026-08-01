@@ -211,6 +211,13 @@ class OverlayControl(db.Model):
     # None (auto — the existing ~25s on-finish timer) | "on" (pinned open) |
     # "off" (suppressed even during the normal auto window).
     reveal_override = Column(String(10), nullable=True)
+    # What the centered "waiting for the game" hero (see overlay/_fragment.html,
+    # only rendered while current_game is None) shows in its middle slot:
+    # logo | standings | last_game | ticker. Independent of standings_mode/
+    # show_ticker — those govern the corner panels during actual gameplay,
+    # this is a separate, bigger, centered presentation for the dead air
+    # before the first game of a session starts.
+    idle_content = Column(String(10), default="logo", nullable=False)
 
     updated_at = Column(
         DateTime(timezone=True),
@@ -227,6 +234,7 @@ class OverlayControl(db.Model):
             "standings_mode": self.standings_mode,
             "standings_scope": self.standings_scope,
             "reveal_override": self.reveal_override,
+            "idle_content": self.idle_content,
             "updated_at": self.updated_at.isoformat(),
         }
 

@@ -1126,6 +1126,131 @@ html, body {
 .overlay-full-standings__games { color: var(--ms-muted, #8A8A8A); text-align: center; width: 4rem; }
 .overlay-full-standings__score { text-align: right; color: var(--ms-text-dim, #D9D2C1); font-weight: 600; }
 
+/* ── Idle hero — only rendered while there's no current game (see
+   _fragment.html). Three-column reservation: a webcam frame (left) and
+   a Twitch-chat frame (right) are placeholders only — the actual video/
+   chat comes from separate OBS sources the caster positions to match
+   these frames; this page only draws the empty "slot" so they know
+   where. The center column shows whichever of logo/standings/last-game/
+   ticker the caster picked on the control page, reusing those panels'
+   existing classes (results-reveal-panel__*, callout, reveal-card*,
+   overlay-full-standings__*, ticker-fact__*) so they inherit the same
+   typography/sizing already tuned elsewhere, no new tokens. ── */
+.overlay-idle-hero {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(220px, 20vw) minmax(0, 1fr) minmax(260px, 24vw);
+  align-items: center;
+  gap: clamp(1rem, 2vw, 2.5rem);
+  padding: 0 clamp(1.5rem, 3vw, 4rem);
+  animation: fade-in-up .5s ease both;
+}
+
+.overlay-idle-hero__cam,
+.overlay-idle-hero__chat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .6rem;
+  border: 1.5px dashed var(--ovl-border-gold, rgba(199,165,82,.4));
+  border-radius: var(--ovl-radius-lg, 18px);
+  background: var(--ovl-glass-bg, rgba(15,14,12,.6));
+  color: var(--ms-muted, #8A8A8A);
+}
+.overlay-idle-hero__cam {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+}
+.overlay-idle-hero__chat {
+  height: min(64vh, 620px);
+}
+.overlay-idle-hero__slot-icon { font-size: 2rem; opacity: .6; }
+.overlay-idle-hero__slot-label {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.overlay-idle-hero__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.overlay-idle-hero__logo { width: 150px; margin-bottom: 4px; }
+.overlay-idle-hero__logo-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 14px 24px rgba(0,0,0,.5)) drop-shadow(0 0 18px var(--ms-gold-glow, rgba(199,165,82,.16)));
+}
+.overlay-idle-hero__wordmark {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 600;
+  font-size: 2.8rem;
+  color: var(--ms-text, #F3E9D2);
+  margin: 0;
+}
+.overlay-idle-hero__tagline {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.15rem;
+  color: var(--ms-muted, #8A8A8A);
+  margin: 0;
+}
+
+.overlay-idle-hero__panel {
+  width: 100%;
+  max-height: 78vh;
+  overflow: hidden auto;
+  background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
+  border: 1px solid var(--ovl-border-gold, rgba(199,165,82,.4));
+  border-radius: var(--ovl-radius-lg, 18px);
+  padding: 1.6rem 2rem;
+  backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
+}
+.overlay-idle-hero__panel-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--ms-gold-light, #D4B06A);
+  padding-bottom: .5rem;
+  margin-bottom: .5rem;
+  border-bottom: 1px solid rgba(199,165,82,.3);
+  text-align: left;
+}
+.overlay-idle-hero__panel--standings table { width: 100%; border-collapse: collapse; font-size: 1.1rem; }
+.overlay-idle-hero__panel--standings td { padding: .35rem 0; border-bottom: 1px solid rgba(255,255,255,.05); text-align: left; }
+
+.overlay-idle-hero__panel--last-game .results-reveal-panel__header { text-align: left; }
+.overlay-idle-hero__panel--last-game .results-reveal-panel__seats {
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+
+.overlay-idle-hero__panel--ticker {
+  display: flex;
+  flex-direction: column;
+  gap: .9rem;
+}
+.overlay-idle-hero__fact {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  text-align: left;
+  opacity: 0;
+  animation: fade-in-up .45s ease both;
+  animation-delay: var(--d, 0ms);
+}
+
 /* ── Reduced motion: every animation above collapses to an instant,
    fully-settled state — nothing spins, sweeps, drifts, or flickers. ── */
 @media (prefers-reduced-motion: reduce) {
@@ -1143,6 +1268,7 @@ html, body {
   .totem-flash__chroma-g, .totem-flash__chroma-b,
   .results-reveal-panel, .results-reveal-panel__iris-trace, .results-reveal-panel__header,
   .results-reveal-panel__header::after, .callout, .reveal-card__inner,
+  .overlay-idle-hero__fact,
   .overlay-ticker, .ticker-fact, .ticker-fact.active, .ticker-fact__label::after,
   .overlay-mini-standings, .overlay-mini-standings__scan, .ovl-hud-bracket, .overlay-mini-standings tr,
   .overlay-full-standings, .overlay-full-standings__sweep, .overlay-full-standings__title::after,
