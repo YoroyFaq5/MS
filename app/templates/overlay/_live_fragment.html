@@ -197,6 +197,19 @@
          overlay.js off ctl_sig's `ic=` field. -->
     <div class="overlay-idle-hero__center">
       <div class="overlay-idle-hero__info">
+        <!-- Ambient motion layers — the panel is meant to read as "alive"
+             even when its content never changes (the camera beside it is
+             always moving; this can't be a static card). Three layers at
+             different speeds/depths (glow/drift/sweep, see their comments
+             in overlay.css) plus a rare discrete pulse traveling down the
+             red edge (JS-scheduled at an irregular interval, see
+             scheduleInfoPulse in overlay.js) — all far too slow/faint to
+             read as "a CSS animation is looping", just as a physical
+             surface with depth. -->
+        <span class="ovl-info-glow" aria-hidden="true"></span>
+        <span class="ovl-info-drift" aria-hidden="true"></span>
+        <span class="ovl-info-sweep" aria-hidden="true"></span>
+        <span class="overlay-idle-hero__info-edge-pulse" aria-hidden="true"></span>
         <div class="overlay-idle-hero__slot overlay-idle-hero__slot--center {{ 'is-active' if effective_idle_content == 'logo' else '' }}" data-idle-slot="logo">
           <div class="overlay-idle-hero__logo">
             <img src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="Mafia Style" class="overlay-idle-hero__logo-img">

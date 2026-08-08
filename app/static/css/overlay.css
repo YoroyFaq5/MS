@@ -1268,15 +1268,118 @@ html, body {
   box-shadow: inset 0 0 0 1px rgba(243,239,234,.14), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  /* Mount-once entrance: the shape unfolds OUT of the red edge line rather
+     than a flat fade-in — starts as the thin sliver the edge already
+     occupies, opens to the full shield-cut shape. Runs exactly once (this
+     element is never removed/re-added, unlike the content slots inside
+     it), so it never repeats or competes with the ambient loops below. */
+  animation: ovl-info-unfold .85s cubic-bezier(.2,.8,.2,1) .12s both;
 }
+@keyframes ovl-info-unfold {
+  0%   { clip-path: polygon(0 0, 4px 0, 4px 100%, 0 100%); }
+  100% { clip-path: var(--ovl-info-clip, none); }
+}
+
+/* ── Ambient motion — LEVEL 1 ─────────────────────────────────────────────
+   The camera beside this panel is always moving (real video); a perfectly
+   static panel next to it reads as a dead card, not broadcast graphics.
+   Three layers at different speeds/opacities so it reads as depth, not a
+   loop — all transform/opacity only (compositor-cheap, safe to run for
+   hours in an OBS Browser Source). Every cycle is intentionally long
+   (17–46s) and low-amplitude enough that no single glance catches it
+   moving — it should only read as "alive" peripherally. */
+.ovl-info-glow {
+  position: absolute;
+  inset: -12%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 60% 45% at 28% 12%, var(--ovl-signal-glow, rgba(227,30,36,.28)) 0%, transparent 68%);
+  opacity: .3;
+  animation: ovl-info-glow-breathe 17s ease-in-out infinite;
+}
+@keyframes ovl-info-glow-breathe {
+  0%, 100% { opacity: .2; transform: scale(1); }
+  50%      { opacity: .38; transform: scale(1.05); }
+}
+.ovl-info-drift {
+  position: absolute;
+  inset: -10%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .05;
+  background-image: repeating-linear-gradient(115deg, var(--ovl-chrome-light, #FFFFFF) 0 1px, transparent 1px 170px);
+  animation: ovl-info-drift-move 46s ease-in-out infinite alternate;
+}
+@keyframes ovl-info-drift-move {
+  from { transform: translate3d(-1.5%, -1%, 0); }
+  to   { transform: translate3d(1.5%, 1%, 0); }
+}
+/* A single soft reflection band that crosses the whole panel roughly once
+   per cycle, then stays off for the rest of it — a "physical surface"
+   cue, not a repeating scanline. */
+.ovl-info-sweep {
+  position: absolute;
+  top: -25%; bottom: -25%;
+  left: -20%;
+  width: 20%;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.05) 45%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.05) 55%, transparent);
+  transform: skewX(-12deg) translateX(0%);
+  opacity: 0;
+  animation: ovl-info-sweep-move 21s ease-in-out infinite;
+}
+@keyframes ovl-info-sweep-move {
+  0%   { transform: skewX(-12deg) translateX(0%);   opacity: 0; }
+  9%   { opacity: 1; }
+  38%  { opacity: 1; }
+  50%  { transform: skewX(-12deg) translateX(650%); opacity: 0; }
+  100% { transform: skewX(-12deg) translateX(650%); opacity: 0; }
+}
+
+/* Base edge — a slow breathing glow (LEVEL 1, always on) underneath the
+   discrete travel pulse (LEVEL 2, see .overlay-idle-hero__info-edge-pulse
+   below) — two different rhythms sharing the same red filament, exactly
+   the "constant ambient vs. occasional accent" split the brand's motion
+   hierarchy asks for. */
 .overlay-idle-hero__info::before {
   content: "";
   position: absolute;
   top: 0; bottom: 34px; left: 0;
   width: 3px;
+  z-index: 1;
   pointer-events: none;
   background: var(--ovl-signal, #E31E24);
   box-shadow: 0 0 14px 1px var(--ovl-signal-glow, rgba(227,30,36,.28));
+  animation: ovl-edge-breathe 11s ease-in-out infinite;
+}
+@keyframes ovl-edge-breathe {
+  0%, 100% { opacity: .8; }
+  50%      { opacity: 1; }
+}
+/* LEVEL 2 — a short, brighter segment that travels the length of the edge
+   once, then goes dark again. JS (scheduleInfoPulse, overlay.js) adds
+   .is-pulsing at a randomized 13–24s interval — CSS keyframes alone only
+   ever produce a fixed period, which is exactly the "oh, that's a loop"
+   read the brief called out. */
+.overlay-idle-hero__info-edge-pulse {
+  position: absolute;
+  top: 0; bottom: 34px; left: 0;
+  width: 3px;
+  height: 24%;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,.95) 45%, var(--ovl-signal-light, #FF3B3B) 60%, transparent);
+  opacity: 0;
+}
+.overlay-idle-hero__info-edge-pulse.is-pulsing {
+  animation: ovl-edge-pulse-run 2.1s cubic-bezier(.3,.7,.2,1);
+}
+@keyframes ovl-edge-pulse-run {
+  0%   { opacity: 0; transform: translateY(-40%); }
+  14%  { opacity: 1; }
+  82%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(390%); }
 }
 
 .overlay-idle-hero__slot {
@@ -1304,12 +1407,30 @@ html, body {
   gap: 16px;
 }
 
+/* Entrance (wrapper, translateY+opacity) and breathing (img, scale+glow)
+   live on DIFFERENT elements on purpose — both would otherwise animate
+   `transform`, and a CSS animation shorthand always wins the whole
+   property for its active duration, so one would silently cancel the
+   other (the exact bug already hit once on this page's scene-reveal
+   entrance, see broadcast-brand.css's .ovl-scene-frame comment). */
 .overlay-idle-hero__logo { width: 150px; margin-bottom: 4px; }
+.overlay-idle-hero__slot--center.is-active .overlay-idle-hero__logo {
+  animation: fade-in-up .5s ease both;
+}
+/* Very slow "breathing" — never a loop you'd consciously clock. The glow
+   drifts from chrome to signal-red at the peak instead of just growing,
+   so the badge's own red accent gets the "slightly more pronounced glow"
+   the brief asked for without needing to isolate it from the flat PNG. */
 .overlay-idle-hero__logo-img {
   display: block;
   width: 100%;
   height: auto;
   filter: drop-shadow(0 14px 24px rgba(0,0,0,.5)) drop-shadow(0 0 18px var(--ovl-chrome-glow, rgba(216,216,216,.16)));
+  animation: ovl-logo-breathe 12s ease-in-out infinite;
+}
+@keyframes ovl-logo-breathe {
+  0%, 100% { transform: scale(1);     filter: drop-shadow(0 14px 24px rgba(0,0,0,.5)) drop-shadow(0 0 18px var(--ovl-chrome-glow, rgba(216,216,216,.16))); }
+  50%      { transform: scale(1.03);  filter: drop-shadow(0 14px 24px rgba(0,0,0,.5)) drop-shadow(0 0 25px var(--ovl-signal-glow, rgba(227,30,36,.28))); }
 }
 .overlay-idle-hero__wordmark {
   font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
@@ -1318,11 +1439,17 @@ html, body {
   color: var(--ms-text, #F2F2F2);
   margin: 0;
 }
+.overlay-idle-hero__slot--center.is-active .overlay-idle-hero__wordmark {
+  animation: fade-in-up .45s ease .14s both;
+}
 .overlay-idle-hero__tagline {
   font-family: 'Inter', sans-serif;
   font-size: 1.15rem;
   color: var(--ms-muted, #8A8A8A);
   margin: 0;
+}
+.overlay-idle-hero__slot--center.is-active .overlay-idle-hero__tagline {
+  animation: fade-in-up .45s ease .24s both;
 }
 
 /* ── Typographic components shared by the standings/last_game/ticker
@@ -1373,6 +1500,53 @@ html, body {
   font-size: 1.35rem;
 }
 
+/* ── Content-transition stagger (LEVEL 3) ─────────────────────────────────
+   Scoped under `.is-active` rather than assigned unconditionally: a CSS
+   animation only (re)plays when the rule that assigns it starts matching,
+   so keying every entrance to `.is-active` makes it replay on EVERY
+   idle-content switch (overlay.js just toggles that class on the
+   already-mounted slot, see applyCtl), not just on first page load — a
+   plain always-on `animation` would already have finished during the
+   time the slot sat invisible and never visibly play again after that.
+   Order is the hierarchy itself: eyebrow → headline → rule → the hero
+   feature (label, then name, then the value LAST as the payoff) →
+   secondary line → row list — never everything at once. */
+.overlay-idle-hero__slot.is-active > .ovl-label {
+  animation: fade-in-up .4s ease both;
+}
+.overlay-idle-hero__slot.is-active > .ovl-info-headline {
+  animation: fade-in-up .45s ease .08s both;
+}
+.overlay-idle-hero__slot.is-active > .ovl-info-rule {
+  transform-origin: left center;
+  animation: ovl-info-rule-draw .5s ease .18s both;
+}
+@keyframes ovl-info-rule-draw {
+  from { transform: scaleX(0); opacity: .5; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+.overlay-idle-hero__slot.is-active .ovl-info-feature > .ovl-label {
+  animation: fade-in-up .35s ease .26s both;
+}
+.overlay-idle-hero__slot.is-active .ovl-info-feature__name {
+  animation: fade-in-up .35s ease .34s both;
+}
+/* The hero number lands last and a little harder than a plain fade — the
+   one moment this panel is allowed to feel like a "payoff". */
+.overlay-idle-hero__slot.is-active .ovl-info-feature__value {
+  animation: ovl-feature-value-in .5s cubic-bezier(.2,.8,.2,1) .44s both;
+}
+@keyframes ovl-feature-value-in {
+  0%   { opacity: 0; transform: translateY(12px) scale(.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.overlay-idle-hero__slot.is-active .ovl-info-subrow {
+  animation: fade-in-up .4s ease .52s both;
+}
+.overlay-idle-hero__slot.is-active > .ovl-info-rule--sm {
+  animation-delay: .6s;
+}
+
 /* Дон/Шериф on the last_game slot — one quiet line each, role color
    standing in for the icon, no boxes. */
 .ovl-info-subrow { display: flex; gap: 1.6rem; flex-wrap: wrap; font-family: 'Inter', sans-serif; font-size: 1rem; flex: none; }
@@ -1382,17 +1556,18 @@ html, body {
    in how many columns a row has (see the --standing/--seat/--fact
    modifiers below). Scrolls independently of the frame if content runs
    long (e.g. a 12+ player standings table on a short canvas). */
-.ovl-info-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-.ovl-info-row {
-  display: grid;
-  align-items: baseline;
-  gap: .3rem 1rem;
-  padding: .6rem 0;
-  border-top: 1px solid rgba(255,255,255,.08);
-  font-family: 'Inter', sans-serif;
-  opacity: 0;
+.ovl-info-list { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* Scoped under `.is-active` (see the content-transition comment above) —
+   each row still staggers off its own `--d`, just offset to start once
+   the header content above it has had time to land. last_game carries
+   more header content (headline + MVP feature + Дон/Шериф line) before
+   its list than standings/ticker do, so it gets a later base offset. */
+.overlay-idle-hero__slot.is-active .ovl-info-row {
   animation: fade-in-up .4s ease both;
-  animation-delay: var(--d, 0ms);
+  animation-delay: calc(var(--d, 0ms) + 380ms);
+}
+.overlay-idle-hero__slot.is-active[data-idle-slot="last_game"] .ovl-info-row {
+  animation-delay: calc(var(--d, 0ms) + 700ms);
 }
 .ovl-info-row:first-child { border-top: none; }
 .ovl-info-row__rank {
@@ -1435,6 +1610,28 @@ html, body {
 .ovl-info-row--seat     { grid-template-columns: 1.6rem 1fr auto auto; font-size: 1rem; }
 .ovl-info-row--fact     { grid-template-columns: 8rem 1fr auto; font-size: 1rem; }
 
+/* ── Table hero moment ─────────────────────────────────────────────────
+   The standings/last_game lists get their own small accent: a thin red
+   line sweeps once from top to bottom right before the rows start
+   landing — "the table is being drawn", not just a row list appearing. */
+.overlay-idle-hero__slot.is-active[data-idle-slot="standings"] .ovl-info-list::before,
+.overlay-idle-hero__slot.is-active[data-idle-slot="last_game"] .ovl-info-list::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, var(--ovl-signal, #E31E24), transparent 75%);
+  box-shadow: 0 0 8px 1px var(--ovl-signal-glow, rgba(227,30,36,.28));
+  animation: ovl-list-sweep-down .55s cubic-bezier(.3,.7,.2,1) both;
+}
+.overlay-idle-hero__slot.is-active[data-idle-slot="standings"] .ovl-info-list::before { animation-delay: .3s; }
+.overlay-idle-hero__slot.is-active[data-idle-slot="last_game"] .ovl-info-list::before { animation-delay: .62s; }
+@keyframes ovl-list-sweep-down {
+  0%   { top: 0; opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
 /* ── Shared panel accent ────────────────────────────────────────────────
    The same thin glowing red edge the seat cards and camera frame use,
    applied to every remaining "glass box" (ticker/mini-standings/full-
@@ -1473,6 +1670,9 @@ html, body {
   .results-reveal-panel, .results-reveal-panel__iris-trace, .results-reveal-panel__header,
   .results-reveal-panel__header::after, .callout, .reveal-card__inner,
   .ovl-info-row,
+  .overlay-idle-hero__logo, .overlay-idle-hero__wordmark, .overlay-idle-hero__tagline,
+  .ovl-label, .ovl-info-headline, .ovl-info-rule,
+  .ovl-info-feature__name, .ovl-info-feature__value, .ovl-info-subrow,
   .overlay-ticker, .ticker-fact, .ticker-fact.active, .ticker-fact__label::after,
   .overlay-mini-standings, .overlay-mini-standings__scan, .ovl-hud-bracket, .overlay-mini-standings tr,
   .overlay-full-standings, .overlay-full-standings__sweep, .overlay-full-standings__title::after,
@@ -1488,6 +1688,24 @@ html, body {
   .overlay-full-standings { transform: translate(-50%, -50%) !important; }
   .ms-seat-card:hover, .ms-seat-card:hover .ms-seat-card__img { transform: none !important; }
   .ovl-embers, .ovl-hud-bracket { opacity: 0 !important; }
+
+  /* Info panel: the shield-cut shape and red edge are the permanent brand
+     frame, not motion artifacts, so they're kept (not reset to none/0)
+     while everything that IS purely motion on/around it — the entrance
+     unfold, the three ambient background layers, the edge's discrete
+     pulse, the logo's breathing, and the one-shot table sweep line — goes
+     fully still or invisible instead of freezing mid-effect. */
+  .overlay-idle-hero__info { clip-path: var(--ovl-info-clip, none) !important; }
+  .overlay-idle-hero__info::before { opacity: 1 !important; }
+  .overlay-idle-hero__logo-img { transform: none !important; }
+  .ovl-info-glow, .ovl-info-drift, .ovl-info-sweep,
+  .overlay-idle-hero__info-edge-pulse {
+    opacity: 0 !important;
+  }
+  .overlay-idle-hero__slot[data-idle-slot="standings"] .ovl-info-list::before,
+  .overlay-idle-hero__slot[data-idle-slot="last_game"] .ovl-info-list::before {
+    opacity: 0 !important;
+  }
 
   .overlay-ticker.is-hidden, .overlay-mini-standings.is-hidden, .overlay-seat-strip.is-hidden,
   .totem-flash {

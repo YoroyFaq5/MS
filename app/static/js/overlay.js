@@ -142,6 +142,28 @@
     if (emberHandle) { clearInterval(emberHandle); emberHandle = null; }
   }
 
+  // ── Idle-hero info panel: rare red edge energy pulse (Live-Commentators
+  // only) — Level 2 of the panel's motion hierarchy, see the "Ambient
+  // motion" comment on .overlay-idle-hero__info in overlay.css. A slow
+  // CSS @keyframes loop only ever produces a fixed period, which reads as
+  // "there's a loop" exactly as fast as this was designed not to — so the
+  // irregular interval is scheduled here instead. Re-queries the edge
+  // element fresh on every fire (rather than holding a stale reference),
+  // so it keeps working across a full fragment DOM swap (data-sig change)
+  // without needing its own re-init hook.
+  function scheduleInfoPulse() {
+    if (REDUCED_MOTION) return;
+    const delay = 13000 + Math.random() * 11000; // ~13-24s, deliberately irregular
+    setTimeout(() => {
+      const edge = root.querySelector('.overlay-idle-hero__info-edge-pulse');
+      if (edge && !edge.classList.contains('is-pulsing')) {
+        edge.classList.add('is-pulsing');
+        edge.addEventListener('animationend', () => edge.classList.remove('is-pulsing'), { once: true });
+      }
+      scheduleInfoPulse();
+    }, delay);
+  }
+
   // Nameplate fit strategy, in order — rather than jumping straight to
   // an ellipsis or a tiny shrunk font for every long nickname:
   //   1. One line at normal size (the common case — leave it alone).
@@ -336,6 +358,7 @@
   startTicker();
   fitSeatNames();
   spawnCardEntranceBursts();
+  scheduleInfoPulse();
   if (window.MSBroadcastScenes) window.MSBroadcastScenes.init();
   setInterval(poll, POLL_MS);
 })();
