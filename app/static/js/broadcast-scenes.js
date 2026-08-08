@@ -86,24 +86,30 @@
     auroraEngines = [];
   }
 
-  function formatTime(totalSeconds) {
+  function splitTime(totalSeconds) {
     const s = Math.max(0, Math.round(totalSeconds));
-    const mm = Math.floor(s / 60);
-    const ss = s % 60;
-    return String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+    return { mm: String(Math.floor(s / 60)).padStart(2, '0'), ss: String(s % 60).padStart(2, '0') };
   }
 
+  // Minutes/seconds are two separate elements (stacked MM over SS, see
+  // .ovl-timer--stacked in broadcast-brand.css) rather than one "MM:SS"
+  // text node — the brief wants the countdown to read as one big graphic
+  // object, not an inline text string.
   function runTimer(durationSeconds, startedAtEpochSeconds) {
-    const valueEl = document.querySelector('[data-scene-panel="starting_soon"] [data-timer-value]');
+    const panel = document.querySelector('[data-scene-panel="starting_soon"]');
+    const mmEl = panel && panel.querySelector('[data-timer-mm]');
+    const ssEl = panel && panel.querySelector('[data-timer-ss]');
     if (timerRaf) cancelAnimationFrame(timerRaf);
-    if (!valueEl) return;
+    if (!mmEl || !ssEl) return;
 
     function tick() {
       let remaining = durationSeconds;
       if (startedAtEpochSeconds) {
         remaining = Math.max(0, durationSeconds - (Date.now() / 1000 - startedAtEpochSeconds));
       }
-      valueEl.textContent = formatTime(remaining);
+      const { mm, ss } = splitTime(remaining);
+      mmEl.textContent = mm;
+      ssEl.textContent = ss;
       timerRaf = requestAnimationFrame(tick);
     }
     tick();

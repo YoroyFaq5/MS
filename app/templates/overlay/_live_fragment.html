@@ -50,6 +50,13 @@
 
 <div class="overlay-fragment" data-sig="{{ sig }}" data-last-finished-id="{{ last_game.id if last_game else '' }}" data-ctl="{{ ctl_sig }}">
 
+  <div class="ovl-viewport-frame" aria-hidden="true">
+    <span class="ovl-viewport-frame__corner ovl-viewport-frame__corner--tl"></span>
+    <span class="ovl-viewport-frame__corner ovl-viewport-frame__corner--tr"></span>
+    <span class="ovl-viewport-frame__corner ovl-viewport-frame__corner--bl"></span>
+    <span class="ovl-viewport-frame__corner ovl-viewport-frame__corner--br"></span>
+  </div>
+
   <!-- Broadcast bar: LIVE status + real game/round numbers (never filler —
        round_number is genuinely null for non-tournament/manual games, so
        it's only shown when the data exists) + brand tag. Present on both

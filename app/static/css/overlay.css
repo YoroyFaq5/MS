@@ -238,6 +238,11 @@ html, body {
   min-width: 0;
   aspect-ratio: 3 / 4;
   transition: transform .35s cubic-bezier(.22,1,.36,1);
+  /* Shield-cut corners, not a rounded rect — a broadcast ID-card
+     silhouette instead of a generic UI card. Shared by __inner (the
+     photo/nameplate slab) and __frame (the metallic ring) so both clip
+     to the exact same notch. */
+  --ms-card-clip: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
 }
 
 .ms-seat-card:hover {
@@ -294,7 +299,7 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  border-radius: var(--ovl-radius-lg, 18px);
+  clip-path: var(--ms-card-clip);
   background: var(--ms-surface-raised, #141414);
   border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
   border-bottom: 2px solid var(--ovl-signal, #E31E24);
@@ -401,7 +406,7 @@ html, body {
 .ms-seat-card__frame {
   position: absolute; inset: 0;
   z-index: 4;
-  border-radius: inherit;
+  clip-path: var(--ms-card-clip);
   padding: 2px;
   pointer-events: none;
   opacity: 0;
@@ -845,7 +850,10 @@ html, body {
    extremes. */
 .overlay-ticker {
   position: fixed;
-  top: 1.1rem; right: 1.1rem;
+  /* Cleared below .ovl-broadcast-bar (broadcast-brand.css), which now
+     also lives in this top strip on Live pages — was 1.1rem, collided
+     with the LIVE badge/brand tag when both were on screen at once. */
+  top: clamp(4.4rem, 8vh, 6.4rem); right: 1.1rem;
   z-index: 2;
   width: clamp(235px, 14.8vw, 610px);
   min-height: clamp(200px, 13.2vw, 540px);
@@ -978,7 +986,8 @@ html, body {
    this container's is enough to scale the whole table with it. */
 .overlay-mini-standings {
   position: fixed;
-  top: 1.1rem; left: 1.1rem;
+  /* Cleared below .ovl-broadcast-bar — see .overlay-ticker's comment. */
+  top: clamp(4.4rem, 8vh, 6.4rem); left: 1.1rem;
   z-index: 2;
   width: clamp(320px, 22vw, 900px);
   background: var(--ovl-glass-bg, rgba(15,14,12,.6));

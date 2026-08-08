@@ -84,6 +84,17 @@
     linear-gradient(77deg, transparent 42.9%, rgba(216,216,216,.05) 43%, rgba(216,216,216,.05) 43.04%, transparent 43.14%),
     linear-gradient(77deg, transparent 61.9%, rgba(227,30,36,.09) 62%, rgba(227,30,36,.09) 62.05%, transparent 62.15%);
 }
+/* Ending-only mood: the frame darkens toward the right, as if the light
+   is receding — distinct from Starting Soon's "coming online" energy
+   without needing a whole second component system. */
+.ovl-ending-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 40%, rgba(5,5,5,.55) 100%);
+}
+
 .ovl-scene-grain {
   position: absolute;
   inset: 0;
@@ -95,42 +106,75 @@
   background-size: 140px 140px;
 }
 
-/* ── Shield watermark — the recurring brand mark ───────────────────────
-   A huge, near-invisible stroked shield sitting in the background,
-   deliberately off-center/oversized/bleeding past the frame edge (the
-   "asymmetry" the composition needs) rather than centered-and-small. One
-   inline SVG, stroke only, vector-effect keeps the line hairline-thin at
-   any scale — cheap to paint, cheap to keep static (no animation on the
-   shape itself; see .ovl-shield-watermark--draw for the one scene that
-   animates it in). */
+/* ── Shield watermark — the signature graphic, not a small logo ────────
+   This is the ONE oversized object every scene is built around (per the
+   brief: the shield should read as MAFIA STYLE even with the text
+   removed) — deliberately huge, cropped by the frame edge, layered
+   (outer shield + inset "depth" shield + two internal grid rules) rather
+   than a single thin outline, sitting behind a soft red glow that acts
+   as the scene's implied light source. Everything here is flat SVG
+   strokes/fills or a CSS radial-gradient — no filter/blur — so the
+   layering reads as "designed depth" without costing OBS anything. */
 .ovl-shield-watermark {
   position: absolute;
   z-index: 0;
   pointer-events: none;
-  opacity: .16;
+  opacity: .42;
 }
 .ovl-shield-watermark svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.ovl-shield-watermark polygon {
-  fill: rgba(227,30,36,.05);
+.ovl-shield-watermark__outer {
+  fill: rgba(227,30,36,.09);
   stroke: var(--ovl-chrome-light, #FFFFFF);
-  stroke-width: .7;
+  stroke-width: .75;
   vector-effect: non-scaling-stroke;
 }
-.ovl-shield-watermark--signal polygon { stroke: var(--ovl-signal, #E31E24); }
-
-.ovl-shield-watermark--corner-br {
-  right: -14%;
-  bottom: -22%;
-  width: 62vh;
-  height: 78vh;
+.ovl-shield-watermark__inner {
+  fill: none;
+  stroke: var(--ovl-signal, #E31E24);
+  stroke-width: .55;
+  opacity: .7;
+  vector-effect: non-scaling-stroke;
 }
+.ovl-shield-watermark__grid {
+  stroke: var(--ovl-chrome-light, #FFFFFF);
+  stroke-width: .28;
+  opacity: .32;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The implied red light source behind the shield — a plain radial
+   gradient, positioned/sized to match whichever watermark modifier is
+   in play (see each --corner-*/--center rule below). */
+.ovl-shield-glow {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--ovl-signal-glow, rgba(227,30,36,.28)) 0%, rgba(74,18,26,.14) 45%, transparent 72%);
+}
+
+/* Sized/offset so the shield's actual silhouette — the flat top AND the
+   point at the bottom — stays mostly ON screen; only bleeds off ONE edge
+   by a modest amount. A shape cropped so aggressively that neither
+   landmark (top or point) survives just reads as "some lines", not
+   "shield" — oversized only pays off if it's still recognizable. */
+.ovl-shield-watermark--corner-br {
+  right: -6%;
+  bottom: -9%;
+  width: 78vh;
+  height: 97.5vh;
+}
+.ovl-shield-glow--corner-br { right: -8%; bottom: -12%; width: 66vh; height: 66vh; }
+
 .ovl-shield-watermark--corner-tl {
-  left: -18%;
-  top: -26%;
-  width: 55vh;
-  height: 69vh;
+  left: -6%;
+  top: -8%;
+  width: 70vh;
+  height: 87.5vh;
   transform: rotate(180deg);
 }
+.ovl-shield-glow--corner-tl { left: -9%; top: -11%; width: 60vh; height: 60vh; }
+
 .ovl-shield-watermark--center {
   left: 50%;
   top: 50%;
@@ -138,16 +182,38 @@
   height: 115vh;
   transform: translate(-50%, -50%);
 }
+.ovl-shield-glow--center { left: 50%; top: 50%; width: 76vh; height: 76vh; transform: translate(-50%, -50%); }
 
 /* Draws itself on once, for scenes whose entrance should feel like the
    mark is being "switched on" rather than just present. stroke-dasharray/
    dashoffset animation — GPU-cheap, no filter, no layout thrash. */
-.ovl-shield-watermark--draw polygon {
-  stroke-dasharray: 620;
-  stroke-dashoffset: 620;
-  animation: ovl-shield-draw 2.4s cubic-bezier(.4,0,.2,1) .3s both;
+.ovl-shield-watermark--draw .ovl-shield-watermark__outer,
+.ovl-shield-watermark--draw .ovl-shield-watermark__inner {
+  stroke-dasharray: 640;
+  stroke-dashoffset: 640;
+  animation: ovl-shield-draw 2.2s cubic-bezier(.4,0,.2,1) .2s both;
+}
+.ovl-shield-watermark--draw .ovl-shield-watermark__inner { animation-delay: .5s; }
+.ovl-shield-watermark--draw .ovl-shield-watermark__grid {
+  transform: scaleX(0);
+  transform-origin: center;
+  animation: ovl-grid-draw .6s cubic-bezier(.4,0,.2,1) 1.6s both;
 }
 @keyframes ovl-shield-draw { to { stroke-dashoffset: 0; } }
+@keyframes ovl-grid-draw { to { transform: scaleX(1); } }
+/* The implied light source flares once on scene load, then settles to
+   its resting opacity — "darkness -> red light -> shield" per the
+   brief's signature-motion note (the glow fires first, the outline
+   traces in after — see the animation-delay stagger above). */
+.ovl-shield-glow {
+  opacity: 0;
+  animation: ovl-glow-flare 1.6s cubic-bezier(.2,.8,.2,1) .1s both;
+}
+@keyframes ovl-glow-flare {
+  0%   { opacity: 0; transform: scale(.7); }
+  35%  { opacity: 1; transform: scale(1.15); }
+  100% { opacity: .8; transform: scale(1); }
+}
 
 /* ── Shield frame — a clipped-border container ─────────────────────────
    Two stacked clip-paths (outer = accent color, inner inset 3px = surface
@@ -236,6 +302,24 @@
   50%      { opacity: 1; }
 }
 
+/* ── Viewport frame — Live scenes only ─────────────────────────────────
+   Four small corner brackets at the true edges of the canvas, echoing a
+   broadcast safe-area/viewfinder graphic — reinforces "this frame was
+   designed for the camera under it" without decorating the center (that
+   center is the actual video capture in OBS; broadcast graphics frame a
+   shot, they don't fill it). Cheap: borders only, no filter. */
+.ovl-viewport-frame { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+.ovl-viewport-frame__corner {
+  position: absolute;
+  width: 30px; height: 30px;
+  border: 1.5px solid var(--ovl-border-accent, rgba(216,216,216,.4));
+  opacity: .55;
+}
+.ovl-viewport-frame__corner--tl { top: .85rem; left: .85rem; border-right: 0; border-bottom: 0; }
+.ovl-viewport-frame__corner--tr { top: .85rem; right: .85rem; border-left: 0; border-bottom: 0; }
+.ovl-viewport-frame__corner--bl { bottom: .85rem; left: .85rem; border-right: 0; border-top: 0; }
+.ovl-viewport-frame__corner--br { bottom: .85rem; right: .85rem; border-left: 0; border-top: 0; }
+
 /* ── Broadcast bar — Live scenes only ──────────────────────────────────
    Fixed top strip: LIVE badge + real game/round numbers on the left,
    brand tag on the right. Sits above the seat strip / idle hero, never
@@ -274,26 +358,34 @@
 @keyframes ovl-accent-grow { to { transform: scaleY(1); } }
 
 /* ── Massive timer — Starting Soon's hero element ──────────────────────
-   Not "15:00" in a text node — big Bebas Neue digits between two thin
-   corner brackets (echoes a camera viewfinder / broadcast countdown
-   graphic), glowing red, with a hairline separator column dividing the
-   label from the digits themselves. */
-.ovl-timer { display: flex; flex-direction: column; align-items: flex-start; gap: .6rem; }
-.ovl-timer__display { position: relative; padding: .05em clamp(1.4rem, 3vw, 2.6rem); }
-.ovl-timer__digits {
-  font-size: clamp(4.6rem, 9.2vw, 9.5rem);
+   Not "15:00" in a text node — minutes stacked directly over seconds
+   with a glowing red rule between them, the single largest graphic
+   object on the whole scene (see brief: "not text, a graphic object").
+   Two independently-updated elements (mm/ss) instead of one string —
+   see runTimer()/splitTime() in broadcast-scenes.js. */
+.ovl-timer { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; }
+.ovl-timer__stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: .84;
+}
+.ovl-timer__mm, .ovl-timer__ss {
+  font-size: clamp(6rem, 14vw, 14.5rem);
   color: var(--ms-text, #F2F2F2);
-  text-shadow: 0 0 46px var(--ovl-signal-glow, rgba(227,30,36,.28)), 0 6px 30px rgba(0,0,0,.6);
+  text-shadow: 0 0 60px var(--ovl-signal-glow, rgba(227,30,36,.28)), 0 12px 44px rgba(0,0,0,.7);
+  font-variant-numeric: tabular-nums;
 }
-.ovl-timer__bracket {
-  position: absolute;
-  top: -.15em; bottom: -.15em;
-  width: 14px;
-  border: 2px solid var(--ovl-signal, #E31E24);
-  opacity: .9;
+.ovl-timer__rule {
+  position: relative;
+  width: 68%;
+  height: 3px;
+  margin: .06em 0;
+  flex: none;
+  background: linear-gradient(90deg, transparent, var(--ovl-signal, #E31E24) 15%, var(--ovl-signal, #E31E24) 85%, transparent);
+  box-shadow: 0 0 20px 1px var(--ovl-signal-glow, rgba(227,30,36,.28));
 }
-.ovl-timer__bracket--l { left: 0; border-right: 0; }
-.ovl-timer__bracket--r { right: 0; border-left: 0; }
 
 /* ── Scene composition scaffold ────────────────────────────────────────
    Shared by Starting Soon / BRB / Ending: content lives in a single
@@ -359,7 +451,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ovl-shield-watermark--draw polygon { animation: none; stroke-dashoffset: 0; }
+  .ovl-shield-watermark--draw .ovl-shield-watermark__outer,
+  .ovl-shield-watermark--draw .ovl-shield-watermark__inner { animation: none; stroke-dashoffset: 0; }
+  .ovl-shield-watermark--draw .ovl-shield-watermark__grid { animation: none; transform: scaleX(1); }
+  .ovl-shield-glow { animation: none; opacity: .8; transform: none; }
   .ovl-live-badge__dot, .ovl-live-badge--paused .ovl-live-badge__dot { animation: none; }
   .ovl-accent-line { animation: none; transform: scaleY(1); }
   .ovl-scene-reveal { animation: none; opacity: 1; transform: none; }

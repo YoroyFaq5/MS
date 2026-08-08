@@ -23,9 +23,13 @@
     <div class="ms-scene ms-scene--brb" data-scene-panel="brb">
       <canvas class="bc-aurora" data-aurora-canvas aria-hidden="true"></canvas>
       <div class="ovl-arch-lines" aria-hidden="true"></div>
+      <div class="ovl-shield-glow ovl-shield-glow--center" aria-hidden="true"></div>
       <div class="ovl-shield-watermark ovl-shield-watermark--center ovl-shield-watermark--draw" aria-hidden="true">
         <svg viewBox="0 0 100 125" preserveAspectRatio="xMidYMid meet">
-          <polygon points="9,0 91,0 91,89 50,125 9,89"></polygon>
+          <polygon class="ovl-shield-watermark__outer" points="9,0 91,0 91,89 50,125 9,89"></polygon>
+          <polygon class="ovl-shield-watermark__inner" points="20,15 80,15 80,80 50,110 20,80"></polygon>
+          <line class="ovl-shield-watermark__grid" x1="9" y1="42" x2="91" y2="42"></line>
+          <line class="ovl-shield-watermark__grid" x1="9" y1="64" x2="91" y2="64"></line>
         </svg>
       </div>
       <div class="bc-vignette" aria-hidden="true"></div>
