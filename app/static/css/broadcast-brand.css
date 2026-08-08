@@ -1,0 +1,367 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   MAFIA STYLE — BROADCAST BRAND SYSTEM
+   ═══════════════════════════════════════════════════════════════════════
+   Loaded after overlay.css + broadcast-scenes.css on every overlay page.
+   This is the shared visual language every scene draws from — typography
+   tiers, the shield motif (the badge's silhouette, reused as watermark/
+   frame/tag), corner labels, the LIVE badge, background depth layers.
+   Individual scenes (Starting Soon/BRB/Ending markup in their templates,
+   the broadcast bar in _live_fragment.html) compose FROM these primitives
+   instead of each inventing its own one-off treatment — that's what makes
+   a new scene automatically read as "MAFIA STYLE" instead of a bolted-on
+   skin. Nothing here uses blur()/filter() beyond what overlay.css already
+   budgets for — OBS Browser Source performance stays flat.
+
+   Colors/fonts are tokens, not hardcoded here — see the #overlay-root
+   block in overlay.css for the actual values (--ovl-burgundy/--ovl-steel/
+   --ovl-signal-deep/--ovl-font-hero added there). */
+
+/* ── Shield geometry ───────────────────────────────────────────────────
+   One polygon, reused everywhere a "shield" is needed: flat rectangular
+   top, straight sides, sharp tapered point at the bottom — the exact
+   silhouette of the MAFIA STYLE badge, traced as a CSS custom property so
+   every consumer (watermark SVG, clipped frames, tag notches) stays in
+   sync if this ever needs adjusting. */
+#overlay-root {
+  --ovl-shield-clip: polygon(9% 0%, 91% 0%, 91% 71%, 50% 100%, 9% 71%);
+}
+
+/* ── Typography tiers ──────────────────────────────────────────────────
+   DISPLAY   massive condensed headline (Bebas Neue) — timers, hero words
+   TITLE     Oswald 700 uppercase — panel/section headings
+   LABEL     small Inter uppercase, wide tracking — "LIVE", "STATUS" etc.
+   DATA      Inter, tabular-nums — numbers that must not jiggle in width
+   MICRO     tiny Inter, muted, wide tracking — technical corner text    */
+.ovl-display {
+  font-family: var(--ovl-font-hero, 'Bebas Neue', var(--ovl-font-display), sans-serif);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: .01em;
+  line-height: .92;
+}
+.ovl-title {
+  font-family: var(--ovl-font-display, 'Oswald', sans-serif);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+.ovl-label {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .17em;
+  font-size: .82rem;
+  color: var(--ms-muted, #8A8A8A);
+}
+.ovl-data {
+  font-family: 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.ovl-micro {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+  font-size: .7rem;
+  color: var(--ms-muted, #8A8A8A);
+  opacity: .8;
+  white-space: nowrap;
+}
+
+/* ── Background depth system ───────────────────────────────────────────
+   Every full-screen scene sits on this: near-black base (declared per
+   scene root, see broadcast-scenes.css .ms-scene--*) + one faint diagonal
+   "architectural line" pair + grain (reuses overlay.css's tiled SVG
+   turbulence, already budgeted) + the vignette that already existed.
+   Nothing here is per-frame JS — nothing here costs anything OBS notices. */
+.ovl-arch-lines {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(77deg, transparent 42.9%, rgba(216,216,216,.05) 43%, rgba(216,216,216,.05) 43.04%, transparent 43.14%),
+    linear-gradient(77deg, transparent 61.9%, rgba(227,30,36,.09) 62%, rgba(227,30,36,.09) 62.05%, transparent 62.15%);
+}
+.ovl-scene-grain {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .045;
+  mix-blend-mode: overlay;
+  background-image: var(--ovl-grain-uri);
+  background-size: 140px 140px;
+}
+
+/* ── Shield watermark — the recurring brand mark ───────────────────────
+   A huge, near-invisible stroked shield sitting in the background,
+   deliberately off-center/oversized/bleeding past the frame edge (the
+   "asymmetry" the composition needs) rather than centered-and-small. One
+   inline SVG, stroke only, vector-effect keeps the line hairline-thin at
+   any scale — cheap to paint, cheap to keep static (no animation on the
+   shape itself; see .ovl-shield-watermark--draw for the one scene that
+   animates it in). */
+.ovl-shield-watermark {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .16;
+}
+.ovl-shield-watermark svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ovl-shield-watermark polygon {
+  fill: rgba(227,30,36,.05);
+  stroke: var(--ovl-chrome-light, #FFFFFF);
+  stroke-width: .7;
+  vector-effect: non-scaling-stroke;
+}
+.ovl-shield-watermark--signal polygon { stroke: var(--ovl-signal, #E31E24); }
+
+.ovl-shield-watermark--corner-br {
+  right: -14%;
+  bottom: -22%;
+  width: 62vh;
+  height: 78vh;
+}
+.ovl-shield-watermark--corner-tl {
+  left: -18%;
+  top: -26%;
+  width: 55vh;
+  height: 69vh;
+  transform: rotate(180deg);
+}
+.ovl-shield-watermark--center {
+  left: 50%;
+  top: 50%;
+  width: 92vh;
+  height: 115vh;
+  transform: translate(-50%, -50%);
+}
+
+/* Draws itself on once, for scenes whose entrance should feel like the
+   mark is being "switched on" rather than just present. stroke-dasharray/
+   dashoffset animation — GPU-cheap, no filter, no layout thrash. */
+.ovl-shield-watermark--draw polygon {
+  stroke-dasharray: 620;
+  stroke-dashoffset: 620;
+  animation: ovl-shield-draw 2.4s cubic-bezier(.4,0,.2,1) .3s both;
+}
+@keyframes ovl-shield-draw { to { stroke-dashoffset: 0; } }
+
+/* ── Shield frame — a clipped-border container ─────────────────────────
+   Two stacked clip-paths (outer = accent color, inner inset 3px = surface
+   color) produce a shield-shaped ring without any SVG/mask asset — the
+   classic "clip twice" border trick. Used for the commentator cam window
+   instead of a plain dashed rounded rect. */
+.ovl-shield-frame {
+  position: relative;
+  clip-path: var(--ovl-shield-clip);
+  background: linear-gradient(165deg, var(--ovl-signal, #E31E24) 0%, var(--ovl-burgundy, #26080C) 46%, var(--ovl-black, #0A0908) 100%);
+}
+.ovl-shield-frame::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: 0;
+  clip-path: var(--ovl-shield-clip);
+  background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
+}
+.ovl-shield-frame__content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  color: var(--ms-muted, #8A8A8A);
+}
+
+/* ── Corner tags / technical labels ────────────────────────────────────
+   Small uppercase micro-text with a thin red rule — the "this is a real
+   broadcast, not a slide" texture the brief asks for. Meaningful content
+   only (brand name, real game/round numbers, status) — never filler. */
+.ovl-corner {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+.ovl-corner--tl { top: clamp(1.2rem, 3vh, 3rem); left: clamp(1.5rem, 3vw, 4rem); align-items: flex-start; }
+.ovl-corner--tr { top: clamp(1.2rem, 3vh, 3rem); right: clamp(1.5rem, 3vw, 4rem); align-items: flex-end; text-align: right; }
+.ovl-corner--bl { bottom: clamp(1.2rem, 3vh, 3rem); left: clamp(1.5rem, 3vw, 4rem); align-items: flex-start; }
+.ovl-corner--br { bottom: clamp(1.2rem, 3vh, 3rem); right: clamp(1.5rem, 3vw, 4rem); align-items: flex-end; text-align: right; }
+
+.ovl-tag-row { display: flex; align-items: center; gap: .55rem; }
+.ovl-rule { display: inline-block; width: 26px; height: 1px; background: linear-gradient(90deg, var(--ovl-signal, #E31E24), transparent); flex: none; }
+.ovl-corner--tr .ovl-rule,
+.ovl-corner--br .ovl-rule { background: linear-gradient(270deg, var(--ovl-signal, #E31E24), transparent); }
+
+/* ── LIVE badge ─────────────────────────────────────────────────────────
+   Solid signal-red pill with a white pulsing dot — the one place pure
+   saturated red is allowed to fill a shape rather than just accent an
+   edge, because it's a status indicator, not decoration. */
+.ovl-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .3rem .7rem .3rem .55rem;
+  background: var(--ovl-signal, #E31E24);
+  border-radius: 2px;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: .8rem;
+  letter-spacing: .1em;
+}
+.ovl-live-badge__dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  flex: none;
+  animation: ovl-live-pulse 1.7s ease-in-out infinite;
+}
+@keyframes ovl-live-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,255,255,.55); }
+  50%      { opacity: .55; box-shadow: 0 0 0 4px rgba(255,255,255,0); }
+}
+.ovl-live-badge--paused { background: var(--ms-surface-alt, #1A1A1A); border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4)); color: var(--ms-text-dim, #C9C9C9); }
+.ovl-live-badge--paused .ovl-live-badge__dot { background: var(--ovl-signal, #E31E24); animation: ovl-live-pulse-slow 2.6s ease-in-out infinite; }
+@keyframes ovl-live-pulse-slow {
+  0%, 100% { opacity: .5; }
+  50%      { opacity: 1; }
+}
+
+/* ── Broadcast bar — Live scenes only ──────────────────────────────────
+   Fixed top strip: LIVE badge + real game/round numbers on the left,
+   brand tag on the right. Sits above the seat strip / idle hero, never
+   overlaps them (seat strip owns the bottom, this owns the top). */
+.ovl-broadcast-bar {
+  position: fixed;
+  top: clamp(1rem, 2.4vh, 2.2rem);
+  left: clamp(1.3rem, 2.6vw, 3.4rem);
+  right: clamp(1.3rem, 2.6vw, 3.4rem);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+  opacity: 0;
+  animation: fade-in-up .5s ease .1s both;
+}
+.ovl-broadcast-bar__left { display: flex; align-items: center; gap: .9rem; }
+
+/* ── Vertical accent line ───────────────────────────────────────────────
+   A single glowing red filament along one edge — BRB's primary visual
+   anchor, per the brief. Grows in once (transform-origin), never loops. */
+.ovl-accent-line {
+  position: absolute;
+  left: clamp(2rem, 6vw, 7rem);
+  top: 14%;
+  bottom: 14%;
+  width: 2px;
+  z-index: 1;
+  background: linear-gradient(180deg, transparent, var(--ovl-signal, #E31E24) 18%, var(--ovl-signal, #E31E24) 82%, transparent);
+  box-shadow: 0 0 24px 2px var(--ovl-signal-glow, rgba(227,30,36,.28));
+  transform-origin: center;
+  transform: scaleY(0);
+  animation: ovl-accent-grow 1.1s cubic-bezier(.4,0,.2,1) .2s both;
+}
+@keyframes ovl-accent-grow { to { transform: scaleY(1); } }
+
+/* ── Massive timer — Starting Soon's hero element ──────────────────────
+   Not "15:00" in a text node — big Bebas Neue digits between two thin
+   corner brackets (echoes a camera viewfinder / broadcast countdown
+   graphic), glowing red, with a hairline separator column dividing the
+   label from the digits themselves. */
+.ovl-timer { display: flex; flex-direction: column; align-items: flex-start; gap: .6rem; }
+.ovl-timer__display { position: relative; padding: .05em clamp(1.4rem, 3vw, 2.6rem); }
+.ovl-timer__digits {
+  font-size: clamp(4.6rem, 9.2vw, 9.5rem);
+  color: var(--ms-text, #F2F2F2);
+  text-shadow: 0 0 46px var(--ovl-signal-glow, rgba(227,30,36,.28)), 0 6px 30px rgba(0,0,0,.6);
+}
+.ovl-timer__bracket {
+  position: absolute;
+  top: -.15em; bottom: -.15em;
+  width: 14px;
+  border: 2px solid var(--ovl-signal, #E31E24);
+  opacity: .9;
+}
+.ovl-timer__bracket--l { left: 0; border-right: 0; }
+.ovl-timer__bracket--r { right: 0; border-left: 0; }
+
+/* ── Scene composition scaffold ────────────────────────────────────────
+   Shared by Starting Soon / BRB / Ending: content lives in a single
+   left-aligned column, vertically centered but NOT horizontally centered
+   — asymmetric on purpose, so the (huge, off-center) shield watermark has
+   room to counterweight it instead of everything stacking dead-center.
+   Vertical centering is flexbox (align-items), deliberately NOT
+   top:50%+transform:translateY(-50%) — .ovl-scene-reveal below animates
+   `transform` on this same element for its entrance, and a CSS animation
+   targeting `transform` overrides any other value for that property for
+   as long as it's active/held (fill-mode both), which would silently
+   cancel out a static centering transform and let the block start at
+   literal 50%-from-top instead of being centered — flexbox sidesteps
+   that entirely since centering isn't expressed via `transform`. */
+.ovl-scene-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+}
+
+.ovl-scene-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  max-width: 46vw;
+  margin-left: clamp(2rem, 7vw, 8rem);
+}
+.ovl-scene-hero__logo { width: 104px; margin-bottom: .1rem; }
+.ovl-scene-hero__headline { font-size: clamp(3.4rem, 7vw, 7.2rem); color: var(--ms-text, #F2F2F2); }
+.ovl-scene-hero__sub {
+  font-family: var(--ovl-font-display, 'Oswald', sans-serif);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  font-size: clamp(1.1rem, 1.5vw, 1.7rem);
+  color: var(--ovl-chrome-light, #FFFFFF);
+  opacity: .85;
+}
+.ovl-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: clamp(1rem, 1.25vw, 1.35rem);
+  color: var(--ms-muted, #8A8A8A);
+  max-width: 38ch;
+}
+
+/* ── Scene entrance — shared by every full-screen scene's content block
+   (Starting Soon / BRB / Ending main column): a slow, confident rise+
+   reveal, distinct from the seat card's fast materialize — this content
+   sits on screen for minutes, not seconds, so its entrance is allowed to
+   take its time. */
+.ovl-scene-reveal {
+  opacity: 0;
+  clip-path: inset(0 0 0 0);
+  animation: ovl-scene-reveal-in 1.1s cubic-bezier(.16,1,.3,1) .25s both;
+}
+@keyframes ovl-scene-reveal-in {
+  0%   { opacity: 0; transform: translateY(18px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ovl-shield-watermark--draw polygon { animation: none; stroke-dashoffset: 0; }
+  .ovl-live-badge__dot, .ovl-live-badge--paused .ovl-live-badge__dot { animation: none; }
+  .ovl-accent-line { animation: none; transform: scaleY(1); }
+  .ovl-scene-reveal { animation: none; opacity: 1; transform: none; }
+  .ovl-broadcast-bar { animation: none; opacity: 1; }
+}

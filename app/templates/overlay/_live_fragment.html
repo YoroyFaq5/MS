@@ -50,6 +50,21 @@
 
 <div class="overlay-fragment" data-sig="{{ sig }}" data-last-finished-id="{{ last_game.id if last_game else '' }}" data-ctl="{{ ctl_sig }}">
 
+  <!-- Broadcast bar: LIVE status + real game/round numbers (never filler —
+       round_number is genuinely null for non-tournament/manual games, so
+       it's only shown when the data exists) + brand tag. Present on both
+       Live-Game and Live-Commentators — this is "this is a real broadcast"
+       texture, not layout-mode-specific content. -->
+  <div class="ovl-broadcast-bar" aria-hidden="true">
+    <div class="ovl-broadcast-bar__left">
+      <span class="ovl-live-badge"><span class="ovl-live-badge__dot" aria-hidden="true"></span>LIVE</span>
+      {% if current_game %}
+      <span class="ovl-micro">Игра №{{ current_game.id }}{% if current_game.round_number %} · Раунд {{ '%02d'|format(current_game.round_number) }}{% endif %}</span>
+      {% endif %}
+    </div>
+    <span class="ovl-micro">Mafia Style · Kazan Club</span>
+  </div>
+
   <!-- Full-viewport flash burst for the results reveal (Totem-of-Undying
        style impact) — always present, empty, purely CSS-animated when
        overlay.js adds .reveal-active to this same root element. Three
@@ -117,9 +132,11 @@
        reveal-panel counterparts so they inherit that styling for free. -->
   {% if layout_mode == 'commentators' %}
   <div class="overlay-idle-hero">
-    <div class="overlay-idle-hero__cam" aria-hidden="false">
-      <span class="overlay-idle-hero__slot-icon" aria-hidden="true">🎙️</span>
-      <span class="overlay-idle-hero__slot-label">Комментатор</span>
+    <div class="overlay-idle-hero__cam ovl-shield-frame" aria-hidden="false">
+      <div class="ovl-shield-frame__content">
+        <span class="overlay-idle-hero__slot-icon" aria-hidden="true">🎙️</span>
+        <span class="overlay-idle-hero__slot-label">Комментатор</span>
+      </div>
     </div>
 
     <!-- All four variants are always in the DOM at once (same reasoning

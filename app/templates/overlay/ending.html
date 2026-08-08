@@ -5,26 +5,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Оверлей — Ending — {{ tournament.name }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/overlay.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/broadcast-scenes.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/broadcast-brand.css') }}">
 </head>
 <body>
   <div id="overlay-root">
-    {# Ending — thanks for watching. Static page: no admin-controlled
+    {# Ending — thanks for watching. Same left-aligned hero column as
+       Starting Soon (recognizable rhythm across the package), watermark
+       moved to the top-left this time so the three static scenes don't
+       all look identical at a glance. Static page: no admin-controlled
        content on this scene, so no poller/fragment endpoint — it's just
        loaded once by OBS. #}
     <div class="ms-scene ms-scene--ending" data-scene-panel="ending">
       <canvas class="bc-aurora" data-aurora-canvas aria-hidden="true"></canvas>
+      <div class="ovl-arch-lines" aria-hidden="true"></div>
+      <div class="ovl-shield-watermark ovl-shield-watermark--corner-tl ovl-shield-watermark--draw" aria-hidden="true">
+        <svg viewBox="0 0 100 125" preserveAspectRatio="xMidYMid meet">
+          <polygon points="9,0 91,0 91,89 50,125 9,89"></polygon>
+        </svg>
+      </div>
       <div class="bc-vignette" aria-hidden="true"></div>
-      <div class="bc-scene-content">
-        <div class="bc-logo-3d">
-          <img class="bc-logo-3d__mark" src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="Mafia Style">
-          <div class="bc-logo-3d__sheen" aria-hidden="true"></div>
+
+      <div class="ovl-scene-frame">
+        <div class="ovl-corner ovl-corner--tr ovl-scene-reveal">
+          <div class="ovl-tag-row">
+            <span class="ovl-micro">Mafia Style · Kazan Club</span>
+            <span class="ovl-rule" aria-hidden="true"></span>
+          </div>
         </div>
-        <h1 class="bc-wordmark">Спасибо за просмотр</h1>
-        <p class="bc-tagline">До встречи на следующей игре</p>
+
+        <div class="ovl-scene-hero ovl-scene-reveal">
+          <div class="bc-logo-3d ovl-scene-hero__logo">
+            <img class="bc-logo-3d__mark" src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="Mafia Style">
+            <div class="bc-logo-3d__sheen" aria-hidden="true"></div>
+          </div>
+          <h1 class="ovl-display ovl-scene-hero__headline">Спасибо за просмотр</h1>
+          <p class="ovl-subtitle">До встречи на следующей игре</p>
+        </div>
       </div>
     </div>
   </div>

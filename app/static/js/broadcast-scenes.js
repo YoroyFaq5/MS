@@ -19,14 +19,21 @@
 
   // Soft radial blobs, no per-frame ctx.filter blur (expensive at 1080p on
   // every frame) — the gradient's own alpha falloff already reads as soft.
+  // Burgundy-dominant with one small, deliberately rarer signal-red pool —
+  // "deep burgundy light pools + controlled red glow" per the brand brief,
+  // never a wash of saturated red (that reads as generic esports, not
+  // luxury-club). Colors mirror --ovl-burgundy/--ovl-burgundy-light/
+  // --ovl-signal from overlay.css's #overlay-root token block — kept as
+  // literal rgba() here since canvas 2D gradients can't read CSS custom
+  // properties directly.
   const DEFAULT_BLOBS = [
-    { cx: .3, cy: .4, radiusX: .12, radiusY: .08, speed: .015, pulseSpeed: .05, phase: 0, size: .55, color: 'rgba(199,165,82,.16)', colorMid: 'rgba(199,165,82,.06)' },
-    { cx: .72, cy: .58, radiusX: .1, radiusY: .1, speed: .011, pulseSpeed: .04, phase: 2.1, size: .5, color: 'rgba(123,15,15,.14)', colorMid: 'rgba(123,15,15,.05)' },
-    { cx: .5, cy: .28, radiusX: .08, radiusY: .06, speed: .009, pulseSpeed: .03, phase: 4.4, size: .4, color: 'rgba(199,165,82,.09)', colorMid: 'rgba(199,165,82,.03)' },
+    { cx: .28, cy: .42, radiusX: .12, radiusY: .08, speed: .015, pulseSpeed: .05, phase: 0, size: .58, color: 'rgba(74,18,26,.22)', colorMid: 'rgba(74,18,26,.08)' },
+    { cx: .74, cy: .6, radiusX: .1, radiusY: .1, speed: .011, pulseSpeed: .04, phase: 2.1, size: .5, color: 'rgba(38,8,12,.3)', colorMid: 'rgba(38,8,12,.1)' },
+    { cx: .55, cy: .22, radiusX: .07, radiusY: .05, speed: .009, pulseSpeed: .03, phase: 4.4, size: .32, color: 'rgba(227,30,36,.1)', colorMid: 'rgba(227,30,36,.03)' },
   ];
   const SLOW_BLOBS = [
-    { cx: .35, cy: .5, radiusX: .05, radiusY: .04, speed: .004, pulseSpeed: .012, phase: 0, size: .5, color: 'rgba(199,165,82,.1)', colorMid: 'rgba(199,165,82,.04)' },
-    { cx: .65, cy: .5, radiusX: .04, radiusY: .05, speed: .003, pulseSpeed: .01, phase: 3, size: .42, color: 'rgba(123,15,15,.09)', colorMid: 'rgba(123,15,15,.03)' },
+    { cx: .32, cy: .5, radiusX: .05, radiusY: .04, speed: .004, pulseSpeed: .012, phase: 0, size: .52, color: 'rgba(74,18,26,.16)', colorMid: 'rgba(74,18,26,.05)' },
+    { cx: .68, cy: .5, radiusX: .04, radiusY: .05, speed: .003, pulseSpeed: .01, phase: 3, size: .42, color: 'rgba(38,8,12,.2)', colorMid: 'rgba(38,8,12,.07)' },
   ];
 
   function startAurora(canvas, blobs) {

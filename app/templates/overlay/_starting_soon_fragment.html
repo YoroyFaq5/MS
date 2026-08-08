@@ -1,11 +1,15 @@
-{# Starting Soon — pre-game waiting scene: aurora canvas, glass panel, 3D
-   logo, countdown, tournament name. Its own Browser Source URL (see
-   app/routes/overlay.py) — no other scene is ever in this page's DOM, so
-   there's no is-active gating here, it's just always on screen. Timer
-   state comes from BroadcastSceneService (see that module) via
-   data-timer-*; broadcast-scenes.js reads them once on init()/DOM-swap and
-   free-runs the countdown client-side between polls (no per-second server
-   round-trip). #}
+{# Starting Soon — the opening slate. Asymmetric composition: brand tag top-
+   left, hero column (logo/wordmark/tournament name/timer) left-of-center,
+   a huge near-invisible shield watermark bleeding off the bottom-right
+   corner counterweighting it, one status tag bottom-right. The timer is
+   the visual anchor — big Bebas Neue digits framed by two brackets (see
+   .ovl-timer* in broadcast-brand.css), not plain text.
+
+   Its own Browser Source URL (see app/routes/overlay.py) — no other scene
+   is ever in this page's DOM. Timer state comes from BroadcastSceneService
+   (see that module) via data-timer-*; broadcast-scenes.js reads them once
+   on init()/DOM-swap and free-runs the countdown client-side between polls
+   (no per-second server round-trip). #}
 <div class="ms-scene ms-scene--starting-soon"
      data-scene-panel="starting_soon"
      data-sig="{{ sig }}"
@@ -13,18 +17,44 @@
      data-timer-duration="{{ broadcast_state.timer_duration }}"
      data-timer-started-at="{{ broadcast_state.timer_started_at or '' }}">
   <canvas class="bc-aurora" data-aurora-canvas aria-hidden="true"></canvas>
+  <div class="ovl-arch-lines" aria-hidden="true"></div>
+  <div class="ovl-shield-watermark ovl-shield-watermark--corner-br ovl-shield-watermark--draw" aria-hidden="true">
+    <svg viewBox="0 0 100 125" preserveAspectRatio="xMidYMid meet">
+      <polygon points="9,0 91,0 91,89 50,125 9,89"></polygon>
+    </svg>
+  </div>
   <div class="bc-vignette" aria-hidden="true"></div>
-  <div class="bc-scene-content">
-    <div class="bc-panel">
-      <div class="bc-logo-3d">
+
+  <div class="ovl-scene-frame">
+    <div class="ovl-corner ovl-corner--tl ovl-scene-reveal">
+      <div class="ovl-tag-row">
+        <span class="ovl-rule" aria-hidden="true"></span>
+        <span class="ovl-micro">Mafia Style · Kazan Club · 2010</span>
+      </div>
+    </div>
+
+    <div class="ovl-scene-hero ovl-scene-reveal">
+      <div class="bc-logo-3d ovl-scene-hero__logo">
         <img class="bc-logo-3d__mark" src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="Mafia Style">
         <div class="bc-logo-3d__sheen" aria-hidden="true"></div>
       </div>
-      <h1 class="bc-wordmark">MAFIA STYLE</h1>
-      <p class="bc-tagline">{{ tournament.name }}</p>
-      <div class="bc-timer">
-        <span class="bc-timer__label">до начала эфира</span>
-        <span class="bc-timer__value tabular" data-timer-value>00:00</span>
+      <h1 class="ovl-display ovl-scene-hero__headline">Mafia Style</h1>
+      <p class="ovl-scene-hero__sub">{{ tournament.name }}</p>
+
+      <div class="ovl-timer">
+        <span class="ovl-label">До начала эфира</span>
+        <div class="ovl-timer__display">
+          <span class="ovl-timer__bracket ovl-timer__bracket--l" aria-hidden="true"></span>
+          <span class="ovl-timer__digits ovl-display tabular" data-timer-value>00:00</span>
+          <span class="ovl-timer__bracket ovl-timer__bracket--r" aria-hidden="true"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="ovl-corner ovl-corner--br ovl-scene-reveal">
+      <div class="ovl-tag-row">
+        <span class="ovl-micro">Ожидание эфира</span>
+        <span class="ovl-rule" aria-hidden="true"></span>
       </div>
     </div>
   </div>

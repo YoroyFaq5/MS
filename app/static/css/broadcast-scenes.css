@@ -30,76 +30,6 @@
   pointer-events: none;
 }
 
-.bc-scene-content {
-  position: absolute;
-  inset: 3.5%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  text-align: center;
-}
-
-.bc-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  padding: 88px 122px 74px;
-  border-radius: 18px;
-  background: var(--ovl-glass-bg, rgba(15, 14, 12, .6));
-  backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
-  -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
-  border: 1px solid var(--ovl-border-accent, rgba(216, 216, 216, .4));
-  box-shadow: var(--ovl-shadow-ambient, 0 24px 48px -16px rgba(0, 0, 0, .65));
-  animation: bc-panel-rise 1.1s cubic-bezier(.16, 1, .3, 1) both;
-}
-@keyframes bc-panel-rise {
-  0% { opacity: 0; transform: translateY(28px) scale(.97); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.bc-wordmark {
-  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
-  font-weight: 600;
-  font-size: 4.4rem;
-  color: var(--ms-text, #F2F2F2);
-  margin: 0;
-}
-.bc-wordmark--glow {
-  text-shadow: 0 0 28px var(--ovl-chrome-glow, rgba(216, 216, 216, .16));
-}
-
-.bc-tagline {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.4rem;
-  color: var(--ms-muted, #8A8A8A);
-  margin: 0;
-}
-
-.bc-timer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-}
-.bc-timer__label {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.25rem;
-  font-weight: 600;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--ms-muted, #8A8A8A);
-}
-.bc-timer__value {
-  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
-  font-size: 5.7rem;
-  color: var(--ms-text, #F2F2F2);
-  text-shadow: 0 0 32px var(--ovl-chrome-glow, rgba(216, 216, 216, .16));
-}
-
 /* Reused ambient light sweep for BRB — same recipe as overlay.css's other
    sweeps, just its own instance so it doesn't fight the standings one. */
 .bc-sweep {
@@ -137,9 +67,6 @@
   width: 224px;
   perspective: 900px;
   margin-bottom: 4px;
-}
-.bc-logo-3d--small {
-  width: 182px;
 }
 .bc-logo-3d__mark {
   display: block;

@@ -59,13 +59,29 @@ html, body {
   --ovl-chrome-glow: rgba(216,216,216,.18);
   --ovl-signal: #E31E24;
   --ovl-signal-light: #FF3B3B;
+  --ovl-signal-deep: #8C0F14;
+  --ovl-crimson: #C4232D;
   --ovl-signal-glow: rgba(227,30,36,.28);
+  /* Secondary layer the badge itself doesn't show but a full broadcast
+     package needs for depth — deep burgundy/wine, sits between the near-
+     black surfaces and the saturated signal red so backgrounds/panel
+     gradients have somewhere to live other than "flat black" or "red". */
+  --ovl-ink: #050505;
+  --ovl-black: #0A0908;
+  --ovl-burgundy: #26080C;
+  --ovl-burgundy-light: #4A121A;
+  /* Cool steel/blue-grey — Sheriff's role color, deliberately NOT white/
+     chrome (which is reserved for the brand itself) so the four in-game
+     roles read as four distinct colors, not "red vs three whites". */
+  --ovl-steel: #8B95A6;
+  --ovl-steel-light: #B7C0CE;
   --ms-text: #F2F2F2;
   --ms-text-dim: #C9C9C9;
   --ms-surface: #0F0F0F;
   --ms-surface-raised: #141414;
   --ms-surface-alt: #1A1A1A;
   --ovl-font-display: 'Oswald', 'Arial Narrow', sans-serif;
+  --ovl-font-hero: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
 
   --ovl-radius-lg: 18px;
   --ovl-radius-md: 14px;
@@ -281,6 +297,7 @@ html, body {
   border-radius: var(--ovl-radius-lg, 18px);
   background: var(--ms-surface-raised, #141414);
   border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
+  border-bottom: 2px solid var(--ovl-signal, #E31E24);
   box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
   transition: box-shadow .35s ease, border-color .35s ease;
   opacity: 0;
@@ -413,21 +430,24 @@ html, body {
               inset 0 0 22px rgba(216,216,216,.35);
 }
 
+/* A small shield tag, not a generic pill — same silhouette as the badge
+   logo (--ovl-shield-clip, see broadcast-brand.css), filled red-to-
+   burgundy so the seat number itself carries the brand mark. */
 .ms-seat-card__slotchip {
   position: absolute;
-  top: .55rem; left: .55rem;
+  top: .5rem; left: .5rem;
   z-index: 3;
-  min-width: 1.6rem;
-  text-align: center;
-  padding: .12rem .4rem;
-  border-radius: 999px;
-  font-size: .72rem;
+  width: 1.75rem;
+  height: 2.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: .2rem;
+  clip-path: var(--ovl-shield-clip, none);
+  font-size: .78rem;
   font-weight: 700;
-  color: var(--ovl-chrome-light, #FFFFFF);
-  background: rgba(13,12,10,.5);
-  border: 1px solid rgba(216,216,216,.35);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  color: #fff;
+  background: linear-gradient(165deg, var(--ovl-signal, #E31E24), var(--ovl-burgundy, #26080C));
   opacity: 0;
   animation: ms-chip-stamp .35s cubic-bezier(.3,1.6,.4,1) calc(var(--d, 0ms) + .68s) both;
 }
@@ -798,9 +818,13 @@ html, body {
 .reveal-card__name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reveal-card__score { color: var(--ms-text-dim, #C9C9C9); }
 .reveal-card__role { font-weight: 700; }
-.reveal-card__role--civilian { color: var(--ms-text-dim, #C9C9C9); }
-.reveal-card__role--sheriff   { color: var(--ovl-chrome-light, #FFFFFF); }
-.reveal-card__role--don       { color: #E0463F; }
+/* Four roles, four distinct colors — chrome/white is reserved for the
+   brand itself, so Sheriff gets its own cool steel/blue-grey rather than
+   sharing white with the UI chrome. Mafia/Don both read as "danger" but
+   at different intensities (deep red vs. dark crimson), never identical. */
+.reveal-card__role--civilian { color: var(--ms-text, #F2F2F2); }
+.reveal-card__role--sheriff   { color: var(--ovl-steel-light, #B7C0CE); }
+.reveal-card__role--don       { color: var(--ovl-crimson, #C4232D); }
 .reveal-card__role--mafia     { color: var(--ovl-signal-light, #FF3B3B); }
 
 /* ═══ SECTION 4: rotating stats ticker — "a small show, every time" ═════
@@ -1169,16 +1193,11 @@ html, body {
   animation: fade-in-up .5s ease both;
 }
 
+/* Sizing wrapper only — the shield-shaped border/background comes from
+   .ovl-shield-frame (broadcast-brand.css), applied on the same element in
+   the template so the commentator cam window reads as a MAFIA STYLE
+   frame, not a generic dashed placeholder box. */
 .overlay-idle-hero__cam {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: .6rem;
-  border: 1.5px dashed var(--ovl-border-accent, rgba(216,216,216,.4));
-  border-radius: var(--ovl-radius-lg, 18px);
-  background: var(--ovl-glass-bg, rgba(15,14,12,.6));
-  color: var(--ms-muted, #8A8A8A);
   aspect-ratio: 16 / 9;
   width: 100%;
 }

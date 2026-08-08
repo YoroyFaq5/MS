@@ -5,27 +5,52 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Оверлей — BRB — {{ tournament.name }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/overlay.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/broadcast-scenes.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/broadcast-brand.css') }}">
 </head>
 <body>
   <div id="overlay-root">
-    {# BRB — calmest scene, near-static aurora, occasional light sweep.
-       Static page: no admin-controlled content on this scene, so no
-       poller/fragment endpoint — it's just loaded once by OBS. #}
+    {# BRB — the break screen. A single glowing red filament along the left
+       edge (its primary visual anchor) plus a huge, centered, near-
+       invisible shield watermark that draws itself on once, a "Пауза"
+       status tag instead of just being empty, and the existing light-sweep
+       drifting across the frame every ~9s. Static page: no admin-
+       controlled content on this scene, so no poller/fragment endpoint —
+       it's just loaded once by OBS. #}
     <div class="ms-scene ms-scene--brb" data-scene-panel="brb">
       <canvas class="bc-aurora" data-aurora-canvas aria-hidden="true"></canvas>
+      <div class="ovl-arch-lines" aria-hidden="true"></div>
+      <div class="ovl-shield-watermark ovl-shield-watermark--center ovl-shield-watermark--draw" aria-hidden="true">
+        <svg viewBox="0 0 100 125" preserveAspectRatio="xMidYMid meet">
+          <polygon points="9,0 91,0 91,89 50,125 9,89"></polygon>
+        </svg>
+      </div>
       <div class="bc-vignette" aria-hidden="true"></div>
       <div class="bc-sweep" aria-hidden="true"></div>
-      <div class="bc-scene-content">
-        <div class="bc-logo-3d bc-logo-3d--small">
-          <img class="bc-logo-3d__mark" src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="Mafia Style">
-          <div class="bc-logo-3d__sheen" aria-hidden="true"></div>
+      <div class="ovl-accent-line" aria-hidden="true"></div>
+
+      <div class="ovl-scene-frame">
+        <div class="ovl-corner ovl-corner--tl ovl-scene-reveal">
+          <div class="ovl-tag-row">
+            <span class="ovl-rule" aria-hidden="true"></span>
+            <span class="ovl-micro">Mafia Style · Kazan Club</span>
+          </div>
         </div>
-        <h1 class="bc-wordmark bc-wordmark--glow">Скоро вернёмся</h1>
-        <p class="bc-tagline">Небольшой перерыв — эфир продолжится через пару минут</p>
+        <div class="ovl-corner ovl-corner--tr ovl-scene-reveal">
+          <span class="ovl-live-badge ovl-live-badge--paused"><span class="ovl-live-badge__dot" aria-hidden="true"></span>Пауза</span>
+        </div>
+
+        <div class="ovl-scene-hero ovl-scene-reveal">
+          <div class="bc-logo-3d ovl-scene-hero__logo">
+            <img class="bc-logo-3d__mark" src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="Mafia Style">
+            <div class="bc-logo-3d__sheen" aria-hidden="true"></div>
+          </div>
+          <h1 class="ovl-display ovl-scene-hero__headline">Скоро вернёмся</h1>
+          <p class="ovl-subtitle">Небольшой перерыв — эфир продолжится через пару минут</p>
+        </div>
       </div>
     </div>
   </div>
