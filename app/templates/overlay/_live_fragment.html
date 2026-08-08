@@ -31,13 +31,20 @@
    no-game-yet idle hero (which can show these same facts as its center
    content — see idle_content == 'ticker' further down) as well as to
    the ticker itself. #}
-{% set facts = [] %}
-{% if superlatives.mvp %}{% set _ = facts.append({'label': '🏆 MVP турнира', 'rating': superlatives.mvp.rating, 'value': superlatives.mvp.value}) %}{% endif %}
-{% if superlatives.don %}{% set _ = facts.append({'label': '👑 Лучший Дон', 'rating': superlatives.don.rating, 'value': superlatives.don.value}) %}{% endif %}
-{% if superlatives.sheriff %}{% set _ = facts.append({'label': '🔍 Лучший Шериф', 'rating': superlatives.sheriff.rating, 'value': superlatives.sheriff.value}) %}{% endif %}
-{% if superlatives.civilian %}{% set _ = facts.append({'label': '🔴 Лучший Мирный', 'rating': superlatives.civilian.rating, 'value': superlatives.civilian.value}) %}{% endif %}
-{% if superlatives.mafia %}{% set _ = facts.append({'label': '⚫ Лучший Чёрный', 'rating': superlatives.mafia.rating, 'value': superlatives.mafia.value}) %}{% endif %}
-{% if hot_streak_rating and hot_streak_count >= 2 %}{% set _ = facts.append({'label': '🔥 Серия побед', 'rating': hot_streak_rating, 'value': hot_streak_count}) %}{% endif %}
+{# mvp_fact/secondary_facts back the idle-hero info panel's featured-value +
+   role-labeled-list composition (see overlay-idle-hero__info in overlay.css);
+   facts stays the flat concatenation of both, unchanged shape, for SECTION 3's
+   corner ticker on Live-Game (still one rotating stack, no feature/secondary
+   split there). No emoji in any label — the broadcast brand never uses them;
+   a role-tinted label (reveal-card__role--*) stands in for an icon instead. #}
+{% set mvp_fact = {'label': 'MVP', 'role_class': '', 'rating': superlatives.mvp.rating, 'value': superlatives.mvp.value} if superlatives.mvp else none %}
+{% set secondary_facts = [] %}
+{% if superlatives.don %}{% set _ = secondary_facts.append({'label': 'Лучший Дон', 'role_class': 'reveal-card__role--don', 'rating': superlatives.don.rating, 'value': superlatives.don.value}) %}{% endif %}
+{% if superlatives.sheriff %}{% set _ = secondary_facts.append({'label': 'Лучший Шериф', 'role_class': 'reveal-card__role--sheriff', 'rating': superlatives.sheriff.rating, 'value': superlatives.sheriff.value}) %}{% endif %}
+{% if superlatives.civilian %}{% set _ = secondary_facts.append({'label': 'Лучший Мирный', 'role_class': 'reveal-card__role--civilian', 'rating': superlatives.civilian.rating, 'value': superlatives.civilian.value}) %}{% endif %}
+{% if superlatives.mafia %}{% set _ = secondary_facts.append({'label': 'Лучший Мафия', 'role_class': 'reveal-card__role--mafia', 'rating': superlatives.mafia.rating, 'value': superlatives.mafia.value}) %}{% endif %}
+{% if hot_streak_rating and hot_streak_count >= 2 %}{% set _ = secondary_facts.append({'label': 'Серия побед', 'role_class': '', 'rating': hot_streak_rating, 'value': hot_streak_count}) %}{% endif %}
+{% set facts = ([mvp_fact] if mvp_fact else []) + secondary_facts %}
 
 {# Same reasoning — last-game callouts, moved up so the idle hero's
    'last_game' mode can reuse them alongside the normal reveal panel. #}
@@ -163,110 +170,112 @@
       <span class="ovl-cam-frame__accent" aria-hidden="true"></span>
     </div>
 
-    <!-- All four variants are always in the DOM at once (same reasoning
-         as the ticker/standings corner panels below) — only the one
-         matching effective_idle_content carries .is-active; overlay.js
-         toggles this via ctl_sig (data-ctl's `ic=` field) on every poll,
-         same mechanism as show_ticker/standings_mode, so switching which
-         one is visible is a CSS opacity crossfade instead of the full
-         page replace a data-sig change would cause. -->
+    <!-- The right column is ONE signature broadcast graphic (.overlay-idle-hero__info)
+         — a shield-cut glass panel that is the camera's visual sibling (mirrored
+         corner-cut language + its own accent edge, see broadcast-brand.css), not
+         a small dashboard widget bolted beside it. All four content variants live
+         INSIDE this one constant frame and just swap what they draw on it —
+         typographic hierarchy (eyebrow/feature/rows + hairline rules), no nested
+         grey cards, no emoji (a role-tinted label stands in for an icon). Same
+         DOM-always-present + .is-active crossfade mechanism as before, driven by
+         overlay.js off ctl_sig's `ic=` field. -->
     <div class="overlay-idle-hero__center">
-      <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'logo' else '' }}" data-idle-slot="logo">
-        <div class="overlay-idle-hero__logo">
-          <img src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="Mafia Style" class="overlay-idle-hero__logo-img">
-        </div>
-        <h1 class="overlay-idle-hero__wordmark">MAFIA STYLE</h1>
-        <p class="overlay-idle-hero__tagline">{{ tournament.name }}</p>
-      </div>
-
-      {% if can_show_standings and full_ratings %}
-      <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'standings' else '' }}" data-idle-slot="standings">
-        <div class="overlay-idle-hero__panel overlay-idle-hero__panel--standings">
-          <div class="overlay-idle-hero__panel-title">Турнирная таблица · {{ standings_title }}</div>
-          <table class="overlay-idle-hero__standings-table">
-            {% for r in full_ratings %}
-            <tr style="--d:{{ loop.index0 * 40 }}ms">
-              <td class="overlay-idle-hero__standings-rank">{{ r.rank }}</td>
-              <td class="overlay-idle-hero__standings-name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
-              <td class="overlay-idle-hero__standings-wins">🏆 {{ r.games_won }}</td>
-              <td class="overlay-idle-hero__standings-score">{{ r.total_score|round(2) }}</td>
-            </tr>
-            {% endfor %}
-          </table>
-        </div>
-      </div>
-      {% endif %}
-
-      {% if last_game %}
-      <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'last_game' else '' }}" data-idle-slot="last_game">
-        {# Own compact broadcast scoreboard instead of the site's own
-           .match-card (games/_match_card.html) — that component is built
-           for the site's admin/history pages (Bootstrap icons, the
-           site's gold/wine tokens, an ELO column) and looked visibly
-           foreign sitting inside this chrome/red system. Reuses the
-           same reveal-card role colors and mvp/sheriff_slot/don_slot
-           already computed above for the full-screen reveal panel. #}
-        <div class="overlay-idle-hero__lastgame">
-          <div class="overlay-idle-hero__lastgame-header overlay-idle-hero__lastgame-header--{{ win }}">
-            <span>
-              {% if win == 'city' %}🏙 Победа города
-              {% elif win == 'mafia' %}🔫 Победа мафии
-              {% else %}🤝 Ничья{% endif %}
-            </span>
-            <span class="overlay-idle-hero__lastgame-id">№{{ last_game.id }}</span>
+      <div class="overlay-idle-hero__info">
+        <div class="overlay-idle-hero__slot overlay-idle-hero__slot--center {{ 'is-active' if effective_idle_content == 'logo' else '' }}" data-idle-slot="logo">
+          <div class="overlay-idle-hero__logo">
+            <img src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="Mafia Style" class="overlay-idle-hero__logo-img">
           </div>
-          {% if has_mvp or sheriff_slot or don_slot %}
-          <div class="overlay-idle-hero__lastgame-callouts">
-            {% if has_mvp %}
-            <span class="callout callout--mvp">
-              <span class="callout__label">⭐ MVP</span>
-              <span class="callout__value">{{ player_name(mvp.player, equipped_bulk.get(mvp.player_id, {})) if mvp.player else '?' }}</span>
-            </span>
+          <h1 class="overlay-idle-hero__wordmark">MAFIA STYLE</h1>
+          <p class="overlay-idle-hero__tagline">{{ tournament.name }}</p>
+        </div>
+
+        {% if can_show_standings and full_ratings %}
+        <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'standings' else '' }}" data-idle-slot="standings">
+          <div class="ovl-label">Турнирная таблица</div>
+          <div class="ovl-info-headline">{{ standings_title }}</div>
+          <div class="ovl-info-rule"></div>
+          <div class="ovl-info-list">
+            {% for r in full_ratings %}
+            <div class="ovl-info-row ovl-info-row--standing" style="--d:{{ loop.index0 * 35 }}ms">
+              <span class="ovl-info-row__rank {{ 'ovl-info-row__rank--first' if r.rank == 1 else '' }}">{{ r.rank }}</span>
+              <span class="ovl-info-row__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</span>
+              <span class="ovl-info-row__meta">{{ r.games_won }}W</span>
+              <span class="ovl-info-row__score">{{ r.total_score|round(2) }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if last_game %}
+        <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'last_game' else '' }}" data-idle-slot="last_game">
+          {# Structurally the same information as the site's own match card
+             (games/_match_card.html) — winner, MVP/Шериф/Дон, full seat list
+             with roles — just drawn in this panel's typographic system
+             instead of that component's rounded/gold-token markup. #}
+          <div class="ovl-label">Игра №{{ last_game.id }}</div>
+          <h2 class="ovl-info-headline ovl-info-headline--{{ win }}">
+            {% if win == 'city' %}Победа города
+            {% elif win == 'mafia' %}Победа мафии
+            {% else %}Ничья{% endif %}
+          </h2>
+          <div class="ovl-info-rule"></div>
+          {% if has_mvp %}
+          <div class="ovl-info-feature">
+            <span class="ovl-label">MVP</span>
+            <span class="ovl-info-feature__name">{{ player_name(mvp.player, equipped_bulk.get(mvp.player_id, {})) if mvp.player else '?' }}</span>
+          </div>
+          {% endif %}
+          {% if sheriff_slot or don_slot %}
+          <div class="ovl-info-subrow">
+            {% if don_slot %}
+            <span class="ovl-info-subrow__item"><span class="ovl-info-subrow__label reveal-card__role--don">Дон</span> {{ player_name(don_slot.player, equipped_bulk.get(don_slot.player_id, {})) if don_slot.player else '?' }}</span>
             {% endif %}
             {% if sheriff_slot %}
-            <span class="callout callout--sheriff">
-              <span class="callout__label">🔍 Шериф</span>
-              <span class="callout__value">{{ player_name(sheriff_slot.player, equipped_bulk.get(sheriff_slot.player_id, {})) if sheriff_slot.player else '?' }}</span>
-            </span>
-            {% endif %}
-            {% if don_slot %}
-            <span class="callout callout--don">
-              <span class="callout__label">👑 Дон</span>
-              <span class="callout__value">{{ player_name(don_slot.player, equipped_bulk.get(don_slot.player_id, {})) if don_slot.player else '?' }}</span>
-            </span>
+            <span class="ovl-info-subrow__item"><span class="ovl-info-subrow__label reveal-card__role--sheriff">Шериф</span> {{ player_name(sheriff_slot.player, equipped_bulk.get(sheriff_slot.player_id, {})) if sheriff_slot.player else '?' }}</span>
             {% endif %}
           </div>
           {% endif %}
-          <div class="overlay-idle-hero__lastgame-seats">
+          <div class="ovl-info-rule ovl-info-rule--sm"></div>
+          <div class="ovl-info-list">
             {% for slot in last_slots %}
-            <div class="overlay-idle-hero__lastgame-seat" style="--d:{{ loop.index0 * 45 }}ms">
-              <span class="overlay-idle-hero__lastgame-seat-num">{{ slot.seat_number }}</span>
-              <span class="overlay-idle-hero__lastgame-seat-name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}</span>
+            <div class="ovl-info-row ovl-info-row--seat" style="--d:{{ loop.index0 * 40 }}ms">
+              <span class="ovl-info-row__rank">{{ slot.seat_number }}</span>
+              <span class="ovl-info-row__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}</span>
               <span class="reveal-card__role reveal-card__role--{{ slot.role.value }}">{{ role_labels[slot.role.value] }}</span>
             </div>
             {% endfor %}
           </div>
         </div>
-      </div>
-      {% endif %}
+        {% endif %}
 
-      {% if facts %}
-      <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'ticker' else '' }}" data-idle-slot="ticker">
-        <div class="overlay-idle-hero__panel overlay-idle-hero__panel--ticker">
-          {% for fact in facts %}
-          {% set is_num = fact.value is number %}
-          {# Reuses .callout — the same "trophy chip" the results-reveal
-             panel already drops in for MVP/Шериф/Дон, instead of the
-             plain label/value/extra text stack this used to be. #}
-          <div class="callout overlay-idle-hero__fact" style="--d:{{ loop.index0 * 60 }}ms">
-            <span class="callout__label">{{ fact.label }}</span>
-            <span class="callout__value">{{ player_name(fact.rating, equipped_bulk.get(fact.rating.player_id, {})) }}</span>
-            <span class="overlay-idle-hero__fact-extra">{{ fact.value|round(2) if is_num else fact.value }}</span>
+        {% if facts %}
+        <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'ticker' else '' }}" data-idle-slot="ticker">
+          <div class="ovl-label">Лучшие игроки турнира</div>
+          <div class="ovl-info-rule"></div>
+          {% if mvp_fact %}
+          <div class="ovl-info-feature ovl-info-feature--mvp">
+            <span class="ovl-label">{{ mvp_fact.label }}</span>
+            <span class="ovl-info-feature__value ovl-display">{{ mvp_fact.value|round(2) }}</span>
+            <span class="ovl-info-feature__name">{{ player_name(mvp_fact.rating, equipped_bulk.get(mvp_fact.rating.player_id, {})) }}</span>
           </div>
-          {% endfor %}
+          {% if secondary_facts %}<div class="ovl-info-rule ovl-info-rule--sm"></div>{% endif %}
+          {% endif %}
+          {% if secondary_facts %}
+          <div class="ovl-info-list">
+            {% for fact in secondary_facts %}
+            {% set is_num = fact.value is number %}
+            <div class="ovl-info-row ovl-info-row--fact" style="--d:{{ loop.index0 * 55 }}ms">
+              <span class="ovl-info-row__label {{ fact.role_class }}">{{ fact.label }}</span>
+              <span class="ovl-info-row__name">{{ player_name(fact.rating, equipped_bulk.get(fact.rating.player_id, {})) }}</span>
+              <span class="ovl-info-row__score">{{ fact.value|round(2) if is_num else fact.value }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
         </div>
+        {% endif %}
       </div>
-      {% endif %}
     </div>
 
   </div>

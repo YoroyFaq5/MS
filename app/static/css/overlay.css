@@ -1195,11 +1195,13 @@ html, body {
   inset: 0;
   z-index: 1;
   display: grid;
-  /* Camera is the dominant visual object on this scene now, not a small
-     placeholder next to the "real" content — see .ovl-cam-frame in
-     broadcast-brand.css. */
+  /* Camera and info panel are two co-equal broadcast objects, not a video
+     with a small dashboard bolted on beside it — see .overlay-idle-hero__info
+     below and .ovl-cam-frame in broadcast-brand.css. align-items:stretch
+     (not center) so the info panel takes the row's FULL height; the camera
+     opts back out to its own aspect-ratio-driven size via align-self. */
   grid-template-columns: minmax(760px, 66vw) minmax(0, 1fr);
-  align-items: center;
+  align-items: stretch;
   gap: clamp(1rem, 2vw, 2.5rem);
   padding: 0 clamp(1.5rem, 3vw, 4rem);
   animation: fade-in-up .5s ease both;
@@ -1213,17 +1215,46 @@ html, body {
   aspect-ratio: 16 / 10;
   width: 100%;
   max-height: 88vh;
+  align-self: center;
 }
 
-/* Fixed box so swapping which slot is active doesn't reflow/resize the
-   center column (a table is much taller than the logo block) — each
-   slot is absolutely positioned to fill it and crossfades via opacity,
-   see .overlay-idle-hero__slot below. */
 .overlay-idle-hero__center {
   position: relative;
   width: 100%;
-  height: min(72vh, 660px);
   min-width: 0;
+  max-height: 88vh;
+}
+
+/* ── Signature information panel — the camera's visual sibling ─────────
+   ONE constant shield-cut glass frame filling the panel's full height
+   (not a small content-sized box floating in empty space), so the right
+   side reads as a second broadcast graphic instead of a dashboard widget
+   next to the video. Mirrors the camera's corner-cut language: the camera
+   clips its top-left/bottom-right corners (--ovl-cam-clip), this clips
+   the OPPOSITE pair (top-right/bottom-left) — related, not identical. Its
+   red accent runs down the LEFT edge, continuing the visual "circuit"
+   from the camera's accent along ITS bottom edge, so the two boxes read
+   as one composition rather than two unrelated rectangles. Every content
+   slot below is absolutely positioned INSIDE this one frame and only
+   crossfades what it draws on it — no per-slot background/border/clip. */
+.overlay-idle-hero__info {
+  position: relative;
+  height: 100%;
+  --ovl-info-clip: polygon(0 0, calc(100% - 34px) 0, 100% 34px, 100% 100%, 34px 100%, 0 calc(100% - 34px));
+  clip-path: var(--ovl-info-clip, none);
+  background: linear-gradient(165deg, rgba(19,16,14,.74), rgba(8,7,6,.9));
+  box-shadow: inset 0 0 0 1px rgba(243,239,234,.14), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
+  backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+}
+.overlay-idle-hero__info::before {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 34px; left: 0;
+  width: 3px;
+  pointer-events: none;
+  background: var(--ovl-signal, #E31E24);
+  box-shadow: 0 0 14px 1px var(--ovl-signal-glow, rgba(227,30,36,.28));
 }
 
 .overlay-idle-hero__slot {
@@ -1231,18 +1262,24 @@ html, body {
   inset: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 16px;
+  padding: clamp(1.6rem, 2.2vw, 2.6rem) clamp(1.8rem, 2.4vw, 2.8rem);
   opacity: 0;
   visibility: hidden;
+  overflow-y: auto;
   transition: opacity .3s ease, visibility 0s linear .3s;
 }
 .overlay-idle-hero__slot.is-active {
   opacity: 1;
   visibility: visible;
   transition: opacity .3s ease, visibility 0s linear 0s;
+}
+/* The logo slot is the one exception to the typographic-list layout below
+   — a centered mark, not a list, so it gets its own alignment. */
+.overlay-idle-hero__slot--center {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 16px;
 }
 
 .overlay-idle-hero__logo { width: 150px; margin-bottom: 4px; }
@@ -1266,168 +1303,115 @@ html, body {
   margin: 0;
 }
 
-.overlay-idle-hero__panel {
-  position: relative;
-  width: 100%;
-  max-height: 100%;
-  overflow: hidden auto;
-  background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
-  border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
-  clip-path: var(--ovl-panel-clip-lg, none);
-  padding: 1.6rem 2rem;
-  backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
-  -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
-  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
-}
-.overlay-idle-hero__panel-title {
+/* ── Typographic components shared by the standings/last_game/ticker
+   slots ─────────────────────────────────────────────────────────────────
+   No nested cards anywhere below: an eyebrow label, a headline or a
+   featured value, a hairline rule, then a flat list of rows separated by
+   1px hairlines. Hierarchy comes from type size/weight/spacing, not
+   boxes. Icons are never emoji — where one is needed, a role-tinted label
+   (reveal-card__role--*, already used by the seat cards/reveal panel)
+   does that job instead. */
+.ovl-info-headline {
   font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
   font-weight: 700;
-  font-size: 1.5rem;
-  color: var(--ovl-chrome-light, #FFFFFF);
-  padding-bottom: .5rem;
-  margin-bottom: .5rem;
-  border-bottom: 1px solid rgba(216,216,216,.3);
-  text-align: left;
+  font-size: clamp(1.5rem, 2vw, 2.1rem);
+  text-transform: uppercase;
+  letter-spacing: .01em;
+  color: var(--ms-text, #F2F2F2);
+  margin: .2rem 0 0;
+  text-wrap: balance;
 }
-/* Sized to its content, not the full center column — five short rows of
-   rank/name/wins/score stretched across the whole width just left a lot
-   of dead glass panel (same reasoning as .overlay-idle-hero__panel--ticker
-   below). Only the columns that matter on a broadcast HUD survive here:
-   games PLAYED was dropped (rarely meaningful at a glance mid-broadcast),
-   wins took its place. */
-.overlay-idle-hero__panel--standings {
-  width: auto;
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 1.2rem 1.5rem;
-}
-.overlay-idle-hero__standings-table { width: 100%; border-collapse: collapse; font-size: 1.05rem; }
-.overlay-idle-hero__standings-table tr {
-  opacity: 0;
-  animation: ovl-row-wipe-l .35s ease-out both;
-  animation-delay: calc(var(--d, 0ms) + .3s);
-}
-.overlay-idle-hero__standings-table td { padding: .4rem .3rem; border-bottom: 1px solid rgba(255,255,255,.05); }
-.overlay-idle-hero__standings-rank { color: var(--ms-muted, #8A8A8A); width: 1.6rem; font-weight: 700; text-align: left; }
-.overlay-idle-hero__standings-name { font-weight: 600; text-align: left; }
-.overlay-idle-hero__standings-wins {
-  text-align: center;
-  width: 3.6rem;
-  color: var(--ovl-chrome-light, #FFFFFF);
-  font-variant-numeric: tabular-nums;
-}
-.overlay-idle-hero__standings-score {
-  text-align: right;
-  color: var(--ms-text-dim, #C9C9C9);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
+.ovl-info-headline--city  { color: var(--ovl-chrome-light, #FFFFFF); }
+.ovl-info-headline--mafia { color: var(--ovl-signal-light, #FF3B3B); }
 
-/* ── "Last game" idle-hero slot — own compact broadcast scoreboard ─────
-   Replaces an earlier version that reused the site's own .match-card
-   (games/_match_card.html) — that component brings the site's gold/wine
-   tokens, Bootstrap icons and an ELO column built for the admin/history
-   pages, and looked visibly foreign sitting inside this chrome/red
-   system. This reuses the SAME role colors as the full-screen reveal
-   panel (.reveal-card__role--*) and the same "trophy chip" (.callout)
-   for MVP/Шериф/Дон, so it reads as part of the same card family. */
-.overlay-idle-hero__lastgame {
-  position: relative;
-  width: 100%;
-  max-width: 640px;
-  margin: 0 auto;
-  background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
-  border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
-  clip-path: var(--ovl-panel-clip-lg, none);
-  padding: 1.4rem 1.7rem 1.6rem;
-}
-.overlay-idle-hero__lastgame-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
-  font-weight: 700;
-  font-size: 1.35rem;
-  padding-bottom: .5rem;
-  margin-bottom: .8rem;
-  border-bottom: 1px solid rgba(216,216,216,.3);
-}
-.overlay-idle-hero__lastgame-header--city  { color: var(--ovl-chrome-light, #FFFFFF); }
-.overlay-idle-hero__lastgame-header--mafia { color: var(--ovl-signal-light, #FF3B3B); }
-.overlay-idle-hero__lastgame-id {
-  font-family: 'Inter', sans-serif;
-  font-size: .95rem;
-  font-weight: 400;
-  color: var(--ms-muted, #8A8A8A);
-}
-.overlay-idle-hero__lastgame-callouts {
-  display: flex;
-  gap: .6rem;
-  flex-wrap: wrap;
-  margin-bottom: .9rem;
-}
-.overlay-idle-hero__lastgame-seats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: .55rem 1.1rem;
-}
-.overlay-idle-hero__lastgame-seat {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  font-family: 'Inter', sans-serif;
-  font-size: .92rem;
-  opacity: 0;
-  animation: fade-in-up .35s ease both;
-  animation-delay: var(--d, 0ms);
-}
-.overlay-idle-hero__lastgame-seat-num {
-  color: var(--ms-muted, #8A8A8A);
-  font-weight: 700;
-  width: 1.1rem;
+.ovl-info-rule {
+  height: 1px;
+  margin: 1rem 0 1.2rem;
+  background: linear-gradient(90deg, var(--ovl-signal, #E31E24), rgba(216,216,216,.14) 45%, transparent);
   flex: none;
 }
-.overlay-idle-hero__lastgame-seat-name {
+.ovl-info-rule--sm { margin: .8rem 0 .9rem; opacity: .7; }
+
+/* Featured value — the MVP score on the ticker slot, the MVP name on
+   last_game — the one moment this panel gets loud; everything else stays
+   quiet, small-caps type. */
+.ovl-info-feature { display: flex; flex-direction: column; gap: .2rem; flex: none; }
+.ovl-info-feature__value {
+  font-family: var(--ovl-font-hero, 'Bebas Neue', var(--ovl-font-display), sans-serif);
+  font-size: clamp(3rem, 4.4vw, 4.8rem);
+  line-height: .9;
+  color: var(--ovl-chrome-light, #FFFFFF);
+  text-shadow: 0 0 30px var(--ovl-signal-glow, rgba(227,30,36,.28));
+}
+.ovl-info-feature__name {
+  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  font-size: 1.35rem;
+}
+
+/* Дон/Шериф on the last_game slot — one quiet line each, role color
+   standing in for the icon, no boxes. */
+.ovl-info-subrow { display: flex; gap: 1.6rem; flex-wrap: wrap; font-family: 'Inter', sans-serif; font-size: 1rem; flex: none; }
+.ovl-info-subrow__label { font-weight: 700; text-transform: uppercase; font-size: .78rem; letter-spacing: .06em; margin-right: .4rem; }
+
+/* Flat row list — standings/seats/facts all compose this, differing only
+   in how many columns a row has (see the --standing/--seat/--fact
+   modifiers below). Scrolls independently of the frame if content runs
+   long (e.g. a 12+ player standings table on a short canvas). */
+.ovl-info-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.ovl-info-row {
+  display: grid;
+  align-items: baseline;
+  gap: .3rem 1rem;
+  padding: .6rem 0;
+  border-top: 1px solid rgba(255,255,255,.08);
+  font-family: 'Inter', sans-serif;
+  opacity: 0;
+  animation: fade-in-up .4s ease both;
+  animation-delay: var(--d, 0ms);
+}
+.ovl-info-row:first-child { border-top: none; }
+.ovl-info-row__rank {
+  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
+  font-weight: 700;
+  color: var(--ms-muted, #8A8A8A);
+  font-variant-numeric: tabular-nums;
+}
+.ovl-info-row__rank--first { color: var(--ovl-signal-light, #FF3B3B); }
+.ovl-info-row__name {
   font-weight: 600;
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* reveal-card__role--* (overlay.css, seat card/reveal panel section)
-   already carries the four role colors — reused here as-is. */
-.overlay-idle-hero__lastgame-seat .reveal-card__role { font-size: .8rem; flex: none; }
-
-/* Sized to content, not the full center column — a handful of short
-   label/name/value lines stretched across the same width as the
-   standings table left a lot of dead glass panel on the right, which
-   is what read as "off". */
-.overlay-idle-hero__panel--ticker {
-  display: flex;
-  flex-direction: column;
-  gap: .9rem;
-  width: auto;
-  max-width: 480px;
-  margin: 0 auto;
-}
-/* .overlay-idle-hero__fact composes with .callout (the same "trophy
-   chip" the reveal panel drops in for MVP/Шериф/Дон) — this just adds
-   the center-aligned layout this ticker context wants and a per-item
-   stagger delay (callout's own totem-callout-drop keyframe/easing stays
-   untouched, only its delay is overridden here). */
-.overlay-idle-hero__fact {
-  align-items: center;
-  text-align: center;
-  min-width: 220px;
-  animation-delay: var(--d, 0ms);
-}
-.overlay-idle-hero__fact-extra {
-  font-family: 'Inter', sans-serif;
-  color: var(--ms-muted, #8A8A8A);
-  font-size: .85rem;
+.ovl-info-row__meta, .ovl-info-row__score {
   font-variant-numeric: tabular-nums;
+  color: var(--ms-text-dim, #C9C9C9);
+  text-align: right;
 }
+.ovl-info-row__label {
+  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: .82rem;
+  letter-spacing: .03em;
+  color: var(--ms-muted, #8A8A8A);
+}
+/* Re-asserted at higher (two-class) specificity so it wins over the plain
+   .ovl-info-row__label color above regardless of source order — a role-
+   tinted label is standing in for an icon here (Best Don/Sheriff/Civilian/
+   Mafia on the ticker slot), so it must actually show the role's color. */
+.ovl-info-row__label.reveal-card__role--civilian { color: var(--ms-text, #F2F2F2); }
+.ovl-info-row__label.reveal-card__role--sheriff   { color: var(--ovl-steel-light, #B7C0CE); }
+.ovl-info-row__label.reveal-card__role--don       { color: var(--ovl-crimson, #C4232D); }
+.ovl-info-row__label.reveal-card__role--mafia     { color: var(--ovl-signal-light, #FF3B3B); }
+
+.ovl-info-row--standing { grid-template-columns: 1.8rem 1fr 3rem 3.6rem; font-size: 1.05rem; }
+.ovl-info-row--seat     { grid-template-columns: 1.6rem 1fr auto; font-size: 1rem; }
+.ovl-info-row--fact     { grid-template-columns: 8rem 1fr auto; font-size: 1rem; }
 
 /* ── Shared panel accent ────────────────────────────────────────────────
    The same thin glowing red edge the seat cards and camera frame use,
@@ -1439,9 +1423,7 @@ html, body {
    bar trims itself at the notch automatically, whichever corner it's on. */
 .overlay-ticker::after,
 .overlay-mini-standings::after,
-.overlay-full-standings::after,
-.overlay-idle-hero__panel::after,
-.overlay-idle-hero__lastgame::after {
+.overlay-full-standings::after {
   content: "";
   position: absolute;
   left: 0; right: 0; bottom: 0;
@@ -1468,7 +1450,7 @@ html, body {
   .totem-flash__chroma-g, .totem-flash__chroma-b,
   .results-reveal-panel, .results-reveal-panel__iris-trace, .results-reveal-panel__header,
   .results-reveal-panel__header::after, .callout, .reveal-card__inner,
-  .overlay-idle-hero__fact,
+  .ovl-info-row,
   .overlay-ticker, .ticker-fact, .ticker-fact.active, .ticker-fact__label::after,
   .overlay-mini-standings, .overlay-mini-standings__scan, .ovl-hud-bracket, .overlay-mini-standings tr,
   .overlay-full-standings, .overlay-full-standings__sweep, .overlay-full-standings__title::after,
