@@ -72,6 +72,18 @@
     <span class="ovl-micro">Mafia Style · Kazan Club</span>
   </div>
 
+  <!-- Donation slot — this page only draws the tag + glass frame; the
+       actual DonationAlerts (or similar) alert widget is a separate OBS
+       Browser Source layered on top, positioned over .ovl-donation-bar__slot.
+       See /overlay/<id>/control for the exact placement note. -->
+  <div class="ovl-donation-bar" aria-hidden="true">
+    <span class="ovl-donation-bar__tag">
+      <span class="ovl-donation-bar__icon">♥</span>
+      Поддержать клуб
+    </span>
+    <span class="ovl-donation-bar__slot"></span>
+  </div>
+
   <!-- Full-viewport flash burst for the results reveal (Totem-of-Undying
        style impact) — always present, empty, purely CSS-animated when
        overlay.js adds .reveal-active to this same root element. Three
@@ -139,11 +151,17 @@
        reveal-panel counterparts so they inherit that styling for free. -->
   {% if layout_mode == 'commentators' %}
   <div class="overlay-idle-hero">
+    <!-- Frame only — deliberately no fill. The real webcam is a separate
+         native OBS source placed BELOW this Browser Source and
+         positioned to match this box (see /overlay/<id>/control); it
+         shows through everywhere this element doesn't paint anything.
+         See .ovl-cam-frame's comment in broadcast-brand.css for why the
+         cut corners are two opaque masks rather than a clip-path. -->
     <div class="overlay-idle-hero__cam ovl-cam-frame" aria-hidden="false">
+      <span class="ovl-cam-frame__mask ovl-cam-frame__mask--tl" aria-hidden="true"></span>
+      <span class="ovl-cam-frame__mask ovl-cam-frame__mask--br" aria-hidden="true"></span>
+      <span class="ovl-cam-frame__outline" aria-hidden="true"></span>
       <span class="ovl-cam-frame__live" aria-hidden="true"><span class="ovl-cam-frame__live-dot"></span>LIVE</span>
-      <div class="ovl-cam-frame__center">
-        <span class="overlay-idle-hero__slot-icon" aria-hidden="true">🎙️</span>
-      </div>
       <span class="ovl-cam-frame__accent" aria-hidden="true"></span>
     </div>
 

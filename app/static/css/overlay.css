@@ -1214,13 +1214,6 @@ html, body {
   width: 100%;
   max-height: 88vh;
 }
-.overlay-idle-hero__slot-icon { font-size: 2rem; opacity: .6; }
-.overlay-idle-hero__slot-label {
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-}
 
 /* Fixed box so swapping which slot is active doesn't reflow/resize the
    center column (a table is much taller than the logo block) — each
