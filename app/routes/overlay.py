@@ -134,6 +134,17 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
     current_slots = sorted(current_game.slots, key=lambda s: s.seat_number) if current_game else []
     last_slots = sorted(last_game.slots, key=lambda s: s.seat_number) if last_game else []
 
+    # "Тур №N" — the same ordinal-within-tournament numbering the site's
+    # own games list shows (tournaments.tournament_games: games sorted by
+    # id, N = position in that list), NOT game.id. The overlay used to show
+    # the raw site-wide game.id, which is a different (and to a viewer,
+    # meaningless) number from what the tournament page itself calls this
+    # game — confusing side by side. game.id is still used everywhere else
+    # here (data-last-finished-id, DB lookups); this is display-only.
+    game_number_by_id = {g.id: i + 1 for i, g in enumerate(sorted(tournament.games, key=lambda g: g.id))}
+    current_game_number = game_number_by_id.get(current_game.id) if current_game else None
+    last_game_number = game_number_by_id.get(last_game.id) if last_game else None
+
     # This tournament-wide rating is always computed regardless of series
     # scope: it backs the seat-strip's per-player "score so far" stat and
     # the ticker's superlatives/hot-streak facts (both already effectively
@@ -234,7 +245,9 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
     return dict(
         tournament=tournament, layout_mode=layout_mode,
         current_game=current_game, current_slots=current_slots,
+        current_game_number=current_game_number,
         last_game=last_game, last_slots=last_slots,
+        last_game_number=last_game_number,
         equipped_bulk=equipped_bulk, ratings_by_pid=ratings_by_pid,
         superlatives=superlatives,
         hot_streak_rating=hot_streak_rating, hot_streak_count=hot_streak_count,

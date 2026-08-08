@@ -88,7 +88,7 @@
     <div class="ovl-broadcast-bar__left">
       <span class="ovl-live-badge"><span class="ovl-live-badge__dot" aria-hidden="true"></span>LIVE</span>
       {% if current_game %}
-      <span class="ovl-micro">Игра №{{ current_game.id }}{% if current_game.round_number %} · Раунд {{ '%02d'|format(current_game.round_number) }}{% endif %}</span>
+      <span class="ovl-micro">Тур №{{ current_game_number }}{% if current_game.round_number %} · Раунд {{ '%02d'|format(current_game.round_number) }}{% endif %}</span>
       {% endif %}
     </div>
     <span class="ovl-micro">Mafia Style · Kazan Club</span>
@@ -242,7 +242,7 @@
              (games/_match_card.html) — winner, MVP/Шериф/Дон, full seat list
              with roles — just drawn in this panel's typographic system
              instead of that component's rounded/gold-token markup. #}
-          <div class="ovl-label">Игра №{{ last_game.id }}</div>
+          <div class="ovl-label">Тур №{{ last_game_number }}</div>
           <h2 class="ovl-info-headline ovl-info-headline--{{ win }}">
             {% if win == 'city' %}Победа города
             {% elif win == 'mafia' %}Победа мафии
@@ -323,7 +323,7 @@
       {% if win == 'city' %}Победа города
       {% elif win == 'mafia' %}Победа мафии
       {% else %}Ничья{% endif %}
-      <span class="results-reveal-panel__game-id">Игра №{{ last_game.id }}</span>
+      <span class="results-reveal-panel__game-id">Тур №{{ last_game_number }}</span>
     </div>
     {% if has_mvp or sheriff_slot or don_slot %}
     <div class="results-reveal-panel__callouts">
