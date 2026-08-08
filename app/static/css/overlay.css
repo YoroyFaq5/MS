@@ -752,20 +752,20 @@ html, body {
 
 .results-reveal-panel__callouts {
   display: flex;
-  gap: .75rem;
+  gap: 1.8rem;
   flex-wrap: wrap;
-  margin-bottom: .75rem;
+  margin-bottom: 1.1rem;
 }
 
 /* Callouts drop in like a trophy being placed on a podium — an overshoot
-   landing rather than a fade, staggered by DOM position. */
+   landing rather than a fade, staggered by DOM position. No box/fill —
+   same flat typographic language as the idle-hero info panel
+   (.ovl-info-row__label doubles as the "icon", role-tinted where one
+   applies), just kept under its own class name for this drop-in motion. */
 .callout {
   display: flex;
   flex-direction: column;
-  background: rgba(216,216,216,.08);
-  border-radius: 8px;
-  padding: .55rem 1.05rem;
-  font-size: 1.3rem;
+  gap: .15rem;
   opacity: 0;
   animation: totem-callout-drop .5s cubic-bezier(.34,1.7,.4,1) both;
 }
@@ -777,13 +777,26 @@ html, body {
   60%  { opacity: 1; transform: translateY(4px) scale(1.05); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.callout__label { color: var(--ms-muted, #8A8A8A); font-size: 1.2rem; }
-.callout__value { font-weight: 700; }
+.callout__value {
+  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  font-size: 1.3rem;
+  color: var(--ms-text, #F2F2F2);
+}
+.callout__score {
+  font-variant-numeric: tabular-nums;
+  color: var(--ms-text-dim, #C9C9C9);
+  font-size: 1rem;
+}
 
+/* Two columns, not a wrapped tile grid — a flat row list like the idle-
+   hero's own seat list, not a dashboard-style card grid. */
 .results-reveal-panel__seats {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: .65rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0 2.5rem;
 }
 
 .reveal-card { position: relative; }
@@ -794,35 +807,40 @@ html, body {
   overflow: visible;
 }
 
-/* Each seat card *resolves out of energy* rather than scaling in — high
+/* Each seat row *resolves out of energy* rather than scaling in — high
    brightness/blur settling to normal, timed to land exactly as its
    converging dust motes (spawned by overlay.js into __particles) finish
-   collapsing into it. */
+   collapsing into it. No card fill/radius — a hairline top border between
+   rows, same language as .ovl-info-row on the idle-hero panel. */
 .reveal-card__inner {
   position: relative;
   z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: .15rem;
-  background: rgba(255,255,255,.04);
-  border-radius: 8px;
-  padding: .65rem .85rem;
-  font-size: 1.25rem;
+  display: grid;
+  grid-template-columns: 2.2rem 1fr auto auto;
+  align-items: baseline;
+  gap: .3rem 1.2rem;
+  padding: .65rem 0;
+  border-top: 1px solid rgba(255,255,255,.08);
+  font-family: 'Inter', sans-serif;
+  font-size: 1.05rem;
   opacity: 0;
   will-change: transform, filter, opacity;
   animation: totem-resolve .55s cubic-bezier(.2,.8,.2,1) both;
   animation-delay: calc(var(--d, 0ms) + 1.05s);
 }
+/* First row in each of the two columns (assumes a 2-column grid) — no
+   hairline above the very top of the list. */
+.results-reveal-panel__seats .reveal-card:nth-child(-n+2) .reveal-card__inner { border-top: none; }
 @keyframes totem-resolve {
   0%   { opacity: 0; filter: blur(7px) brightness(2.4) saturate(1.6); transform: scale(.85); }
   55%  { opacity: 1; filter: blur(2px) brightness(1.6) saturate(1.2); transform: scale(1.03); }
   100% { opacity: 1; filter: blur(0) brightness(1) saturate(1);       transform: scale(1); }
 }
 
-.reveal-card__seat { color: var(--ovl-chrome-light, #FFFFFF); font-weight: 600; }
-.reveal-card__name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.reveal-card__score { color: var(--ms-text-dim, #C9C9C9); }
-.reveal-card__role { font-weight: 700; }
+.reveal-card__seat { color: var(--ms-muted, #8A8A8A); font-weight: 700; font-variant-numeric: tabular-nums; }
+.reveal-card__name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reveal-card__score { color: var(--ms-text-dim, #C9C9C9); text-align: right; font-variant-numeric: tabular-nums; }
+.reveal-card__role { font-weight: 700; text-align: right; }
 /* Four roles, four distinct colors — chrome/white is reserved for the
    brand itself, so Sheriff gets its own cool steel/blue-grey rather than
    sharing white with the UI chrome. Mafia/Don both read as "danger" but
@@ -1203,7 +1221,11 @@ html, body {
   grid-template-columns: minmax(760px, 66vw) minmax(0, 1fr);
   align-items: stretch;
   gap: clamp(1rem, 2vw, 2.5rem);
-  padding: 0 clamp(1.5rem, 3vw, 4rem);
+  /* Top padding clears .ovl-broadcast-bar/.ovl-donation-bar (fixed, same
+     top strip, see broadcast-brand.css) — the info panel now stretches to
+     the row's full height, so without this its own top edge/content
+     collided with that bar instead of sitting below it. */
+  padding: clamp(4.6rem, 8.4vh, 6.6rem) clamp(1.5rem, 3vw, 4rem) clamp(2rem, 4vh, 3rem);
   animation: fade-in-up .5s ease both;
 }
 
@@ -1410,7 +1432,7 @@ html, body {
 .ovl-info-row__label.reveal-card__role--mafia     { color: var(--ovl-signal-light, #FF3B3B); }
 
 .ovl-info-row--standing { grid-template-columns: 1.8rem 1fr 3rem 3.6rem; font-size: 1.05rem; }
-.ovl-info-row--seat     { grid-template-columns: 1.6rem 1fr auto; font-size: 1rem; }
+.ovl-info-row--seat     { grid-template-columns: 1.6rem 1fr auto auto; font-size: 1rem; }
 .ovl-info-row--fact     { grid-template-columns: 8rem 1fr auto; font-size: 1rem; }
 
 /* ── Shared panel accent ────────────────────────────────────────────────
