@@ -1444,7 +1444,7 @@ html, body {
 }
 .overlay-idle-hero__tagline {
   font-family: 'Inter', sans-serif;
-  font-size: 1.15rem;
+  font-size: 1.3rem;
   color: var(--ms-muted, #8A8A8A);
   margin: 0;
 }
@@ -1460,10 +1460,17 @@ html, body {
    boxes. Icons are never emoji — where one is needed, a role-tinted label
    (reveal-card__role--*, already used by the seat cards/reveal panel)
    does that job instead. */
+/* Eyebrow labels inside the info panel read small at this panel's actual
+   size/viewing distance — bumped up from .ovl-label's site-wide .82rem
+   default (broadcast-brand.css) without touching that shared class, since
+   it's also used for things sized correctly already (the LIVE badge,
+   corner tags). */
+.overlay-idle-hero__slot .ovl-label { font-size: 1rem; }
+
 .ovl-info-headline {
   font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
   font-weight: 700;
-  font-size: clamp(1.5rem, 2vw, 2.1rem);
+  font-size: clamp(1.8rem, 2.3vw, 2.5rem);
   text-transform: uppercase;
   letter-spacing: .01em;
   color: var(--ms-text, #F2F2F2);
@@ -1497,7 +1504,7 @@ html, body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .02em;
-  font-size: 1.35rem;
+  font-size: 1.6rem;
 }
 
 /* ── Content-transition stagger (LEVEL 3) ─────────────────────────────────
@@ -1549,14 +1556,29 @@ html, body {
 
 /* Дон/Шериф on the last_game slot — one quiet line each, role color
    standing in for the icon, no boxes. */
-.ovl-info-subrow { display: flex; gap: 1.6rem; flex-wrap: wrap; font-family: 'Inter', sans-serif; font-size: 1rem; flex: none; }
-.ovl-info-subrow__label { font-weight: 700; text-transform: uppercase; font-size: .78rem; letter-spacing: .06em; margin-right: .4rem; }
+.ovl-info-subrow { display: flex; gap: 1.6rem; flex-wrap: wrap; font-family: 'Inter', sans-serif; font-size: 1.15rem; flex: none; }
+.ovl-info-subrow__label { font-weight: 700; text-transform: uppercase; font-size: .92rem; letter-spacing: .06em; margin-right: .4rem; }
 
 /* Flat row list — standings/seats/facts all compose this, differing only
    in how many columns a row has (see the --standing/--seat/--fact
    modifiers below). Scrolls independently of the frame if content runs
    long (e.g. a 12+ player standings table on a short canvas). */
 .ovl-info-list { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* display/gap/padding here, NOT in the .is-active-scoped rule below — this
+   is structural layout (each row's own grid column widths, set by the
+   --standing/--seat/--fact modifiers, only take effect with display:grid
+   present), not motion, so it must apply regardless of which slot is
+   currently active or content silently collapses to unaligned inline flow. */
+.ovl-info-row {
+  display: grid;
+  align-items: baseline;
+  gap: .3rem 1rem;
+  padding: .7rem 0;
+  border-top: 1px solid rgba(255,255,255,.08);
+  font-family: 'Inter', sans-serif;
+  opacity: 0;
+}
+.ovl-info-row:first-child { border-top: none; }
 /* Scoped under `.is-active` (see the content-transition comment above) —
    each row still staggers off its own `--d`, just offset to start once
    the header content above it has had time to land. last_game carries
@@ -1569,7 +1591,6 @@ html, body {
 .overlay-idle-hero__slot.is-active[data-idle-slot="last_game"] .ovl-info-row {
   animation-delay: calc(var(--d, 0ms) + 700ms);
 }
-.ovl-info-row:first-child { border-top: none; }
 .ovl-info-row__rank {
   font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
   font-weight: 700;
@@ -1593,7 +1614,7 @@ html, body {
   font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
   font-weight: 700;
   text-transform: uppercase;
-  font-size: .82rem;
+  font-size: 1rem;
   letter-spacing: .03em;
   color: var(--ms-muted, #8A8A8A);
 }
@@ -1606,9 +1627,9 @@ html, body {
 .ovl-info-row__label.reveal-card__role--don       { color: var(--ovl-crimson, #C4232D); }
 .ovl-info-row__label.reveal-card__role--mafia     { color: var(--ovl-signal-light, #FF3B3B); }
 
-.ovl-info-row--standing { grid-template-columns: 1.8rem 1fr 3rem 3.6rem; font-size: 1.05rem; }
-.ovl-info-row--seat     { grid-template-columns: 1.6rem 1fr auto auto; font-size: 1rem; }
-.ovl-info-row--fact     { grid-template-columns: 8rem 1fr auto; font-size: 1rem; }
+.ovl-info-row--standing { grid-template-columns: 2.1rem 1fr 3.4rem 4rem; font-size: 1.2rem; }
+.ovl-info-row--seat     { grid-template-columns: 1.9rem 1fr auto auto; font-size: 1.15rem; }
+.ovl-info-row--fact     { grid-template-columns: 9.5rem 1fr auto; font-size: 1.15rem; }
 
 /* ── Table hero moment ─────────────────────────────────────────────────
    The standings/last_game lists get their own small accent: a thin red
