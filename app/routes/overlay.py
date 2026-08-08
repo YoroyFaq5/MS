@@ -13,10 +13,20 @@ having to reload the Browser Source. No session/auth in practice (OBS
 loads it cold), so all scene routes are intentionally public, same
 precedent as `games.api_game`.
 
+Each scene also has a tournament-AGNOSTIC twin under `/overlay/current/*`
+that resolves "which tournament" via ActiveBroadcastService instead of a
+URL segment — meant to be the URLs actually pasted into OBS, so switching
+which tournament is being broadcast (a new event, a different concurrent
+tournament) never requires editing OBS sources, just clicking "Сделать
+активным" on that tournament's control page. The `/overlay/<id>/*` URLs
+still work standalone (e.g. to preview/test one tournament's overlay
+without touching what's "active").
+
 Also hosts the admin-only control page (`/overlay/<id>/control` +
 its POST actions) that lets an admin/caster show or hide the ticker,
-switch the standings between top-5/full/hidden, and manually pin the
-last-game reveal open or suppressed on top of its normal ~25s auto-timer.
+switch the standings between top-5/full/hidden, manually pin the
+last-game reveal open or suppressed on top of its normal ~25s auto-timer,
+and mark this tournament as the active one for `/overlay/current/*`.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 
@@ -29,6 +39,7 @@ from app.services.rating_service import RatingService, RoleTournamentStats
 from app.services.shop_service import ShopService
 from app.services.overlay_control_service import OverlayControlService
 from app.services.broadcast_scene_service import BroadcastSceneService
+from app.services.active_broadcast_service import ActiveBroadcastService
 from app.services.series_tournament_service import SeriesTournamentService
 from app.auth_decorators import admin_required
 
@@ -248,7 +259,8 @@ def _build_starting_soon_context(tournament_id: int) -> dict:
 
 @overlay_bp.route("/<int:tournament_id>")
 def overlay_page(tournament_id: int):
-    return render_template("overlay/live_page.html", **_build_live_context(tournament_id, "game"))
+    fragment_url = url_for("overlay.overlay_fragment", tournament_id=tournament_id)
+    return render_template("overlay/live_page.html", fragment_url=fragment_url, **_build_live_context(tournament_id, "game"))
 
 
 @overlay_bp.route("/<int:tournament_id>/fragment")
@@ -260,7 +272,8 @@ def overlay_fragment(tournament_id: int):
 
 @overlay_bp.route("/<int:tournament_id>/commentators")
 def overlay_commentators_page(tournament_id: int):
-    return render_template("overlay/commentators_page.html", **_build_live_context(tournament_id, "commentators"))
+    fragment_url = url_for("overlay.overlay_commentators_fragment", tournament_id=tournament_id)
+    return render_template("overlay/commentators_page.html", fragment_url=fragment_url, **_build_live_context(tournament_id, "commentators"))
 
 
 @overlay_bp.route("/<int:tournament_id>/commentators/fragment")
@@ -272,7 +285,8 @@ def overlay_commentators_fragment(tournament_id: int):
 
 @overlay_bp.route("/<int:tournament_id>/starting-soon")
 def overlay_starting_soon_page(tournament_id: int):
-    return render_template("overlay/starting_soon_page.html", **_build_starting_soon_context(tournament_id))
+    fragment_url = url_for("overlay.overlay_starting_soon_fragment", tournament_id=tournament_id)
+    return render_template("overlay/starting_soon_page.html", fragment_url=fragment_url, **_build_starting_soon_context(tournament_id))
 
 
 @overlay_bp.route("/<int:tournament_id>/starting-soon/fragment")
@@ -294,6 +308,86 @@ def overlay_ending_page(tournament_id: int):
     return render_template("overlay/ending.html", tournament=tournament)
 
 
+# ── Tournament-agnostic "current" scenes — the URLs meant to actually go
+#    into OBS (see module docstring). Each is a thin wrapper around its
+#    /<id>/* twin: resolve the active tournament id, then delegate. ─────────
+
+def _current_or_no_active(build_fn, *args):
+    """Resolves the active tournament id and calls build_fn(tournament_id,
+    *args); returns None (caller renders the "no active tournament" page)
+    if nothing is set yet."""
+    tournament_id = ActiveBroadcastService.get_active_tournament_id()
+    if tournament_id is None or db.session.get(Tournament, tournament_id) is None:
+        return None
+    return build_fn(tournament_id, *args)
+
+
+@overlay_bp.route("/current")
+def overlay_current_page():
+    ctx = _current_or_no_active(_build_live_context, "game")
+    if ctx is None:
+        return render_template("overlay/no_active.html")
+    return render_template("overlay/live_page.html", fragment_url=url_for("overlay.overlay_current_fragment"), **ctx)
+
+
+@overlay_bp.route("/current/fragment")
+def overlay_current_fragment():
+    ctx = _current_or_no_active(_build_live_context, "game")
+    if ctx is None:
+        abort(404)
+    return render_template("overlay/_live_fragment.html", **ctx)
+
+
+@overlay_bp.route("/current/commentators")
+def overlay_current_commentators_page():
+    ctx = _current_or_no_active(_build_live_context, "commentators")
+    if ctx is None:
+        return render_template("overlay/no_active.html")
+    return render_template("overlay/commentators_page.html", fragment_url=url_for("overlay.overlay_current_commentators_fragment"), **ctx)
+
+
+@overlay_bp.route("/current/commentators/fragment")
+def overlay_current_commentators_fragment():
+    ctx = _current_or_no_active(_build_live_context, "commentators")
+    if ctx is None:
+        abort(404)
+    return render_template("overlay/_live_fragment.html", **ctx)
+
+
+@overlay_bp.route("/current/starting-soon")
+def overlay_current_starting_soon_page():
+    ctx = _current_or_no_active(_build_starting_soon_context)
+    if ctx is None:
+        return render_template("overlay/no_active.html")
+    return render_template("overlay/starting_soon_page.html", fragment_url=url_for("overlay.overlay_current_starting_soon_fragment"), **ctx)
+
+
+@overlay_bp.route("/current/starting-soon/fragment")
+def overlay_current_starting_soon_fragment():
+    ctx = _current_or_no_active(_build_starting_soon_context)
+    if ctx is None:
+        abort(404)
+    return render_template("overlay/_starting_soon_fragment.html", **ctx)
+
+
+@overlay_bp.route("/current/brb")
+def overlay_current_brb_page():
+    tournament_id = ActiveBroadcastService.get_active_tournament_id()
+    tournament = db.session.get(Tournament, tournament_id) if tournament_id else None
+    if tournament is None:
+        return render_template("overlay/no_active.html")
+    return render_template("overlay/brb.html", tournament=tournament)
+
+
+@overlay_bp.route("/current/ending")
+def overlay_current_ending_page():
+    tournament_id = ActiveBroadcastService.get_active_tournament_id()
+    tournament = db.session.get(Tournament, tournament_id) if tournament_id else None
+    if tournament is None:
+        return render_template("overlay/no_active.html")
+    return render_template("overlay/ending.html", tournament=tournament)
+
+
 # ── Admin control panel ──────────────────────────────────────────────────
 
 @overlay_bp.route("/<int:tournament_id>/control")
@@ -302,12 +396,23 @@ def overlay_control(tournament_id: int):
     tournament = db.session.get(Tournament, tournament_id) or abort(404)
     control = OverlayControlService.get_control(tournament_id)
     series_tournament = db.session.query(SeriesTournament).filter_by(tournament_id=tournament_id).first()
+    is_active_broadcast = ActiveBroadcastService.get_active_tournament_id() == tournament_id
     return render_template(
         "overlay/control.html",
         tournament=tournament,
         control=control,
         series_tournament=series_tournament,
+        is_active_broadcast=is_active_broadcast,
     )
+
+
+@overlay_bp.route("/<int:tournament_id>/control/set-active", methods=["POST"])
+@admin_required
+def overlay_set_active(tournament_id: int):
+    db.session.get(Tournament, tournament_id) or abort(404)
+    ActiveBroadcastService.set_active_tournament_id(tournament_id)
+    flash("Этот турнир теперь активен для /overlay/current/* — ссылки в OBS менять не нужно.", "success")
+    return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
 
 
 @overlay_bp.route("/<int:tournament_id>/control/ticker", methods=["POST"])

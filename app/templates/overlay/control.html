@@ -15,6 +15,19 @@
   </div>
 </div>
 
+{% if is_active_broadcast %}
+<div class="alert alert-success small d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <span><i class="bi bi-broadcast me-1"></i> Этот турнир сейчас активен для <code>/overlay/current/*</code> — именно эти ссылки открыты в OBS.</span>
+</div>
+{% else %}
+<div class="alert alert-warning small d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <span><i class="bi bi-exclamation-triangle me-1"></i> Этот турнир НЕ активен — <code>/overlay/current/*</code> в OBS сейчас показывает другой турнир (или заглушку).</span>
+  <form method="POST" action="{{ url_for('overlay.overlay_set_active', tournament_id=tournament.id) }}">
+    <button type="submit" class="btn btn-warning btn-sm">Сделать активным для OBS</button>
+  </form>
+</div>
+{% endif %}
+
 <div class="alert alert-secondary small">
   <i class="bi bi-info-circle me-1"></i>
   Изменения подхватываются на странице оверлея в течение ~5 секунд
@@ -35,13 +48,18 @@
           выключите «Обновлять браузер, когда сцена становится активной»
           и настройте свой Stinger как Scene Transition в OBS.
         </p>
-        <div class="row g-2">
+        <p class="text-muted small mb-2">
+          <strong>Постоянные ссылки (добавьте в OBS один раз)</strong> —
+          всегда показывают ТЕКУЩИЙ активный турнир (кнопка выше),
+          переключение турнира между эфирами не требует лезть в OBS:
+        </p>
+        <div class="row g-2 mb-3">
           {% for label, url in [
-            ('Live — Игра', url_for('overlay.overlay_page', tournament_id=tournament.id, _external=true)),
-            ('Live — Комментаторы', url_for('overlay.overlay_commentators_page', tournament_id=tournament.id, _external=true)),
-            ('Starting Soon', url_for('overlay.overlay_starting_soon_page', tournament_id=tournament.id, _external=true)),
-            ('BRB', url_for('overlay.overlay_brb_page', tournament_id=tournament.id, _external=true)),
-            ('Ending', url_for('overlay.overlay_ending_page', tournament_id=tournament.id, _external=true)),
+            ('Live — Игра', url_for('overlay.overlay_current_page', _external=true)),
+            ('Live — Комментаторы', url_for('overlay.overlay_current_commentators_page', _external=true)),
+            ('Starting Soon', url_for('overlay.overlay_current_starting_soon_page', _external=true)),
+            ('BRB', url_for('overlay.overlay_current_brb_page', _external=true)),
+            ('Ending', url_for('overlay.overlay_current_ending_page', _external=true)),
           ] %}
           <div class="col-md-6 col-lg-4">
             <label class="form-label small text-muted mb-1">{{ label }}</label>
@@ -49,6 +67,23 @@
           </div>
           {% endfor %}
         </div>
+        <details>
+          <summary class="text-muted small">Прямые ссылки на этот турнир (для проверки — не зависят от того, какой турнир активен)</summary>
+          <div class="row g-2 mt-1">
+            {% for label, url in [
+              ('Live — Игра', url_for('overlay.overlay_page', tournament_id=tournament.id, _external=true)),
+              ('Live — Комментаторы', url_for('overlay.overlay_commentators_page', tournament_id=tournament.id, _external=true)),
+              ('Starting Soon', url_for('overlay.overlay_starting_soon_page', tournament_id=tournament.id, _external=true)),
+              ('BRB', url_for('overlay.overlay_brb_page', tournament_id=tournament.id, _external=true)),
+              ('Ending', url_for('overlay.overlay_ending_page', tournament_id=tournament.id, _external=true)),
+            ] %}
+            <div class="col-md-6 col-lg-4">
+              <label class="form-label small text-muted mb-1">{{ label }}</label>
+              <input type="text" class="form-control form-control-sm" value="{{ url }}" readonly onclick="this.select()">
+            </div>
+            {% endfor %}
+          </div>
+        </details>
       </div>
     </div>
   </div>

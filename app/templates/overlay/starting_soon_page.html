@@ -12,7 +12,7 @@
 </head>
 <body>
   <div id="overlay-root"
-       data-fragment-url="{{ url_for('overlay.overlay_starting_soon_fragment', tournament_id=tournament.id) }}"
+       data-fragment-url="{{ fragment_url }}"
        data-poll-interval-ms="5000">
     {% include "overlay/_starting_soon_fragment.html" %}
   </div>
