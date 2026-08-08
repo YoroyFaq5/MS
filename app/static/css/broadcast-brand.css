@@ -75,14 +75,35 @@
    "architectural line" pair + grain (reuses overlay.css's tiled SVG
    turbulence, already budgeted) + the vignette that already existed.
    Nothing here is per-frame JS — nothing here costs anything OBS notices. */
+/* Animated via transform on an oversized inner layer (never
+   background-position) — transform is compositor-only, so this costs
+   OBS nothing per frame regardless of how long a scene sits on screen.
+   The pattern repeats every 600px along its own diagonal, and the
+   keyframe translates by exactly that much, so the loop has no visible
+   seam; inset:-600px keeps every edge covered through the whole
+   translate range so drifting never reveals a gap. */
 .ovl-arch-lines {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    linear-gradient(77deg, transparent 42.9%, rgba(216,216,216,.05) 43%, rgba(216,216,216,.05) 43.04%, transparent 43.14%),
-    linear-gradient(77deg, transparent 61.9%, rgba(227,30,36,.09) 62%, rgba(227,30,36,.09) 62.05%, transparent 62.15%);
+  overflow: hidden;
+}
+.ovl-arch-lines__pattern {
+  position: absolute;
+  inset: -600px;
+  background: repeating-linear-gradient(77deg,
+    transparent 0 239px,
+    rgba(216,216,216,.055) 239px 240px,
+    transparent 240px 359px,
+    rgba(227,30,36,.09) 359px 360px,
+    transparent 360px 600px);
+  animation: ovl-arch-drift 46s linear infinite;
+  will-change: transform;
+}
+@keyframes ovl-arch-drift {
+  from { transform: translate(0, 0); }
+  to   { transform: translate(-600px, -600px); }
 }
 /* Ending-only mood: the frame darkens toward the right, as if the light
    is receding — distinct from Starting Soon's "coming online" energy
@@ -215,35 +236,95 @@
   100% { opacity: .8; transform: scale(1); }
 }
 
-/* ── Shield frame — a clipped-border container ─────────────────────────
-   Two stacked clip-paths (outer = accent color, inner inset 3px = surface
-   color) produce a shield-shaped ring without any SVG/mask asset — the
-   classic "clip twice" border trick. Used for the commentator cam window
-   instead of a plain dashed rounded rect. */
-.ovl-shield-frame {
+/* ── Camera frame — the commentator cam's signature container ─────────
+   Deliberately NOT the full pointed-shield silhouette (that shape reads
+   fine for a small badge, but squished into a wide 16:9 box the point
+   just looks like a rendering glitch) — instead the same "shield-
+   inspired" language the seat cards already use: two corners clipped at
+   an angle (--ovl-cam-clip, same recipe as --ms-card-clip, sized for a
+   much bigger box), a thin red edge along the bottom, dark layered
+   gradient for depth, and ivory hairline borders — recognizable without
+   a thick decorative border. */
+.ovl-cam-frame {
   position: relative;
-  clip-path: var(--ovl-shield-clip);
-  background: linear-gradient(165deg, var(--ovl-signal, #E31E24) 0%, var(--ovl-burgundy, #26080C) 46%, var(--ovl-black, #0A0908) 100%);
+  --ovl-cam-clip: polygon(26px 0, 100% 0, 100% calc(100% - 26px), calc(100% - 26px) 100%, 0 100%, 0 26px);
+  clip-path: var(--ovl-cam-clip);
+  overflow: hidden;
+  background: linear-gradient(160deg, var(--ms-surface-alt, #1A1A1A) 0%, var(--ms-surface, #0F0F0F) 55%, var(--ovl-black, #0A0908) 100%);
+  box-shadow: var(--ovl-shadow-ambient, 0 24px 48px -16px rgba(0,0,0,.65));
 }
-.ovl-shield-frame::before {
+.ovl-cam-frame::before {
   content: "";
-  position: absolute;
-  inset: 3px;
-  z-index: 0;
-  clip-path: var(--ovl-shield-clip);
-  background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
+  position: absolute; inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  clip-path: var(--ovl-cam-clip);
+  box-shadow: inset 0 0 0 1px rgba(243,239,234,.16);
 }
-.ovl-shield-frame__content {
-  position: relative;
+/* Thin red edge along the bottom — a separate child rather than a
+   box-shadow trick, and clipped "for free": clip-path on the parent
+   already clips everything painted inside it (children included) to
+   the same cut-corner silhouette, so this bar is trimmed at the cut
+   corner automatically instead of poking past the diagonal. */
+.ovl-cam-frame__accent {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  z-index: 2;
+  pointer-events: none;
+  background: var(--ovl-signal, #E31E24);
+  box-shadow: 0 0 14px 1px var(--ovl-signal-glow, rgba(227,30,36,.28));
+}
+.ovl-cam-frame__center {
+  position: absolute;
+  inset: 0;
   z-index: 1;
-  width: 100%;
-  height: 100%;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: .5rem;
   color: var(--ms-muted, #8A8A8A);
+}
+.ovl-cam-frame__center .overlay-idle-hero__slot-icon { font-size: 2.6rem; opacity: .3; }
+
+/* Small "on-air" tag in the frame's own corner — distinct from (and
+   smaller than) the page-level .ovl-broadcast-bar's LIVE badge, a subtle
+   marker rather than a second loud badge. */
+.ovl-cam-frame__live {
+  position: absolute;
+  top: 14px; left: 14px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .2rem .55rem .2rem .4rem;
+  background: rgba(10,9,8,.6);
+  border: 1px solid rgba(227,30,36,.55);
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: .62rem;
+  letter-spacing: .12em;
+  color: var(--ovl-signal-light, #FF3B3B);
+}
+.ovl-cam-frame__live-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--ovl-signal, #E31E24);
+  animation: ovl-live-pulse 1.7s ease-in-out infinite;
+}
+
+/* Nameplate bar — same visual family as the seat card's __plate, so the
+   camera box reads as part of the same card system instead of a
+   different placeholder language. */
+.ovl-cam-frame__plate {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 3;
+  padding: .75rem 1.15rem .6rem;
+  background: linear-gradient(180deg, transparent, rgba(10,9,8,.78) 55%, rgba(10,9,8,.94));
+}
+.ovl-cam-frame__plate .overlay-idle-hero__slot-label {
+  color: var(--ms-text, #F2F2F2);
+  font-size: .98rem;
 }
 
 /* ── Corner tags / technical labels ────────────────────────────────────
@@ -455,6 +536,7 @@
   .ovl-shield-watermark--draw .ovl-shield-watermark__inner { animation: none; stroke-dashoffset: 0; }
   .ovl-shield-watermark--draw .ovl-shield-watermark__grid { animation: none; transform: scaleX(1); }
   .ovl-shield-glow { animation: none; opacity: .8; transform: none; }
+  .ovl-arch-lines__pattern { animation: none; }
   .ovl-live-badge__dot, .ovl-live-badge--paused .ovl-live-badge__dot { animation: none; }
   .ovl-accent-line { animation: none; transform: scaleY(1); }
   .ovl-scene-reveal { animation: none; opacity: 1; transform: none; }

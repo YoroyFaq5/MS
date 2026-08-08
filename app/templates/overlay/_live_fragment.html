@@ -139,11 +139,15 @@
        reveal-panel counterparts so they inherit that styling for free. -->
   {% if layout_mode == 'commentators' %}
   <div class="overlay-idle-hero">
-    <div class="overlay-idle-hero__cam ovl-shield-frame" aria-hidden="false">
-      <div class="ovl-shield-frame__content">
+    <div class="overlay-idle-hero__cam ovl-cam-frame" aria-hidden="false">
+      <span class="ovl-cam-frame__live" aria-hidden="true"><span class="ovl-cam-frame__live-dot"></span>LIVE</span>
+      <div class="ovl-cam-frame__center">
         <span class="overlay-idle-hero__slot-icon" aria-hidden="true">🎙️</span>
+      </div>
+      <div class="ovl-cam-frame__plate">
         <span class="overlay-idle-hero__slot-label">Комментатор</span>
       </div>
+      <span class="ovl-cam-frame__accent" aria-hidden="true"></span>
     </div>
 
     <!-- All four variants are always in the DOM at once (same reasoning
@@ -166,13 +170,13 @@
       <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'standings' else '' }}" data-idle-slot="standings">
         <div class="overlay-idle-hero__panel overlay-idle-hero__panel--standings">
           <div class="overlay-idle-hero__panel-title">Турнирная таблица · {{ standings_title }}</div>
-          <table>
+          <table class="overlay-idle-hero__standings-table">
             {% for r in full_ratings %}
             <tr style="--d:{{ loop.index0 * 40 }}ms">
-              <td class="overlay-full-standings__rank">{{ r.rank }}</td>
-              <td class="overlay-full-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
-              <td class="overlay-full-standings__games">{{ r.games_played }} игр</td>
-              <td class="overlay-full-standings__score">{{ r.total_score|round(2) }}</td>
+              <td class="overlay-idle-hero__standings-rank">{{ r.rank }}</td>
+              <td class="overlay-idle-hero__standings-name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
+              <td class="overlay-idle-hero__standings-wins">🏆 {{ r.games_won }}</td>
+              <td class="overlay-idle-hero__standings-score">{{ r.total_score|round(2) }}</td>
             </tr>
             {% endfor %}
           </table>
@@ -261,8 +265,11 @@
   <!-- SECTION 3: rotating stats ticker — all facts rendered server-side
        (computed near the top of this file, shared with the idle hero's
        'ticker' mode below), JS only toggles which .ticker-fact has
-       .active every ~8s. -->
-  {% if facts %}
+       .active every ~8s. Live-Game only: Live-Commentators already has
+       this same data available as one of its idle-hero center slots
+       (control.idle_content), so the corner version here would just be
+       the same facts shown twice on screen at once. -->
+  {% if facts and layout_mode == 'game' %}
   <div class="overlay-ticker {{ '' if control.show_ticker else 'is-hidden' }}">
     <div class="overlay-ticker__stage">
       {% for fact in facts %}
@@ -288,8 +295,12 @@
        control.standings_mode — which one is actually visible (or
        neither) is a pure CSS class toggle driven by data-ctl in
        overlay.js, not DOM presence, so switching modes animates instead
-       of panels abruptly appearing/disappearing. -->
-  {% if can_show_standings and top_ratings %}
+       of panels abruptly appearing/disappearing.
+
+       Live-Game only — same reasoning as the ticker above: Live-
+       Commentators has its own 'standings' idle-hero center slot for
+       this, so these corner panels would just duplicate it. -->
+  {% if can_show_standings and top_ratings and layout_mode == 'game' %}
   <div class="overlay-mini-standings {{ '' if control.standings_mode == 'top5' else 'is-hidden' }}">
     <span class="ovl-hud-bracket ovl-hud-bracket--tl" aria-hidden="true"></span>
     <span class="ovl-hud-bracket ovl-hud-bracket--br" aria-hidden="true"></span>
@@ -307,7 +318,7 @@
   </div>
   {% endif %}
 
-  {% if can_show_standings and full_ratings %}
+  {% if can_show_standings and full_ratings and layout_mode == 'game' %}
   <div class="overlay-full-standings {{ '' if control.standings_mode == 'full' else 'is-hidden' }}">
     <div class="overlay-full-standings__sweep" aria-hidden="true"></div>
     <div class="overlay-full-standings__title">Турнирная таблица · {{ standings_title }}</div>

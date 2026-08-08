@@ -1195,7 +1195,10 @@ html, body {
   inset: 0;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(420px, 40vw) minmax(0, 1fr);
+  /* Camera is the dominant visual object on this scene now, not a small
+     placeholder next to the "real" content — see .ovl-cam-frame in
+     broadcast-brand.css. */
+  grid-template-columns: minmax(620px, 57vw) minmax(0, 1fr);
   align-items: center;
   gap: clamp(1rem, 2vw, 2.5rem);
   padding: 0 clamp(1.5rem, 3vw, 4rem);
@@ -1291,8 +1294,39 @@ html, body {
   border-bottom: 1px solid rgba(216,216,216,.3);
   text-align: left;
 }
-.overlay-idle-hero__panel--standings table { width: 100%; border-collapse: collapse; font-size: 1.1rem; }
-.overlay-idle-hero__panel--standings td { padding: .35rem 0; border-bottom: 1px solid rgba(255,255,255,.05); text-align: left; }
+/* Sized to its content, not the full center column — five short rows of
+   rank/name/wins/score stretched across the whole width just left a lot
+   of dead glass panel (same reasoning as .overlay-idle-hero__panel--ticker
+   below). Only the columns that matter on a broadcast HUD survive here:
+   games PLAYED was dropped (rarely meaningful at a glance mid-broadcast),
+   wins took its place. */
+.overlay-idle-hero__panel--standings {
+  width: auto;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.2rem 1.5rem;
+}
+.overlay-idle-hero__standings-table { width: 100%; border-collapse: collapse; font-size: 1.05rem; }
+.overlay-idle-hero__standings-table tr {
+  opacity: 0;
+  animation: ovl-row-wipe-l .35s ease-out both;
+  animation-delay: calc(var(--d, 0ms) + .3s);
+}
+.overlay-idle-hero__standings-table td { padding: .4rem .3rem; border-bottom: 1px solid rgba(255,255,255,.05); }
+.overlay-idle-hero__standings-rank { color: var(--ms-muted, #8A8A8A); width: 1.6rem; font-weight: 700; text-align: left; }
+.overlay-idle-hero__standings-name { font-weight: 600; text-align: left; }
+.overlay-idle-hero__standings-wins {
+  text-align: center;
+  width: 3.6rem;
+  color: var(--ovl-chrome-light, #FFFFFF);
+  font-variant-numeric: tabular-nums;
+}
+.overlay-idle-hero__standings-score {
+  text-align: right;
+  color: var(--ms-text-dim, #C9C9C9);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 
 /* Last-game mode reuses the site's own .match-card (games/_match_card.html)
    as-is — same card players already see in the games history list — so
