@@ -22,7 +22,14 @@
        it's just loaded once by OBS. #}
     <div class="ms-scene ms-scene--brb" data-scene-panel="brb">
       <canvas class="bc-aurora" data-aurora-canvas aria-hidden="true"></canvas>
-      <div class="ovl-arch-lines" aria-hidden="true"><div class="ovl-arch-lines__pattern"></div></div>
+      <div class="ovl-arch-lines" aria-hidden="true">
+        <svg viewBox="0 0 1920 1080" preserveAspectRatio="none">
+          <line class="ovl-arch-lines__base" x1="700" y1="-200" x2="1042" y2="1280"></line>
+          <line class="ovl-arch-lines__base ovl-arch-lines__base--signal" x1="1150" y1="-200" x2="1492" y2="1280"></line>
+          <line class="ovl-arch-lines__chase" x1="700" y1="-200" x2="1042" y2="1280"></line>
+          <line class="ovl-arch-lines__chase ovl-arch-lines__chase--signal" x1="1150" y1="-200" x2="1492" y2="1280"></line>
+        </svg>
+      </div>
       <div class="ovl-shield-glow ovl-shield-glow--center" aria-hidden="true"></div>
       <div class="ovl-shield-watermark ovl-shield-watermark--center ovl-shield-watermark--draw" aria-hidden="true">
         <svg viewBox="0 0 100 125" preserveAspectRatio="xMidYMid meet">

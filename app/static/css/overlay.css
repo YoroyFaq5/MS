@@ -862,7 +862,7 @@ html, body {
   justify-content: center;
   background: var(--ovl-glass-bg, rgba(15,14,12,.6));
   border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
-  border-radius: var(--ovl-radius-md, 14px);
+  clip-path: var(--ovl-panel-clip-sm, none);
   padding: clamp(1.1rem, 1.27vw, 3.2rem) clamp(.85rem, 1.04vw, 2.75rem);
   font-size: clamp(1.17rem, 1.1vw, 2.8rem);
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
@@ -992,7 +992,7 @@ html, body {
   width: clamp(320px, 22vw, 900px);
   background: var(--ovl-glass-bg, rgba(15,14,12,.6));
   border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
-  border-radius: var(--ovl-radius-md, 14px);
+  clip-path: var(--ovl-panel-clip-sm-flip, none);
   padding: clamp(.91rem, .91vw, 2.35rem) clamp(1.05rem, 1.05vw, 2.75rem);
   font-size: clamp(1.1rem, 1.01vw, 2.6rem);
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
@@ -1105,7 +1105,7 @@ html, body {
   overflow: hidden auto;
   background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
   border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
-  border-radius: var(--ovl-radius-lg, 18px);
+  clip-path: var(--ovl-panel-clip-lg, none);
   padding: clamp(1.43rem, 1.4vw, 3.58rem) clamp(1.7rem, 1.76vw, 4.5rem);
   font-size: clamp(1.37rem, 1.2vw, 3.06rem);
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
@@ -1198,7 +1198,7 @@ html, body {
   /* Camera is the dominant visual object on this scene now, not a small
      placeholder next to the "real" content — see .ovl-cam-frame in
      broadcast-brand.css. */
-  grid-template-columns: minmax(620px, 57vw) minmax(0, 1fr);
+  grid-template-columns: minmax(760px, 66vw) minmax(0, 1fr);
   align-items: center;
   gap: clamp(1rem, 2vw, 2.5rem);
   padding: 0 clamp(1.5rem, 3vw, 4rem);
@@ -1210,8 +1210,9 @@ html, body {
    the template so the commentator cam window reads as a MAFIA STYLE
    frame, not a generic dashed placeholder box. */
 .overlay-idle-hero__cam {
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 16 / 10;
   width: 100%;
+  max-height: 88vh;
 }
 .overlay-idle-hero__slot-icon { font-size: 2rem; opacity: .6; }
 .overlay-idle-hero__slot-label {
@@ -1273,12 +1274,13 @@ html, body {
 }
 
 .overlay-idle-hero__panel {
+  position: relative;
   width: 100%;
   max-height: 100%;
   overflow: hidden auto;
   background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
   border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
-  border-radius: var(--ovl-radius-lg, 18px);
+  clip-path: var(--ovl-panel-clip-lg, none);
   padding: 1.6rem 2rem;
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
@@ -1335,6 +1337,7 @@ html, body {
 .overlay-idle-hero__panel--last-game {
   background: none;
   border: none;
+  clip-path: none;
   box-shadow: none;
   padding: 0;
   backdrop-filter: none;
@@ -1342,6 +1345,10 @@ html, body {
   max-width: 420px;
   margin: 0 auto;
 }
+/* This variant sheds ALL glass-panel chrome (see comment above) —
+   including the shared red accent bar, which would otherwise float
+   under the site's own match-card as a stray line. */
+.overlay-idle-hero__panel--last-game::after { content: none; }
 
 /* Sized to content, not the full center column — a handful of short
    label/name/value lines stretched across the same width as the
@@ -1364,6 +1371,27 @@ html, body {
   opacity: 0;
   animation: fade-in-up .45s ease both;
   animation-delay: var(--d, 0ms);
+}
+
+/* ── Shared panel accent ────────────────────────────────────────────────
+   The same thin glowing red edge the seat cards and camera frame use,
+   applied to every remaining "glass box" (ticker/mini-standings/full-
+   standings/idle-hero panels) so they read as the same card system
+   instead of a generic dashboard widget with just different colors.
+   A ::after works on all of them for free: clip-path on the parent
+   already clips its own pseudo-elements to the cut-corner shape, so this
+   bar trims itself at the notch automatically, whichever corner it's on. */
+.overlay-ticker::after,
+.overlay-mini-standings::after,
+.overlay-full-standings::after,
+.overlay-idle-hero__panel::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  pointer-events: none;
+  background: var(--ovl-signal, #E31E24);
+  box-shadow: 0 0 14px 1px var(--ovl-signal-glow, rgba(227,30,36,.28));
 }
 
 /* ── Reduced motion: every animation above collapses to an instant,

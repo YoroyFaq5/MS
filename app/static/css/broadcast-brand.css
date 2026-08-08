@@ -24,6 +24,19 @@
    sync if this ever needs adjusting. */
 #overlay-root {
   --ovl-shield-clip: polygon(9% 0%, 91% 0%, 91% 71%, 50% 100%, 9% 71%);
+  /* Same cut-corner language as the seat cards (--ms-card-clip, overlay.css)
+     and the camera frame (--ovl-cam-clip) — applied to every remaining
+     "glass panel" (ticker/standings/idle-hero panels) so they read as
+     part of the same card system instead of generic rounded dashboard
+     boxes. Two sizes: small panels get a tighter cut, large panels a
+     bigger one, so the notch stays proportional. */
+  --ovl-panel-clip-sm: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  --ovl-panel-clip-lg: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
+  /* Mirrored cut (top-right/bottom-left) — mini-standings already anchors
+     its own HUD corner brackets (.ovl-hud-bracket) at top-left/bottom-
+     right, so this leaves THOSE two corners sharp instead of clipping
+     the exact pixels the brackets sit on. */
+  --ovl-panel-clip-sm-flip: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
 }
 
 /* ── Typography tiers ──────────────────────────────────────────────────
@@ -71,39 +84,52 @@
 
 /* ── Background depth system ───────────────────────────────────────────
    Every full-screen scene sits on this: near-black base (declared per
-   scene root, see broadcast-scenes.css .ms-scene--*) + one faint diagonal
-   "architectural line" pair + grain (reuses overlay.css's tiled SVG
-   turbulence, already budgeted) + the vignette that already existed.
-   Nothing here is per-frame JS — nothing here costs anything OBS notices. */
-/* Animated via transform on an oversized inner layer (never
-   background-position) — transform is compositor-only, so this costs
-   OBS nothing per frame regardless of how long a scene sits on screen.
-   The pattern repeats every 600px along its own diagonal, and the
-   keyframe translates by exactly that much, so the loop has no visible
-   seam; inset:-600px keeps every edge covered through the whole
-   translate range so drifting never reveals a gap. */
+   scene root, see broadcast-scenes.css .ms-scene--*) + two faint diagonal
+   "architectural lines" with light traveling along their own path + grain
+   (reuses overlay.css's tiled SVG turbulence, already budgeted) + the
+   vignette that already existed. Nothing here is per-frame JS — nothing
+   here costs anything OBS notices.
+
+   The lines themselves never move — only a short bright dash travels
+   ALONG each one's own length (stroke-dasharray/dashoffset, the same
+   "drawing" mechanism as .ovl-shield-watermark--draw's one-shot entrance,
+   just looped forever here) — a wire with a pulse of current running
+   through it, not a sliding wallpaper pattern. */
 .ovl-arch-lines {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  overflow: hidden;
 }
-.ovl-arch-lines__pattern {
-  position: absolute;
-  inset: -600px;
-  background: repeating-linear-gradient(77deg,
-    transparent 0 239px,
-    rgba(216,216,216,.055) 239px 240px,
-    transparent 240px 359px,
-    rgba(227,30,36,.09) 359px 360px,
-    transparent 360px 600px);
-  animation: ovl-arch-drift 46s linear infinite;
-  will-change: transform;
+.ovl-arch-lines svg { display: block; width: 100%; height: 100%; }
+.ovl-arch-lines__base {
+  stroke: var(--ovl-chrome-light, #FFFFFF);
+  stroke-width: 1;
+  opacity: .05;
+  vector-effect: non-scaling-stroke;
 }
-@keyframes ovl-arch-drift {
-  from { transform: translate(0, 0); }
-  to   { transform: translate(-600px, -600px); }
+.ovl-arch-lines__base--signal { stroke: var(--ovl-signal, #E31E24); opacity: .08; }
+
+/* dasharray "140 1800": a 140-unit bright dash inside a period (1940)
+   longer than the line itself, so exactly one pulse is ever visible on
+   the line at a time, never two. Keyframe offset spans exactly one full
+   period (-1940), so the loop has no visible seam/jump. */
+.ovl-arch-lines__chase {
+  stroke: var(--ovl-chrome-light, #FFFFFF);
+  stroke-width: 1.5;
+  opacity: .8;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 140 1800;
+  animation: ovl-arch-chase 7s linear infinite;
+}
+.ovl-arch-lines__chase--signal {
+  stroke: var(--ovl-signal, #E31E24);
+  animation-duration: 8.5s;
+  animation-delay: 2.4s;
+}
+@keyframes ovl-arch-chase {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -1940; }
 }
 /* Ending-only mood: the frame darkens toward the right, as if the light
    is receding — distinct from Starting Soon's "coming online" energy
@@ -315,18 +341,6 @@
 /* Nameplate bar — same visual family as the seat card's __plate, so the
    camera box reads as part of the same card system instead of a
    different placeholder language. */
-.ovl-cam-frame__plate {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  z-index: 3;
-  padding: .75rem 1.15rem .6rem;
-  background: linear-gradient(180deg, transparent, rgba(10,9,8,.78) 55%, rgba(10,9,8,.94));
-}
-.ovl-cam-frame__plate .overlay-idle-hero__slot-label {
-  color: var(--ms-text, #F2F2F2);
-  font-size: .98rem;
-}
-
 /* ── Corner tags / technical labels ────────────────────────────────────
    Small uppercase micro-text with a thin red rule — the "this is a real
    broadcast, not a slide" texture the brief asks for. Meaningful content
@@ -536,7 +550,7 @@
   .ovl-shield-watermark--draw .ovl-shield-watermark__inner { animation: none; stroke-dashoffset: 0; }
   .ovl-shield-watermark--draw .ovl-shield-watermark__grid { animation: none; transform: scaleX(1); }
   .ovl-shield-glow { animation: none; opacity: .8; transform: none; }
-  .ovl-arch-lines__pattern { animation: none; }
+  .ovl-arch-lines__chase { animation: none; opacity: 0; }
   .ovl-live-badge__dot, .ovl-live-badge--paused .ovl-live-badge__dot { animation: none; }
   .ovl-accent-line { animation: none; transform: scaleY(1); }
   .ovl-scene-reveal { animation: none; opacity: 1; transform: none; }
