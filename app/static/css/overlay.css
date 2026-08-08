@@ -1865,6 +1865,21 @@ html, body {
   animation: ovl-shield-piece-in .3s cubic-bezier(.34,1.4,.64,1) both;
   animation-delay: calc(200ms + var(--d, 0ms) * .4);
 }
+/* The last_game LEVEL 3 rule above (line ~1595) is qualified with
+   [data-idle-slot="last_game"], which makes it MORE specific
+   (0,4,0) than the plain .is-shield-in override just above (0,3,0) —
+   without this, that higher-specificity rule would win the tie
+   regardless of source order, so last_game's rows would fall back to
+   the slow plain fade-in-up (700ms+ base delay) while the headline/
+   value/subrow above them already reassembled fast — reading as the
+   panel's content "updating twice" in two disconnected waves. Matching
+   the qualifier here restores the normal tie-break (later in source
+   wins) so every piece of the game-result card reassembles on the same
+   punchy clock. */
+.overlay-idle-hero__slot.is-shield-in[data-idle-slot="last_game"] .ovl-info-row {
+  animation: ovl-shield-piece-in .3s cubic-bezier(.34,1.4,.64,1) both;
+  animation-delay: calc(200ms + var(--d, 0ms) * .4);
+}
 @keyframes ovl-shield-piece-in {
   0%   { opacity: 0; transform: translateY(10px) scale(.94); filter: blur(4px) brightness(1.6); }
   60%  { opacity: 1; filter: blur(0) brightness(1.15); }
