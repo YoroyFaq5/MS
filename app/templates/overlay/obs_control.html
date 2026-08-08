@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OBS Пульт — {{ state.tournament_name }}</title>
+  <title>OBS Пульт{% if state %} — {{ state.tournament_name }}{% endif %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/obs-control.css') }}">
@@ -15,14 +15,26 @@
      Talks ONLY to the new /obs-control/* JSON endpoints (obs-control.js) —
      completely separate from /<id>/control's classic form endpoints, so
      nothing here can affect that page or whatever OBS dock already points
-     at it. #}
+     at it.
+
+     Two ways to reach this page — /<id>/obs-control (a specific
+     tournament, action_base/state_url point at that id) or /current/obs-
+     control (action_base/state_url point at the id-less /current/*
+     routes, which re-resolve whichever tournament is active on EVERY
+     request — see _resolve_obs_control_tournament_id in overlay.py). The
+     whole dashboard below is always rendered structurally the same in
+     both cases; obs-control.js enables/disables it and shows/hides the
+     series-scope section and the "no active tournament" banner purely
+     from polled state, so a /current/* dock left open the whole night
+     keeps working across tournament switches without a page reload. #}
   <div id="dock-root"
-       data-tournament-id="{{ tournament_id }}"
-       data-state-url="{{ url_for('overlay.overlay_obs_control_state', tournament_id=tournament_id) }}">
+       data-is-current="{{ '1' if is_current else '0' }}"
+       data-action-base="{{ action_base }}"
+       data-state-url="{{ state_url }}">
 
     <div class="dock-header">
       <div class="dock-header__brand"><span class="dock-header__brand-dot" aria-hidden="true"></span>Mafia Style · OBS Пульт</div>
-      <div class="dock-header__tournament">{{ state.tournament_name }}</div>
+      <div class="dock-header__tournament" id="dock-tournament-name">{{ state.tournament_name if state else '—' }}</div>
       <span class="dock-header__tour" id="dock-tour" hidden></span>
     </div>
 
@@ -30,78 +42,90 @@
       <span class="dock-status__dot" aria-hidden="true"></span><span class="dock-status__label"></span>
     </div>
 
+    {# Only meaningful in /current/* mode — "nothing is active yet, go
+       pick one" (there's no single id here to offer a "make active"
+       button for, unlike the per-tournament banner below). Hidden by
+       default; obs-control.js shows it when state.active === false. #}
+    <div class="dock-section dock-noactive" id="dock-noactive" hidden>
+      <div class="dock-active-banner dock-active-banner--warn">
+        <span>⚠ Нет активного турнира — откройте «Управление оверлеем» нужного турнира и нажмите «Сделать активным для OBS».</span>
+      </div>
+    </div>
+
+    {# Per-tournament mode only — /current/* has no single id to offer a
+       "make active" action for (see the banner above instead). #}
     <div class="dock-section" id="dock-active-section" style="padding-top:.7rem;"></div>
 
-    <div class="dock-section">
-      <div class="dock-section__title">Центр экрана · Комментаторы</div>
-      <div class="dock-grid" id="dock-idle-content">
-        <button type="button" class="dock-btn" data-idle="logo">Лого турнира<span class="dock-btn__key">1</span></button>
-        <button type="button" class="dock-btn" data-idle="standings">Турнирная таблица<span class="dock-btn__key">2</span></button>
-        <button type="button" class="dock-btn" data-idle="last_game">Прошлая игра<span class="dock-btn__key">3</span></button>
-        <button type="button" class="dock-btn" data-idle="ticker">Интересные факты<span class="dock-btn__key">4</span></button>
-      </div>
-    </div>
+    <div class="dock-dashboard" id="dock-dashboard">
 
-    <div class="dock-section">
-      <div class="dock-section__title">Панели трансляции</div>
-      <div class="dock-stack">
-        <button type="button" class="dock-btn dock-btn--toggle" id="dock-seats">
-          <span>🃏 Полоса игроков <span class="dock-btn__key">S</span></span>
-          <span class="dock-toggle-pill"></span>
-        </button>
-        <button type="button" class="dock-btn dock-btn--toggle" id="dock-ticker">
-          <span>📊 Тикер статистики <span class="dock-btn__key">T</span></span>
-          <span class="dock-toggle-pill"></span>
-        </button>
+      <div class="dock-section">
+        <div class="dock-section__title">Центр экрана · Комментаторы</div>
+        <div class="dock-grid" id="dock-idle-content">
+          <button type="button" class="dock-btn" data-idle="logo">Лого турнира<span class="dock-btn__key">1</span></button>
+          <button type="button" class="dock-btn" data-idle="standings">Турнирная таблица<span class="dock-btn__key">2</span></button>
+          <button type="button" class="dock-btn" data-idle="last_game">Прошлая игра<span class="dock-btn__key">3</span></button>
+          <button type="button" class="dock-btn" data-idle="ticker">Интересные факты<span class="dock-btn__key">4</span></button>
+        </div>
       </div>
-    </div>
 
-    <div class="dock-section">
-      <div class="dock-section__title">Турнирная таблица</div>
-      <div class="dock-grid dock-grid--3" id="dock-standings-mode">
-        <button type="button" class="dock-btn" data-mode="top5">Топ-5</button>
-        <button type="button" class="dock-btn" data-mode="full">Полная</button>
-        <button type="button" class="dock-btn" data-mode="hidden">Скрыто</button>
+      <div class="dock-section">
+        <div class="dock-section__title">Панели трансляции</div>
+        <div class="dock-stack">
+          <button type="button" class="dock-btn dock-btn--toggle" id="dock-seats">
+            <span>🃏 Полоса игроков <span class="dock-btn__key">S</span></span>
+            <span class="dock-toggle-pill"></span>
+          </button>
+          <button type="button" class="dock-btn dock-btn--toggle" id="dock-ticker">
+            <span>📊 Тикер статистики <span class="dock-btn__key">T</span></span>
+            <span class="dock-toggle-pill"></span>
+          </button>
+        </div>
       </div>
-      {% if state.hide_standings %}
-      <p class="dock-section__hint">⚠ У турнира включено «Таблица скрыта» на сайте — здесь она не покажется независимо от выбора.</p>
-      {% endif %}
-    </div>
 
-    <div class="dock-section">
-      <div class="dock-section__title">Реванш последней игры</div>
-      <div class="dock-grid dock-grid--3" id="dock-reveal">
-        <button type="button" class="dock-btn" data-reveal="">Авто</button>
-        <button type="button" class="dock-btn" data-reveal="on">Показать</button>
-        <button type="button" class="dock-btn" data-reveal="off">Скрыть</button>
+      <div class="dock-section">
+        <div class="dock-section__title">Турнирная таблица</div>
+        <div class="dock-grid dock-grid--3" id="dock-standings-mode">
+          <button type="button" class="dock-btn" data-mode="top5">Топ-5</button>
+          <button type="button" class="dock-btn" data-mode="full">Полная</button>
+          <button type="button" class="dock-btn" data-mode="hidden">Скрыто</button>
+        </div>
+        <p class="dock-section__hint" id="dock-hide-standings-hint" hidden>⚠ У турнира включено «Таблица скрыта» на сайте — здесь она не покажется независимо от выбора.</p>
       </div>
-    </div>
 
-    {% if state.has_series %}
-    <div class="dock-section">
-      <div class="dock-section__title">Зачёт (серия)</div>
-      <div class="dock-grid" id="dock-scope">
-        <button type="button" class="dock-btn" data-scope="evening">Этот вечер</button>
-        <button type="button" class="dock-btn" data-scope="series">Весь турнир</button>
+      <div class="dock-section">
+        <div class="dock-section__title">Реванш последней игры</div>
+        <div class="dock-grid dock-grid--3" id="dock-reveal">
+          <button type="button" class="dock-btn" data-reveal="">Авто</button>
+          <button type="button" class="dock-btn" data-reveal="on">Показать</button>
+          <button type="button" class="dock-btn" data-reveal="off">Скрыть</button>
+        </div>
       </div>
-    </div>
-    {% endif %}
 
-    <div class="dock-section">
-      <div class="dock-section__title">Таймер · Starting Soon</div>
-      <div class="dock-timer-row">
-        <input type="number" id="dock-timer-minutes" min="0" step="1" value="15">
-        <button type="button" class="dock-btn" id="dock-timer-start">Запустить</button>
+      <div class="dock-section" id="dock-scope-section" hidden>
+        <div class="dock-section__title">Зачёт (серия)</div>
+        <div class="dock-grid" id="dock-scope">
+          <button type="button" class="dock-btn" data-scope="evening">Этот вечер</button>
+          <button type="button" class="dock-btn" data-scope="series">Весь турнир</button>
+        </div>
       </div>
-      <div class="dock-timer-state" id="dock-timer-state">—</div>
-    </div>
 
-    <div class="dock-section">
-      <div class="dock-section__title">⚡ Быстрые действия</div>
-      <div class="dock-stack">
-        <button type="button" class="dock-btn dock-btn--warn" id="dock-hide-all">Скрыть всё <span class="dock-btn__key">H</span></button>
-        <button type="button" class="dock-btn dock-btn--danger" id="dock-reset">Reset / безопасное состояние</button>
+      <div class="dock-section">
+        <div class="dock-section__title">Таймер · Starting Soon</div>
+        <div class="dock-timer-row">
+          <input type="number" id="dock-timer-minutes" min="0" step="1" value="15">
+          <button type="button" class="dock-btn" id="dock-timer-start">Запустить</button>
+        </div>
+        <div class="dock-timer-state" id="dock-timer-state">—</div>
       </div>
+
+      <div class="dock-section">
+        <div class="dock-section__title">⚡ Быстрые действия</div>
+        <div class="dock-stack">
+          <button type="button" class="dock-btn dock-btn--warn" id="dock-hide-all">Скрыть всё <span class="dock-btn__key">H</span></button>
+          <button type="button" class="dock-btn dock-btn--danger" id="dock-reset">Reset / безопасное состояние</button>
+        </div>
+      </div>
+
     </div>
 
     <div class="dock-hotkeys">

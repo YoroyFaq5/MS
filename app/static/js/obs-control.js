@@ -1,24 +1,30 @@
 // OBS Custom Browser Dock — compact remote for the overlay control state.
-// Talks to /overlay/<id>/obs-control/* JSON endpoints ONLY — those are new
-// routes added specifically for this page (see app/routes/overlay.py); the
-// classic /overlay/<id>/control/* form endpoints (used by the existing
-// full admin page, including anyone's current OBS Custom Dock pointed at
-// it) are never called from here and are untouched by this file existing.
-// Every action below just calls the same OverlayControlService/
-// BroadcastSceneService/ActiveBroadcastService methods the old page uses —
-// this is a second INTERFACE, not a second state system.
+// Talks to /overlay/<id>/obs-control/* or /overlay/current/obs-control/*
+// JSON endpoints ONLY — those are new routes added specifically for this
+// page (see app/routes/overlay.py); the classic /overlay/<id>/control/*
+// form endpoints (used by the existing full admin page, including anyone's
+// current OBS Custom Dock pointed at it) are never called from here and
+// are untouched by this file existing. Every action below just calls the
+// same OverlayControlService/BroadcastSceneService/ActiveBroadcastService
+// methods the old page uses — this is a second INTERFACE, not a second
+// state system.
 (function () {
   const root = document.getElementById('dock-root');
   if (!root) return;
 
-  const tournamentId = root.dataset.tournamentId;
+  const IS_CURRENT = root.dataset.isCurrent === '1';
+  const ACTION_BASE = root.dataset.actionBase; // e.g. /overlay/6/obs-control or /overlay/current/obs-control
   const STATE_URL = root.dataset.stateUrl;
-  const base = `/overlay/${tournamentId}/obs-control`;
   const POLL_MS = 5000;
 
   const statusEl = document.getElementById('dock-status');
+  const tournamentNameEl = document.getElementById('dock-tournament-name');
   const tourEl = document.getElementById('dock-tour');
+  const noActiveEl = document.getElementById('dock-noactive');
   const activeSection = document.getElementById('dock-active-section');
+  const dashboardEl = document.getElementById('dock-dashboard');
+  const scopeSection = document.getElementById('dock-scope-section');
+  const hideStandingsHint = document.getElementById('dock-hide-standings-hint');
   const idleButtons = Array.from(document.querySelectorAll('#dock-idle-content [data-idle]'));
   const seatsBtn = document.getElementById('dock-seats');
   const tickerBtn = document.getElementById('dock-ticker');
@@ -40,10 +46,34 @@
     statusEl.className = `dock-status is-${mode}`;
   }
 
+  function setDashboardEnabled(enabled) {
+    dashboardEl.style.opacity = enabled ? '1' : '.4';
+    dashboardEl.style.pointerEvents = enabled ? '' : 'none';
+  }
+
   function paint(state) {
-    latestState = state;
     setStatus('connected');
     consecutiveFailures = 0;
+
+    if (state.active === false) {
+      // /current/* with nothing marked active yet — a real, expected
+      // state (see overlay_obs_control_state), not an error. Keep the
+      // dashboard structurally in place but non-interactive, and let the
+      // banner explain what to do instead of leaving buttons that would
+      // just 409.
+      latestState = null;
+      tournamentNameEl.textContent = '—';
+      tourEl.hidden = true;
+      noActiveEl.hidden = false;
+      activeSection.innerHTML = '';
+      setDashboardEnabled(false);
+      return;
+    }
+
+    noActiveEl.hidden = true;
+    setDashboardEnabled(true);
+    latestState = state;
+    tournamentNameEl.textContent = state.tournament_name;
 
     if (state.has_current_game) {
       tourEl.hidden = false;
@@ -55,23 +85,29 @@
       tourEl.hidden = true;
     }
 
+    // The "make this tournament active" banner only makes sense in the
+    // per-tournament dock — /current/* is already whatever's active, by
+    // construction, so there's no separate id here to offer that button
+    // for.
     activeSection.innerHTML = '';
-    if (state.is_active_broadcast) {
-      const b = document.createElement('div');
-      b.className = 'dock-active-banner dock-active-banner--ok';
-      b.innerHTML = '<span>✓ Активен для /overlay/current/*</span>';
-      activeSection.appendChild(b);
-    } else {
-      const b = document.createElement('div');
-      b.className = 'dock-active-banner dock-active-banner--warn';
-      b.innerHTML = '<span>⚠ Не активен в OBS</span>';
-      const btn = document.createElement('button');
-      btn.className = 'dock-btn dock-btn--warn';
-      btn.style.minHeight = '32px';
-      btn.textContent = 'Сделать активным';
-      btn.addEventListener('click', () => act('/set-active', {}));
-      b.appendChild(btn);
-      activeSection.appendChild(b);
+    if (!IS_CURRENT) {
+      if (state.is_active_broadcast) {
+        const b = document.createElement('div');
+        b.className = 'dock-active-banner dock-active-banner--ok';
+        b.innerHTML = '<span>✓ Активен для /overlay/current/*</span>';
+        activeSection.appendChild(b);
+      } else {
+        const b = document.createElement('div');
+        b.className = 'dock-active-banner dock-active-banner--warn';
+        b.innerHTML = '<span>⚠ Не активен в OBS</span>';
+        const btn = document.createElement('button');
+        btn.className = 'dock-btn dock-btn--warn';
+        btn.style.minHeight = '32px';
+        btn.textContent = 'Сделать активным';
+        btn.addEventListener('click', () => act('/set-active', {}));
+        b.appendChild(btn);
+        activeSection.appendChild(b);
+      }
     }
 
     idleButtons.forEach((btn) => btn.classList.toggle('dock-btn--active', btn.dataset.idle === state.idle_content));
@@ -85,6 +121,8 @@
       btn.classList.toggle('dock-btn--on', val === state.reveal_override);
     });
     scopeButtons.forEach((btn) => btn.classList.toggle('dock-btn--on', btn.dataset.scope === state.standings_scope));
+    scopeSection.hidden = !state.has_series;
+    hideStandingsHint.hidden = !state.hide_standings;
 
     paintTimer(state);
   }
@@ -127,11 +165,17 @@
     if (inFlight) return; // avoid pile-ups if a click lands mid-request
     inFlight = true;
     try {
-      const resp = await fetch(base + path, {
+      const resp = await fetch(ACTION_BASE + path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      if (resp.status === 409) {
+        // /current/* action fired with nothing active — not a connectivity
+        // problem, just re-sync to show the "no active tournament" banner.
+        await refresh();
+        return;
+      }
       if (!resp.ok) throw new Error('bad status');
       const state = await resp.json();
       paint(state);
@@ -173,10 +217,11 @@
   // ── Hotkeys ──────────────────────────────────────────────────────────
   // Only fire when this dock's own view has focus and the user isn't
   // typing into the timer-minutes field. No hotkey for Reset on purpose
-  // (mouse + confirm() only) or Hide All is decided fast without a second
-  // dialog — reserving that one keyboard slot for the recoverable action.
+  // (mouse + confirm() only) — reserving that one keyboard slot for the
+  // recoverable action (Hide All), decided fast without a second dialog.
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (!latestState) return; // nothing active — hotkeys would just 409
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 

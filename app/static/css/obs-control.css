@@ -79,6 +79,13 @@ body {
 .dock-header__tour {
   display: inline-block;
   margin-top: .15rem;
+}
+/* An explicit `display` above always beats the UA stylesheet's
+   `[hidden]{display:none}` for equal specificity (author styles come
+   after UA styles in the cascade) — without this override toggling the
+   `hidden` attribute via JS would silently do nothing here. */
+.dock-header__tour[hidden] {
+  display: none;
   padding: .15rem .5rem;
   background: var(--dock-surface);
   border: 1px solid var(--dock-border);

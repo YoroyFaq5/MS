@@ -564,118 +564,225 @@ def _build_obs_control_state(tournament_id: int):
     )
 
 
-@overlay_bp.route("/<int:tournament_id>/obs-control")
-@admin_required
-def overlay_obs_control(tournament_id: int):
-    state = _build_obs_control_state(tournament_id)
-    if state is None:
-        abort(404)
-    return render_template("overlay/obs_control.html", tournament_id=tournament_id, state=state)
-
-
-@overlay_bp.route("/<int:tournament_id>/obs-control/state")
-@admin_required
-def overlay_obs_control_state(tournament_id: int):
-    state = _build_obs_control_state(tournament_id)
-    if state is None:
-        abort(404)
-    return jsonify(state)
+def _resolve_obs_control_tournament_id(tournament_id):
+    """`tournament_id` is None on every /current/obs-control/* route below
+    (see their `defaults={"tournament_id": None}`) — resolves it via
+    ActiveBroadcastService instead, same as `_current_or_no_active` does
+    for the viewer-facing /overlay/current/* scenes, so the dock can use
+    the SAME "paste this URL into OBS once, never touch it again" pattern
+    those already have. Returns None if there's genuinely nothing to
+    resolve (no active tournament set, or it got deleted)."""
+    if tournament_id is not None:
+        return tournament_id
+    active_id = ActiveBroadcastService.get_active_tournament_id()
+    if active_id is None or db.session.get(Tournament, active_id) is None:
+        return None
+    return active_id
 
 
 def _obs_control_json_body() -> dict:
     return request.get_json(silent=True) or {}
 
 
-@overlay_bp.route("/<int:tournament_id>/obs-control/ticker", methods=["POST"])
+# Every view below is registered under BOTH a per-tournament URL
+# (/<id>/obs-control/...) and a tournament-agnostic one (/current/obs-
+# control/..., `defaults={"tournament_id": None}` telling Flask that URL
+# has no <tournament_id> segment) — one implementation, exactly like
+# overlay_current_page/_current_or_no_active do for the viewer-facing
+# scenes above. Which URL a caster puts in OBS is their choice; /current/*
+# re-resolves the active tournament on every single request (page load,
+# poll, or button click), so it keeps working even if the active
+# tournament changes while the dock stays open.
+
+@overlay_bp.route("/<int:tournament_id>/obs-control")
+@overlay_bp.route("/current/obs-control", defaults={"tournament_id": None})
 @admin_required
-def overlay_obs_control_toggle_ticker(tournament_id: int):
-    OverlayControlService.toggle_ticker(tournament_id)
-    return jsonify(_build_obs_control_state(tournament_id))
+def overlay_obs_control(tournament_id):
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    is_current = tournament_id is None
+    action_base = "/overlay/current/obs-control" if is_current else f"/overlay/{resolved_id}/obs-control"
+    state_url = url_for("overlay.overlay_obs_control_state") if is_current \
+        else url_for("overlay.overlay_obs_control_state", tournament_id=resolved_id)
+    state = _build_obs_control_state(resolved_id) if resolved_id is not None else None
+    if not is_current and state is None:
+        abort(404)
+    return render_template(
+        "overlay/obs_control.html",
+        state=state, is_current=is_current, tournament_id=resolved_id,
+        action_base=action_base, state_url=state_url,
+    )
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/state")
+@overlay_bp.route("/current/obs-control/state", defaults={"tournament_id": None})
+@admin_required
+def overlay_obs_control_state(tournament_id):
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        if tournament_id is None:
+            # A real, expected state for /current/* (nothing marked active
+            # yet) — 200 with a flag, NOT an error, so the dock's JS can
+            # show "no active tournament" instead of "server unreachable".
+            return jsonify({"active": False})
+        abort(404)
+    state = _build_obs_control_state(resolved_id)
+    state["active"] = True
+    return jsonify(state)
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/ticker", methods=["POST"])
+@overlay_bp.route("/current/obs-control/ticker", methods=["POST"], defaults={"tournament_id": None})
+@admin_required
+def overlay_obs_control_toggle_ticker(tournament_id):
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    OverlayControlService.toggle_ticker(resolved_id)
+    state = _build_obs_control_state(resolved_id)
+    state["active"] = True
+    return jsonify(state)
 
 
 @overlay_bp.route("/<int:tournament_id>/obs-control/seats", methods=["POST"])
+@overlay_bp.route("/current/obs-control/seats", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
-def overlay_obs_control_toggle_seats(tournament_id: int):
-    OverlayControlService.toggle_seats(tournament_id)
-    return jsonify(_build_obs_control_state(tournament_id))
+def overlay_obs_control_toggle_seats(tournament_id):
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    OverlayControlService.toggle_seats(resolved_id)
+    state = _build_obs_control_state(resolved_id)
+    state["active"] = True
+    return jsonify(state)
 
 
 @overlay_bp.route("/<int:tournament_id>/obs-control/standings", methods=["POST"])
+@overlay_bp.route("/current/obs-control/standings", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
-def overlay_obs_control_set_standings_mode(tournament_id: int):
-    OverlayControlService.set_standings_mode(tournament_id, _obs_control_json_body().get("mode", "top5"))
-    return jsonify(_build_obs_control_state(tournament_id))
+def overlay_obs_control_set_standings_mode(tournament_id):
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    OverlayControlService.set_standings_mode(resolved_id, _obs_control_json_body().get("mode", "top5"))
+    state = _build_obs_control_state(resolved_id)
+    state["active"] = True
+    return jsonify(state)
 
 
 @overlay_bp.route("/<int:tournament_id>/obs-control/standings-scope", methods=["POST"])
+@overlay_bp.route("/current/obs-control/standings-scope", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
-def overlay_obs_control_set_standings_scope(tournament_id: int):
-    OverlayControlService.set_standings_scope(tournament_id, _obs_control_json_body().get("scope", "evening"))
-    return jsonify(_build_obs_control_state(tournament_id))
+def overlay_obs_control_set_standings_scope(tournament_id):
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    OverlayControlService.set_standings_scope(resolved_id, _obs_control_json_body().get("scope", "evening"))
+    state = _build_obs_control_state(resolved_id)
+    state["active"] = True
+    return jsonify(state)
 
 
 @overlay_bp.route("/<int:tournament_id>/obs-control/reveal", methods=["POST"])
+@overlay_bp.route("/current/obs-control/reveal", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
-def overlay_obs_control_set_reveal(tournament_id: int):
-    OverlayControlService.set_reveal_override(tournament_id, _obs_control_json_body().get("override") or None)
-    return jsonify(_build_obs_control_state(tournament_id))
+def overlay_obs_control_set_reveal(tournament_id):
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    OverlayControlService.set_reveal_override(resolved_id, _obs_control_json_body().get("override") or None)
+    state = _build_obs_control_state(resolved_id)
+    state["active"] = True
+    return jsonify(state)
 
 
 @overlay_bp.route("/<int:tournament_id>/obs-control/idle-content", methods=["POST"])
+@overlay_bp.route("/current/obs-control/idle-content", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
-def overlay_obs_control_set_idle_content(tournament_id: int):
-    OverlayControlService.set_idle_content(tournament_id, _obs_control_json_body().get("mode", "logo"))
-    return jsonify(_build_obs_control_state(tournament_id))
+def overlay_obs_control_set_idle_content(tournament_id):
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    OverlayControlService.set_idle_content(resolved_id, _obs_control_json_body().get("mode", "logo"))
+    state = _build_obs_control_state(resolved_id)
+    state["active"] = True
+    return jsonify(state)
 
 
 @overlay_bp.route("/<int:tournament_id>/obs-control/timer", methods=["POST"])
+@overlay_bp.route("/current/obs-control/timer", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
-def overlay_obs_control_start_timer(tournament_id: int):
+def overlay_obs_control_start_timer(tournament_id):
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
     try:
         minutes = float(_obs_control_json_body().get("minutes", 15))
     except (TypeError, ValueError):
         minutes = 15.0
-    BroadcastSceneService.start_timer(tournament_id, round(minutes * 60))
-    return jsonify(_build_obs_control_state(tournament_id))
+    BroadcastSceneService.start_timer(resolved_id, round(minutes * 60))
+    state = _build_obs_control_state(resolved_id)
+    state["active"] = True
+    return jsonify(state)
 
 
 @overlay_bp.route("/<int:tournament_id>/obs-control/set-active", methods=["POST"])
+@overlay_bp.route("/current/obs-control/set-active", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
-def overlay_obs_control_set_active(tournament_id: int):
+def overlay_obs_control_set_active(tournament_id):
+    # The one action that's meaningless on /current/*: there's nothing to
+    # "make active" without a concrete id (that's the whole point of this
+    # button on the per-tournament dock — picking WHICH tournament
+    # /current/* should resolve to next).
+    if tournament_id is None:
+        abort(400)
     db.session.get(Tournament, tournament_id) or abort(404)
     ActiveBroadcastService.set_active_tournament_id(tournament_id)
-    return jsonify(_build_obs_control_state(tournament_id))
+    state = _build_obs_control_state(tournament_id)
+    state["active"] = True
+    return jsonify(state)
 
 
 @overlay_bp.route("/<int:tournament_id>/obs-control/hide-all", methods=["POST"])
+@overlay_bp.route("/current/obs-control/hide-all", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
-def overlay_obs_control_hide_all(tournament_id: int):
+def overlay_obs_control_hide_all(tournament_id):
     """Quick action — every viewer-facing panel off at once (ticker, seats,
     standings, the last-game reveal) without touching idle_content or which
     tournament is active. Just a convenience wrapper around the same
     setters every button above already calls individually."""
-    control = OverlayControlService.get_control(tournament_id)
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    control = OverlayControlService.get_control(resolved_id)
     if control.show_ticker:
-        OverlayControlService.toggle_ticker(tournament_id)
+        OverlayControlService.toggle_ticker(resolved_id)
     if control.show_seats:
-        OverlayControlService.toggle_seats(tournament_id)
-    OverlayControlService.set_standings_mode(tournament_id, "hidden")
-    OverlayControlService.set_reveal_override(tournament_id, "off")
-    return jsonify(_build_obs_control_state(tournament_id))
+        OverlayControlService.toggle_seats(resolved_id)
+    OverlayControlService.set_standings_mode(resolved_id, "hidden")
+    OverlayControlService.set_reveal_override(resolved_id, "off")
+    state = _build_obs_control_state(resolved_id)
+    state["active"] = True
+    return jsonify(state)
 
 
 @overlay_bp.route("/<int:tournament_id>/obs-control/reset", methods=["POST"])
+@overlay_bp.route("/current/obs-control/reset", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
-def overlay_obs_control_reset(tournament_id: int):
+def overlay_obs_control_reset(tournament_id):
     """'Safe state' — the same values a brand-new OverlayControl row starts
     with. The dock's own JS requires an explicit confirm before sending
     this (see obs_control.html) since it undoes manual choices."""
-    control = OverlayControlService.get_control(tournament_id)
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    control = OverlayControlService.get_control(resolved_id)
     if not control.show_ticker:
-        OverlayControlService.toggle_ticker(tournament_id)
+        OverlayControlService.toggle_ticker(resolved_id)
     if not control.show_seats:
-        OverlayControlService.toggle_seats(tournament_id)
-    OverlayControlService.set_standings_mode(tournament_id, "top5")
-    OverlayControlService.set_reveal_override(tournament_id, None)
-    OverlayControlService.set_idle_content(tournament_id, "logo")
-    return jsonify(_build_obs_control_state(tournament_id))
+        OverlayControlService.toggle_seats(resolved_id)
+    OverlayControlService.set_standings_mode(resolved_id, "top5")
+    OverlayControlService.set_reveal_override(resolved_id, None)
+    OverlayControlService.set_idle_content(resolved_id, "logo")
+    state = _build_obs_control_state(resolved_id)
+    state["active"] = True
+    return jsonify(state)
