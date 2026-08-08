@@ -208,6 +208,15 @@
         <span class="ovl-info-drift" aria-hidden="true"></span>
         <span class="ovl-info-sweep" aria-hidden="true"></span>
         <span class="overlay-idle-hero__info-edge-pulse" aria-hidden="true"></span>
+        <!-- "THE SHIELD REASSEMBLY" — the signature transition JS runs when the
+             caster switches which content this panel shows (see
+             runShieldTransition in overlay.js). These two are inert at rest
+             (opacity:0, no animation) and only ever activated by JS toggling
+             .is-scanning / .is-flashing during that ~1s sequence — never on
+             their own. Both sit inside the panel's own clip-path, so they're
+             automatically cut to the shield silhouette, not a plain rectangle. -->
+        <span class="overlay-idle-hero__shield-scan" aria-hidden="true"></span>
+        <span class="overlay-idle-hero__shield-flash" aria-hidden="true"></span>
         <div class="overlay-idle-hero__slot overlay-idle-hero__slot--center {{ 'is-active' if effective_idle_content == 'logo' else '' }}" data-idle-slot="logo">
           <div class="overlay-idle-hero__logo">
             <img src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="Mafia Style" class="overlay-idle-hero__logo-img">

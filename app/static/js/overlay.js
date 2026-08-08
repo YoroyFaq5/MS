@@ -169,6 +169,108 @@
     }, delay);
   }
 
+  // ── Idle-hero panel: "THE SHIELD REASSEMBLY" ─────────────────────────
+  // The signature transition for switching which content the idle-hero
+  // panel shows (logo/standings/last_game/ticker — the caster's button
+  // on the OBS dock, see obs-control.js's #dock-idle-content). Never a
+  // plain crossfade: old content BREAKS APART (.is-shield-out), the
+  // panel's own shield silhouette FLASHES once (.is-scanning/.is-flashing
+  // on the two dedicated elements in _live_fragment.html), then the new
+  // content REASSEMBLES headline-first (.is-shield-in) — see the
+  // "SECTION 7: THE SHIELD REASSEMBLY" block in overlay.css for what each
+  // class actually looks like. This function only ever toggles classes on
+  // elements that already exist in the DOM — no re-render, no innerHTML
+  // churn — so it works equally well right after a full sig-replace or
+  // after 100 quiet polls in a row.
+  //
+  // Durations here are the single source of truth the CSS phase lengths
+  // (ovl-shield-shatter-out .26s, ovl-shield-flash-pop .28s, the .is-
+  // shield-in delay ladder topping out around 200ms + stagger + .3s) were
+  // tuned against — keep them in step if either side changes.
+  const SHIELD_TIMING = { out: 300, flash: 170, settle: 560 };
+  let shieldBusy = false;
+  let shieldPendingTarget = null;
+  let activeIdleContent = currentCtl ? currentCtl.idleContent : 'logo';
+
+  function shieldKindFor(target) {
+    // Destination decides the "flavor" (brief's variants A-D) — going TO
+    // last_game is the sharper "game result" beat, TO standings leans on
+    // the table's own list-sweep, TO logo is the quieter "reverse
+    // assembly", everything else is the standard scan/break/reassemble.
+    if (target === 'last_game') return 'result';
+    if (target === 'standings') return 'table';
+    if (target === 'logo') return 'idle';
+    return 'standard';
+  }
+
+  function snapIdleContent(target) {
+    root.querySelectorAll('[data-idle-slot]').forEach((slot) => {
+      slot.classList.toggle('is-active', slot.dataset.idleSlot === target);
+    });
+    activeIdleContent = target;
+  }
+
+  function transitionIdleContent(target) {
+    if (target === activeIdleContent) return;
+    if (REDUCED_MOTION) { snapIdleContent(target); return; }
+    if (shieldBusy) { shieldPendingTarget = target; return; } // latest click wins, no backlog
+    runShieldTransition(target);
+  }
+
+  function runShieldTransition(target) {
+    const panel = root.querySelector('.overlay-idle-hero__info');
+    const oldSlot = root.querySelector('.overlay-idle-hero__slot.is-active');
+    const newSlot = root.querySelector('[data-idle-slot="' + target + '"]');
+    if (!panel || !newSlot) { snapIdleContent(target); return; } // defensive — should never happen, all 4 slots are always in the DOM
+
+    shieldBusy = true;
+    const kind = shieldKindFor(target);
+    const scan = panel.querySelector('.overlay-idle-hero__shield-scan');
+    const flash = panel.querySelector('.overlay-idle-hero__shield-flash');
+
+    // Phase 1 — SCAN + BREAK APART.
+    panel.dataset.shieldKind = kind;
+    panel.classList.add('is-shield-transition');
+    if (oldSlot) oldSlot.classList.add('is-shield-out');
+    if (scan) {
+      scan.classList.remove('is-scanning');
+      void scan.offsetWidth; // force reflow so a re-add mid-cycle still restarts the animation
+      scan.classList.add('is-scanning');
+    }
+
+    // Phase 2 — SHIELD FLASH. Old content is fully gone by now; briefly
+    // nothing but the panel's own silhouette flashing.
+    setTimeout(() => {
+      if (oldSlot) oldSlot.classList.remove('is-active', 'is-shield-out');
+      if (flash) {
+        flash.classList.remove('is-flashing');
+        void flash.offsetWidth;
+        flash.classList.add('is-flashing');
+      }
+    }, SHIELD_TIMING.out);
+
+    // Phase 3 — REASSEMBLY. New slot mounts active with the punchier
+    // .is-shield-in entrance (overrides the plain page-load fade for as
+    // long as this class stays on).
+    setTimeout(() => {
+      if (flash) flash.classList.remove('is-flashing');
+      newSlot.classList.add('is-active', 'is-shield-in');
+      activeIdleContent = target;
+    }, SHIELD_TIMING.out + SHIELD_TIMING.flash);
+
+    // Cleanup — hand back to the idle/ambient rules, then either settle
+    // or immediately chase whatever target arrived while this was running.
+    setTimeout(() => {
+      newSlot.classList.remove('is-shield-in');
+      panel.classList.remove('is-shield-transition');
+      delete panel.dataset.shieldKind;
+      shieldBusy = false;
+      const next = shieldPendingTarget;
+      shieldPendingTarget = null;
+      if (next && next !== activeIdleContent) runShieldTransition(next);
+    }, SHIELD_TIMING.out + SHIELD_TIMING.flash + SHIELD_TIMING.settle);
+  }
+
   // Nameplate fit strategy, in order — rather than jumping straight to
   // an ellipsis or a tiny shrunk font for every long nickname:
   //   1. One line at normal size (the common case — leave it alone).
@@ -302,9 +404,7 @@
     const full = root.querySelector('.overlay-full-standings');
     if (full) full.classList.toggle('is-hidden', ctl.standingsMode !== 'full');
 
-    root.querySelectorAll('[data-idle-slot]').forEach((slot) => {
-      slot.classList.toggle('is-active', slot.dataset.idleSlot === ctl.idleContent);
-    });
+    transitionIdleContent(ctl.idleContent);
 
     if (ctl.revealOverride === 'on') triggerReveal(true);
     else if (ctl.revealOverride === 'off') hideReveal();
@@ -334,6 +434,13 @@
       root.innerHTML = '';
       root.appendChild(newRoot);
       currentSig = newSig;
+      // Fresh DOM — the server already rendered the correct slot as
+      // .is-active (see effective_idle_content in overlay.py), and any
+      // shield transition mid-flight against the OLD elements is now
+      // moot (they're gone). Just resync the tracking state to match.
+      activeIdleContent = newCtl.idleContent;
+      shieldBusy = false;
+      shieldPendingTarget = null;
       startTicker();
       fitSeatNames();
       spawnCardEntranceBursts();
