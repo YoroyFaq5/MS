@@ -56,22 +56,6 @@
 
 <div class="overlay-fragment" data-sig="{{ sig }}" data-last-finished-id="{{ last_game.id if last_game else '' }}" data-ctl="{{ ctl_sig }}">
 
-  <!-- Same "light traveling its own path" background depth every other
-       scene (Starting Soon/BRB/Ending) already has — Live never got it, so
-       any area not covered by the seat strip/camera/info panel (most
-       visibly the idle-hero's logo slot) read as flat, dead black instead
-       of part of the same system. Pure stroked SVG lines, no fill —
-       html/body stays background:transparent (this page composites over
-       whatever's beneath it in OBS), so this can't break that contract. -->
-  <div class="ovl-arch-lines" aria-hidden="true">
-    <svg viewBox="0 0 1920 1080" preserveAspectRatio="none">
-      <line class="ovl-arch-lines__base" x1="700" y1="-200" x2="1042" y2="1280"></line>
-      <line class="ovl-arch-lines__base ovl-arch-lines__base--signal" x1="1150" y1="-200" x2="1492" y2="1280"></line>
-      <line class="ovl-arch-lines__chase" x1="700" y1="-200" x2="1042" y2="1280"></line>
-      <line class="ovl-arch-lines__chase ovl-arch-lines__chase--signal" x1="1150" y1="-200" x2="1492" y2="1280"></line>
-    </svg>
-  </div>
-
   <div class="ovl-viewport-frame" aria-hidden="true">
     <span class="ovl-viewport-frame__corner ovl-viewport-frame__corner--tl"></span>
     <span class="ovl-viewport-frame__corner ovl-viewport-frame__corner--tr"></span>
