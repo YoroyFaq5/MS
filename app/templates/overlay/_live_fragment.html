@@ -72,16 +72,15 @@
     <span class="ovl-micro">Mafia Style · Kazan Club</span>
   </div>
 
-  <!-- Donation slot — this page only draws the tag + glass frame; the
-       actual DonationAlerts (or similar) alert widget is a separate OBS
-       Browser Source layered on top, positioned over .ovl-donation-bar__slot.
-       See /overlay/<id>/control for the exact placement note. -->
+  <!-- Donation tag — just a label. The actual DonationAlerts widget is a
+       separate OBS Browser Source, added right after this tag on screen,
+       sized to its own natural width — see .ovl-donation-bar's comment
+       in broadcast-brand.css for why there's no fixed-size box here. -->
   <div class="ovl-donation-bar" aria-hidden="true">
     <span class="ovl-donation-bar__tag">
       <span class="ovl-donation-bar__icon">♥</span>
       Поддержать клуб
     </span>
-    <span class="ovl-donation-bar__slot"></span>
   </div>
 
   <!-- Full-viewport flash burst for the results reveal (Totem-of-Undying

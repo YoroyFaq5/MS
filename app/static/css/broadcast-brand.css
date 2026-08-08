@@ -404,14 +404,16 @@
 }
 
 /* ── Donation bar — Live scenes only ───────────────────────────────────
-   A reserved, always-visible slot for a DonationAlerts (or similar)
-   widget. This page only draws the tag + glass "slot" frame — the actual
-   alert widget is a separate OBS Browser Source (DonationAlerts gives
-   you its own URL) layered ON TOP of this one, positioned to sit inside
-   the slot below; unlike the camera, no corner-masking trick is needed
-   since those widgets render on a transparent background themselves and
-   only show content when a donation comes in, so simply stacking them
-   above this frame is enough. */
+   Just a tag/label — deliberately NOT a fixed-size box to hold the
+   widget. An earlier version reserved a fixed 460px glass "slot" next to
+   the tag for the DonationAlerts widget to sit inside, but that widget's
+   own natural render width never matches a guessed fixed box exactly,
+   so it either looked lost inside empty extra space or got clipped —
+   two independently-sized things trying to line up an edge is fragile.
+   The DonationAlerts widget already draws its own bar/border/background
+   (configured on DonationAlerts' side to match this palette) — it just
+   needs to sit immediately after this tag as its own free-sized OBS
+   Browser Source, nothing here needs to match its width. */
 .ovl-donation-bar {
   position: fixed;
   top: clamp(1rem, 2.4vh, 2.2rem);
@@ -419,8 +421,7 @@
   transform: translateX(-50%);
   z-index: 3;
   display: flex;
-  align-items: stretch;
-  height: 42px;
+  align-items: center;
   opacity: 0;
   animation: fade-in-up .5s ease .15s both;
 }
@@ -428,7 +429,7 @@
   display: flex;
   align-items: center;
   gap: .4rem;
-  padding: 0 .9rem 0 .7rem;
+  padding: .5rem .9rem .5rem .7rem;
   background: linear-gradient(135deg, var(--ovl-signal, #E31E24), var(--ovl-burgundy, #26080C));
   clip-path: polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px));
   font-family: 'Inter', sans-serif;
@@ -441,14 +442,6 @@
   flex: none;
 }
 .ovl-donation-bar__icon { font-size: .8rem; }
-.ovl-donation-bar__slot {
-  width: 460px;
-  max-width: 34vw;
-  background: var(--ovl-glass-bg, rgba(15,14,12,.6));
-  border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.35));
-  border-left: none;
-  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
-}
 
 /* ── Viewport frame — Live scenes only ─────────────────────────────────
    Four small corner brackets at the true edges of the canvas, echoing a
