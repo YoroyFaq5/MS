@@ -1323,25 +1323,81 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Last-game mode reuses the site's own .match-card (games/_match_card.html)
-   as-is — same card players already see in the games history list — so
-   this variant sheds the generic glass-panel chrome above (that card
-   brings its own background/border/radius) and just centers/constrains it. */
-.overlay-idle-hero__panel--last-game {
-  background: none;
-  border: none;
-  clip-path: none;
-  box-shadow: none;
-  padding: 0;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  max-width: 420px;
+/* ── "Last game" idle-hero slot — own compact broadcast scoreboard ─────
+   Replaces an earlier version that reused the site's own .match-card
+   (games/_match_card.html) — that component brings the site's gold/wine
+   tokens, Bootstrap icons and an ELO column built for the admin/history
+   pages, and looked visibly foreign sitting inside this chrome/red
+   system. This reuses the SAME role colors as the full-screen reveal
+   panel (.reveal-card__role--*) and the same "trophy chip" (.callout)
+   for MVP/Шериф/Дон, so it reads as part of the same card family. */
+.overlay-idle-hero__lastgame {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
   margin: 0 auto;
+  background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
+  border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
+  clip-path: var(--ovl-panel-clip-lg, none);
+  padding: 1.4rem 1.7rem 1.6rem;
 }
-/* This variant sheds ALL glass-panel chrome (see comment above) —
-   including the shared red accent bar, which would otherwise float
-   under the site's own match-card as a stray line. */
-.overlay-idle-hero__panel--last-game::after { content: none; }
+.overlay-idle-hero__lastgame-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
+  font-weight: 700;
+  font-size: 1.35rem;
+  padding-bottom: .5rem;
+  margin-bottom: .8rem;
+  border-bottom: 1px solid rgba(216,216,216,.3);
+}
+.overlay-idle-hero__lastgame-header--city  { color: var(--ovl-chrome-light, #FFFFFF); }
+.overlay-idle-hero__lastgame-header--mafia { color: var(--ovl-signal-light, #FF3B3B); }
+.overlay-idle-hero__lastgame-id {
+  font-family: 'Inter', sans-serif;
+  font-size: .95rem;
+  font-weight: 400;
+  color: var(--ms-muted, #8A8A8A);
+}
+.overlay-idle-hero__lastgame-callouts {
+  display: flex;
+  gap: .6rem;
+  flex-wrap: wrap;
+  margin-bottom: .9rem;
+}
+.overlay-idle-hero__lastgame-seats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: .55rem 1.1rem;
+}
+.overlay-idle-hero__lastgame-seat {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-family: 'Inter', sans-serif;
+  font-size: .92rem;
+  opacity: 0;
+  animation: fade-in-up .35s ease both;
+  animation-delay: var(--d, 0ms);
+}
+.overlay-idle-hero__lastgame-seat-num {
+  color: var(--ms-muted, #8A8A8A);
+  font-weight: 700;
+  width: 1.1rem;
+  flex: none;
+}
+.overlay-idle-hero__lastgame-seat-name {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* reveal-card__role--* (overlay.css, seat card/reveal panel section)
+   already carries the four role colors — reused here as-is. */
+.overlay-idle-hero__lastgame-seat .reveal-card__role { font-size: .8rem; flex: none; }
 
 /* Sized to content, not the full center column — a handful of short
    label/name/value lines stretched across the same width as the
@@ -1350,20 +1406,27 @@ html, body {
 .overlay-idle-hero__panel--ticker {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: .9rem;
   width: auto;
   max-width: 480px;
   margin: 0 auto;
 }
+/* .overlay-idle-hero__fact composes with .callout (the same "trophy
+   chip" the reveal panel drops in for MVP/Шериф/Дон) — this just adds
+   the center-aligned layout this ticker context wants and a per-item
+   stagger delay (callout's own totem-callout-drop keyframe/easing stays
+   untouched, only its delay is overridden here). */
 .overlay-idle-hero__fact {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: .15rem;
   text-align: center;
-  opacity: 0;
-  animation: fade-in-up .45s ease both;
+  min-width: 220px;
   animation-delay: var(--d, 0ms);
+}
+.overlay-idle-hero__fact-extra {
+  font-family: 'Inter', sans-serif;
+  color: var(--ms-muted, #8A8A8A);
+  font-size: .85rem;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Shared panel accent ────────────────────────────────────────────────
@@ -1377,7 +1440,8 @@ html, body {
 .overlay-ticker::after,
 .overlay-mini-standings::after,
 .overlay-full-standings::after,
-.overlay-idle-hero__panel::after {
+.overlay-idle-hero__panel::after,
+.overlay-idle-hero__lastgame::after {
   content: "";
   position: absolute;
   left: 0; right: 0; bottom: 0;

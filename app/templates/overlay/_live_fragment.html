@@ -1,5 +1,4 @@
 {% from "_macros.html" import player_name %}
-{% from "games/_match_card.html" import render_match_card %}
 
 {# Broadcast-style portrait seat card — the photo is a full-bleed background
    layer (ms-seat-card__media), with a frosted glass nameplate overlaid on
@@ -200,8 +199,53 @@
 
       {% if last_game %}
       <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'last_game' else '' }}" data-idle-slot="last_game">
-        <div class="overlay-idle-hero__panel overlay-idle-hero__panel--last-game">
-          {{ render_match_card(last_game, last_slots, equipped_bulk) }}
+        {# Own compact broadcast scoreboard instead of the site's own
+           .match-card (games/_match_card.html) — that component is built
+           for the site's admin/history pages (Bootstrap icons, the
+           site's gold/wine tokens, an ELO column) and looked visibly
+           foreign sitting inside this chrome/red system. Reuses the
+           same reveal-card role colors and mvp/sheriff_slot/don_slot
+           already computed above for the full-screen reveal panel. #}
+        <div class="overlay-idle-hero__lastgame">
+          <div class="overlay-idle-hero__lastgame-header overlay-idle-hero__lastgame-header--{{ win }}">
+            <span>
+              {% if win == 'city' %}🏙 Победа города
+              {% elif win == 'mafia' %}🔫 Победа мафии
+              {% else %}🤝 Ничья{% endif %}
+            </span>
+            <span class="overlay-idle-hero__lastgame-id">№{{ last_game.id }}</span>
+          </div>
+          {% if has_mvp or sheriff_slot or don_slot %}
+          <div class="overlay-idle-hero__lastgame-callouts">
+            {% if has_mvp %}
+            <span class="callout callout--mvp">
+              <span class="callout__label">⭐ MVP</span>
+              <span class="callout__value">{{ player_name(mvp.player, equipped_bulk.get(mvp.player_id, {})) if mvp.player else '?' }}</span>
+            </span>
+            {% endif %}
+            {% if sheriff_slot %}
+            <span class="callout callout--sheriff">
+              <span class="callout__label">🔍 Шериф</span>
+              <span class="callout__value">{{ player_name(sheriff_slot.player, equipped_bulk.get(sheriff_slot.player_id, {})) if sheriff_slot.player else '?' }}</span>
+            </span>
+            {% endif %}
+            {% if don_slot %}
+            <span class="callout callout--don">
+              <span class="callout__label">👑 Дон</span>
+              <span class="callout__value">{{ player_name(don_slot.player, equipped_bulk.get(don_slot.player_id, {})) if don_slot.player else '?' }}</span>
+            </span>
+            {% endif %}
+          </div>
+          {% endif %}
+          <div class="overlay-idle-hero__lastgame-seats">
+            {% for slot in last_slots %}
+            <div class="overlay-idle-hero__lastgame-seat" style="--d:{{ loop.index0 * 45 }}ms">
+              <span class="overlay-idle-hero__lastgame-seat-num">{{ slot.seat_number }}</span>
+              <span class="overlay-idle-hero__lastgame-seat-name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}</span>
+              <span class="reveal-card__role reveal-card__role--{{ slot.role.value }}">{{ role_labels[slot.role.value] }}</span>
+            </div>
+            {% endfor %}
+          </div>
         </div>
       </div>
       {% endif %}
@@ -211,10 +255,13 @@
         <div class="overlay-idle-hero__panel overlay-idle-hero__panel--ticker">
           {% for fact in facts %}
           {% set is_num = fact.value is number %}
-          <div class="overlay-idle-hero__fact" style="--d:{{ loop.index0 * 60 }}ms">
-            <span class="ticker-fact__label">{{ fact.label }}</span>
-            <span class="ticker-fact__value">{{ player_name(fact.rating, equipped_bulk.get(fact.rating.player_id, {})) }}</span>
-            <span class="ticker-fact__extra">{{ fact.value|round(2) if is_num else fact.value }}</span>
+          {# Reuses .callout — the same "trophy chip" the results-reveal
+             panel already drops in for MVP/Шериф/Дон, instead of the
+             plain label/value/extra text stack this used to be. #}
+          <div class="callout overlay-idle-hero__fact" style="--d:{{ loop.index0 * 60 }}ms">
+            <span class="callout__label">{{ fact.label }}</span>
+            <span class="callout__value">{{ player_name(fact.rating, equipped_bulk.get(fact.rating.player_id, {})) }}</span>
+            <span class="overlay-idle-hero__fact-extra">{{ fact.value|round(2) if is_num else fact.value }}</span>
           </div>
           {% endfor %}
         </div>
