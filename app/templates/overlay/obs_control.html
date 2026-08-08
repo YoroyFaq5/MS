@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OBS Пульт — {{ state.tournament_name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/obs-control.css') }}">
+</head>
+<body>
+  {# Standalone page (same pattern as overlay/live_page.html etc.) — no
+     base.html, no site navbar/Bootstrap: this is meant to live inside an
+     OBS Custom Browser Dock at ~250-400px wide, not a normal browser tab.
+     Talks ONLY to the new /obs-control/* JSON endpoints (obs-control.js) —
+     completely separate from /<id>/control's classic form endpoints, so
+     nothing here can affect that page or whatever OBS dock already points
+     at it. #}
+  <div id="dock-root"
+       data-tournament-id="{{ tournament_id }}"
+       data-state-url="{{ url_for('overlay.overlay_obs_control_state', tournament_id=tournament_id) }}">
+
+    <div class="dock-header">
+      <div class="dock-header__brand"><span class="dock-header__brand-dot" aria-hidden="true"></span>Mafia Style · OBS Пульт</div>
+      <div class="dock-header__tournament">{{ state.tournament_name }}</div>
+      <span class="dock-header__tour" id="dock-tour" hidden></span>
+    </div>
+
+    <div class="dock-status is-connecting" id="dock-status">
+      <span class="dock-status__dot" aria-hidden="true"></span><span class="dock-status__label"></span>
+    </div>
+
+    <div class="dock-section" id="dock-active-section" style="padding-top:.7rem;"></div>
+
+    <div class="dock-section">
+      <div class="dock-section__title">Центр экрана · Комментаторы</div>
+      <div class="dock-grid" id="dock-idle-content">
+        <button type="button" class="dock-btn" data-idle="logo">Лого турнира<span class="dock-btn__key">1</span></button>
+        <button type="button" class="dock-btn" data-idle="standings">Турнирная таблица<span class="dock-btn__key">2</span></button>
+        <button type="button" class="dock-btn" data-idle="last_game">Прошлая игра<span class="dock-btn__key">3</span></button>
+        <button type="button" class="dock-btn" data-idle="ticker">Интересные факты<span class="dock-btn__key">4</span></button>
+      </div>
+    </div>
+
+    <div class="dock-section">
+      <div class="dock-section__title">Панели трансляции</div>
+      <div class="dock-stack">
+        <button type="button" class="dock-btn dock-btn--toggle" id="dock-seats">
+          <span>🃏 Полоса игроков <span class="dock-btn__key">S</span></span>
+          <span class="dock-toggle-pill"></span>
+        </button>
+        <button type="button" class="dock-btn dock-btn--toggle" id="dock-ticker">
+          <span>📊 Тикер статистики <span class="dock-btn__key">T</span></span>
+          <span class="dock-toggle-pill"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="dock-section">
+      <div class="dock-section__title">Турнирная таблица</div>
+      <div class="dock-grid dock-grid--3" id="dock-standings-mode">
+        <button type="button" class="dock-btn" data-mode="top5">Топ-5</button>
+        <button type="button" class="dock-btn" data-mode="full">Полная</button>
+        <button type="button" class="dock-btn" data-mode="hidden">Скрыто</button>
+      </div>
+      {% if state.hide_standings %}
+      <p class="dock-section__hint">⚠ У турнира включено «Таблица скрыта» на сайте — здесь она не покажется независимо от выбора.</p>
+      {% endif %}
+    </div>
+
+    <div class="dock-section">
+      <div class="dock-section__title">Реванш последней игры</div>
+      <div class="dock-grid dock-grid--3" id="dock-reveal">
+        <button type="button" class="dock-btn" data-reveal="">Авто</button>
+        <button type="button" class="dock-btn" data-reveal="on">Показать</button>
+        <button type="button" class="dock-btn" data-reveal="off">Скрыть</button>
+      </div>
+    </div>
+
+    {% if state.has_series %}
+    <div class="dock-section">
+      <div class="dock-section__title">Зачёт (серия)</div>
+      <div class="dock-grid" id="dock-scope">
+        <button type="button" class="dock-btn" data-scope="evening">Этот вечер</button>
+        <button type="button" class="dock-btn" data-scope="series">Весь турнир</button>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="dock-section">
+      <div class="dock-section__title">Таймер · Starting Soon</div>
+      <div class="dock-timer-row">
+        <input type="number" id="dock-timer-minutes" min="0" step="1" value="15">
+        <button type="button" class="dock-btn" id="dock-timer-start">Запустить</button>
+      </div>
+      <div class="dock-timer-state" id="dock-timer-state">—</div>
+    </div>
+
+    <div class="dock-section">
+      <div class="dock-section__title">⚡ Быстрые действия</div>
+      <div class="dock-stack">
+        <button type="button" class="dock-btn dock-btn--warn" id="dock-hide-all">Скрыть всё <span class="dock-btn__key">H</span></button>
+        <button type="button" class="dock-btn dock-btn--danger" id="dock-reset">Reset / безопасное состояние</button>
+      </div>
+    </div>
+
+    <div class="dock-hotkeys">
+      <kbd>1</kbd>–<kbd>4</kbd> центр экрана (Комментаторы) · <kbd>S</kbd> игроки · <kbd>T</kbd> тикер · <kbd>H</kbd> скрыть всё
+    </div>
+
+  </div>
+  <script src="{{ url_for('static', filename='js/obs-control.js') }}" defer></script>
+</body>
+</html>

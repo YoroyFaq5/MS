@@ -1,0 +1,270 @@
+/* OBS Custom Browser Dock — "director's remote" ==========================
+   Purely a UI tool, not broadcast graphics — unlike overlay.css/broadcast-
+   brand.css this uses ordinary green/red/amber semantic colors (visible=
+   green, hidden=neutral, disconnected=amber/red) instead of the "red only
+   means active/event" motion language those files use, because a control
+   panel needs "is this ON" to read instantly, not to look cinematic.
+   Self-contained token set — deliberately not reusing overlay.css's
+   #overlay-root tokens, since this page is never composited in OBS as a
+   video source, just viewed in a Custom Browser Dock (a small persistent
+   Chromium panel docked in the OBS window). Tuned to stay usable from
+   ~250px wide up. */
+
+:root {
+  --dock-bg: #0b0b0c;
+  --dock-surface: #16161a;
+  --dock-surface-raised: #1e1e22;
+  --dock-border: #2a2a2f;
+  --dock-text: #f2f2f2;
+  --dock-text-dim: #9a9aa0;
+  --dock-text-faint: #6b6b70;
+  --dock-red: #e31e24;
+  --dock-red-light: #ff3b3b;
+  --dock-green: #2ecc71;
+  --dock-green-dim: rgba(46,204,113,.14);
+  --dock-amber: #f5a623;
+  --dock-font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--dock-bg);
+  color: var(--dock-text);
+  font-family: var(--dock-font);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  padding-bottom: 1.5rem;
+}
+
+.dock-header {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  padding: .85rem 1rem .75rem;
+  background: linear-gradient(180deg, var(--dock-surface-raised), var(--dock-surface));
+  border-bottom: 1px solid var(--dock-border);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.dock-header__brand {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  font-weight: 800;
+  font-size: .92rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.dock-header__brand-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--dock-red);
+  flex: none;
+  box-shadow: 0 0 8px 1px rgba(227,30,36,.55);
+}
+.dock-header__tournament {
+  font-size: .82rem;
+  color: var(--dock-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dock-header__tour {
+  display: inline-block;
+  margin-top: .15rem;
+  padding: .15rem .5rem;
+  background: var(--dock-surface);
+  border: 1px solid var(--dock-border);
+  border-left: 2px solid var(--dock-red);
+  font-weight: 700;
+  font-size: .78rem;
+  letter-spacing: .02em;
+  width: fit-content;
+}
+
+.dock-status {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .6rem 1rem;
+  font-size: .8rem;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--dock-border);
+}
+.dock-status__dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--dock-text-faint);
+  transition: background .2s ease;
+}
+.dock-status.is-connected .dock-status__dot { background: var(--dock-green); box-shadow: 0 0 6px 1px rgba(46,204,113,.5); }
+.dock-status.is-connected .dock-status__label::after { content: "Сервер подключён"; }
+.dock-status.is-disconnected .dock-status__dot {
+  background: var(--dock-amber);
+  animation: dock-pulse 1s ease-in-out infinite;
+}
+.dock-status.is-disconnected .dock-status__label::after { content: "Нет связи с сервером"; color: var(--dock-amber); }
+.dock-status.is-connecting .dock-status__label::after { content: "Подключение…"; }
+@keyframes dock-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+.dock-section {
+  padding: .8rem 1rem;
+  border-bottom: 1px solid var(--dock-border);
+}
+.dock-section__title {
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--dock-text-faint);
+  margin: 0 0 .55rem;
+}
+.dock-section__hint {
+  font-size: .74rem;
+  color: var(--dock-text-faint);
+  margin: .4rem 0 0;
+  line-height: 1.4;
+}
+
+.dock-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: .5rem;
+}
+.dock-grid--3 { grid-template-columns: repeat(3, 1fr); }
+.dock-stack { display: flex; flex-direction: column; gap: .5rem; }
+
+.dock-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .1rem;
+  min-height: 44px;
+  padding: .5rem .4rem;
+  background: var(--dock-surface);
+  border: 1px solid var(--dock-border);
+  color: var(--dock-text);
+  font-family: inherit;
+  font-size: .8rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: background .12s ease, border-color .12s ease, transform .05s ease;
+}
+.dock-btn:hover { background: var(--dock-surface-raised); border-color: #3a3a40; }
+.dock-btn:active { transform: scale(.97); }
+.dock-btn:disabled { opacity: .45; cursor: default; pointer-events: none; }
+.dock-btn__key {
+  font-size: .66rem;
+  color: var(--dock-text-faint);
+  font-weight: 500;
+}
+
+.dock-btn--on {
+  background: var(--dock-green-dim);
+  border-color: var(--dock-green);
+  color: #e9fff2;
+}
+.dock-btn--active {
+  background: rgba(227,30,36,.14);
+  border-color: var(--dock-red);
+  color: #fff;
+}
+.dock-btn--wide { grid-column: 1 / -1; }
+
+.dock-btn--toggle {
+  flex-direction: row;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: .6rem .8rem;
+  font-size: .85rem;
+}
+.dock-btn--toggle .dock-toggle-pill {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  padding: .15rem .5rem;
+  border-radius: 999px;
+  background: var(--dock-surface-raised);
+  color: var(--dock-text-faint);
+}
+.dock-btn--toggle.dock-btn--on .dock-toggle-pill {
+  background: var(--dock-green);
+  color: #06210f;
+}
+
+.dock-btn--danger { border-color: rgba(227,30,36,.4); color: var(--dock-red-light); }
+.dock-btn--danger:hover { background: rgba(227,30,36,.12); border-color: var(--dock-red); }
+.dock-btn--warn { border-color: rgba(245,166,35,.5); color: var(--dock-amber); }
+.dock-btn--warn:hover { background: rgba(245,166,35,.12); }
+
+.dock-timer-row {
+  display: flex;
+  gap: .5rem;
+}
+.dock-timer-row input {
+  width: 4.2rem;
+  flex: none;
+  background: var(--dock-surface);
+  border: 1px solid var(--dock-border);
+  color: var(--dock-text);
+  font-family: inherit;
+  font-size: .85rem;
+  padding: 0 .5rem;
+  text-align: center;
+}
+.dock-timer-row .dock-btn { flex: 1 1 auto; }
+.dock-timer-state {
+  margin-top: .5rem;
+  font-size: .78rem;
+  color: var(--dock-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.dock-active-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  padding: .55rem .7rem;
+  font-size: .8rem;
+  font-weight: 600;
+}
+.dock-active-banner--ok { background: var(--dock-green-dim); border: 1px solid var(--dock-green); color: #e9fff2; }
+.dock-active-banner--warn { background: rgba(245,166,35,.12); border: 1px solid var(--dock-amber); color: #ffe9c2; }
+
+.dock-hotkeys {
+  padding: .7rem 1rem 1rem;
+  font-size: .68rem;
+  color: var(--dock-text-faint);
+  line-height: 1.6;
+}
+.dock-hotkeys kbd {
+  display: inline-block;
+  min-width: 1.1em;
+  padding: .05rem .3rem;
+  background: var(--dock-surface-raised);
+  border: 1px solid var(--dock-border);
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: .68rem;
+  color: var(--dock-text-dim);
+}
+
+/* Narrow-dock safety net — below ~260px even a 2-col grid gets tight */
+@media (max-width: 260px) {
+  .dock-grid, .dock-grid--3 { grid-template-columns: 1fr; }
+}

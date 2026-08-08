@@ -28,7 +28,7 @@ switch the standings between top-5/full/hidden, manually pin the
 last-game reveal open or suppressed on top of its normal ~25s auto-timer,
 and mark this tournament as the active one for `/overlay/current/*`.
 """
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
 
 from app import db
 from app.models import (
@@ -494,3 +494,188 @@ def overlay_start_timer(tournament_id: int):
     BroadcastSceneService.start_timer(tournament_id, round(minutes * 60))
     flash(f"Таймер Starting Soon запущен заново: {minutes:g} мин.", "success")
     return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
+
+
+# ── OBS Custom Browser Dock — compact remote, separate from /control ───────
+# A second, purpose-built page meant to be pinned as an OBS "Custom Browser
+# Dock" (OBS → Docks → Custom Browser Dock), not a replacement for
+# /<id>/control above. That page is a full Bootstrap admin page — fine in a
+# normal browser tab, cramped and heavy for a ~300px-wide panel glanced at
+# constantly during a live show. This reuses the EXACT SAME state layer
+# (OverlayControlService / BroadcastSceneService / ActiveBroadcastService —
+# no new source of truth, nothing duplicated) through its own thin JSON
+# endpoints instead of the classic form-POST-and-redirect ones above, for
+# two concrete reasons: those always redirect to `overlay_control` (would
+# hijack this page's own navigation on every single click since the dock
+# would follow that redirect), and a full page reload per click is a much
+# worse feel in a panel meant to be clicked constantly. Every route above
+# this comment — including all of /<id>/control/* — is untouched by any of
+# this and keeps behaving exactly as before, whether opened as a normal
+# page or as someone's existing OBS dock.
+def _build_obs_control_state(tournament_id: int):
+    """Plain-dict snapshot of everything the dock needs — both the initial
+    page render and the polling /state endpoint below return exactly this
+    shape, so the page's own JS can just re-run the same "paint state"
+    function after every action instead of hand-diffing fields. Deliberately
+    NOT `_build_live_context`: that pulls ratings/superlatives/recent-form
+    for the actual broadcast, none of which this control surface needs."""
+    tournament = db.session.get(Tournament, tournament_id)
+    if tournament is None:
+        return None
+    control = OverlayControlService.get_control(tournament_id)
+    series_tournament = db.session.query(SeriesTournament).filter_by(tournament_id=tournament_id).first()
+    timer_state = BroadcastSceneService.get(tournament_id)
+
+    current_game = (
+        db.session.query(Game)
+        .filter(Game.tournament_id == tournament_id, Game.is_finished == False)
+        .order_by(Game.played_at.desc(), Game.id.desc())
+        .first()
+    )
+    last_game = (
+        db.session.query(Game)
+        .filter(Game.tournament_id == tournament_id, Game.is_finished == True)
+        .order_by(Game.played_at.desc(), Game.id.desc())
+        .first()
+    )
+    # Same "Тур №N" ordinal as the overlay itself (see _build_live_context) —
+    # keeps the number shown on the dock consistent with what's on stream.
+    game_number_by_id = {g.id: i + 1 for i, g in enumerate(sorted(tournament.games, key=lambda g: g.id))}
+
+    return dict(
+        tournament_id=tournament.id,
+        tournament_name=tournament.name,
+        is_active_broadcast=ActiveBroadcastService.get_active_tournament_id() == tournament_id,
+        has_series=series_tournament is not None,
+        show_ticker=control.show_ticker,
+        show_seats=control.show_seats,
+        standings_mode=control.standings_mode,
+        standings_scope=control.standings_scope,
+        reveal_override=control.reveal_override,
+        idle_content=control.idle_content,
+        hide_standings=tournament.hide_standings,
+        timer_duration=timer_state["timer_duration"],
+        timer_started_at=timer_state["timer_started_at"],
+        has_current_game=current_game is not None,
+        current_game_number=game_number_by_id.get(current_game.id) if current_game else None,
+        current_round=current_game.round_number if current_game else None,
+        has_last_game=last_game is not None,
+        last_game_number=game_number_by_id.get(last_game.id) if last_game else None,
+    )
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control")
+@admin_required
+def overlay_obs_control(tournament_id: int):
+    state = _build_obs_control_state(tournament_id)
+    if state is None:
+        abort(404)
+    return render_template("overlay/obs_control.html", tournament_id=tournament_id, state=state)
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/state")
+@admin_required
+def overlay_obs_control_state(tournament_id: int):
+    state = _build_obs_control_state(tournament_id)
+    if state is None:
+        abort(404)
+    return jsonify(state)
+
+
+def _obs_control_json_body() -> dict:
+    return request.get_json(silent=True) or {}
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/ticker", methods=["POST"])
+@admin_required
+def overlay_obs_control_toggle_ticker(tournament_id: int):
+    OverlayControlService.toggle_ticker(tournament_id)
+    return jsonify(_build_obs_control_state(tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/seats", methods=["POST"])
+@admin_required
+def overlay_obs_control_toggle_seats(tournament_id: int):
+    OverlayControlService.toggle_seats(tournament_id)
+    return jsonify(_build_obs_control_state(tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/standings", methods=["POST"])
+@admin_required
+def overlay_obs_control_set_standings_mode(tournament_id: int):
+    OverlayControlService.set_standings_mode(tournament_id, _obs_control_json_body().get("mode", "top5"))
+    return jsonify(_build_obs_control_state(tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/standings-scope", methods=["POST"])
+@admin_required
+def overlay_obs_control_set_standings_scope(tournament_id: int):
+    OverlayControlService.set_standings_scope(tournament_id, _obs_control_json_body().get("scope", "evening"))
+    return jsonify(_build_obs_control_state(tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/reveal", methods=["POST"])
+@admin_required
+def overlay_obs_control_set_reveal(tournament_id: int):
+    OverlayControlService.set_reveal_override(tournament_id, _obs_control_json_body().get("override") or None)
+    return jsonify(_build_obs_control_state(tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/idle-content", methods=["POST"])
+@admin_required
+def overlay_obs_control_set_idle_content(tournament_id: int):
+    OverlayControlService.set_idle_content(tournament_id, _obs_control_json_body().get("mode", "logo"))
+    return jsonify(_build_obs_control_state(tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/timer", methods=["POST"])
+@admin_required
+def overlay_obs_control_start_timer(tournament_id: int):
+    try:
+        minutes = float(_obs_control_json_body().get("minutes", 15))
+    except (TypeError, ValueError):
+        minutes = 15.0
+    BroadcastSceneService.start_timer(tournament_id, round(minutes * 60))
+    return jsonify(_build_obs_control_state(tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/set-active", methods=["POST"])
+@admin_required
+def overlay_obs_control_set_active(tournament_id: int):
+    db.session.get(Tournament, tournament_id) or abort(404)
+    ActiveBroadcastService.set_active_tournament_id(tournament_id)
+    return jsonify(_build_obs_control_state(tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/hide-all", methods=["POST"])
+@admin_required
+def overlay_obs_control_hide_all(tournament_id: int):
+    """Quick action — every viewer-facing panel off at once (ticker, seats,
+    standings, the last-game reveal) without touching idle_content or which
+    tournament is active. Just a convenience wrapper around the same
+    setters every button above already calls individually."""
+    control = OverlayControlService.get_control(tournament_id)
+    if control.show_ticker:
+        OverlayControlService.toggle_ticker(tournament_id)
+    if control.show_seats:
+        OverlayControlService.toggle_seats(tournament_id)
+    OverlayControlService.set_standings_mode(tournament_id, "hidden")
+    OverlayControlService.set_reveal_override(tournament_id, "off")
+    return jsonify(_build_obs_control_state(tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/reset", methods=["POST"])
+@admin_required
+def overlay_obs_control_reset(tournament_id: int):
+    """'Safe state' — the same values a brand-new OverlayControl row starts
+    with. The dock's own JS requires an explicit confirm before sending
+    this (see obs_control.html) since it undoes manual choices."""
+    control = OverlayControlService.get_control(tournament_id)
+    if not control.show_ticker:
+        OverlayControlService.toggle_ticker(tournament_id)
+    if not control.show_seats:
+        OverlayControlService.toggle_seats(tournament_id)
+    OverlayControlService.set_standings_mode(tournament_id, "top5")
+    OverlayControlService.set_reveal_override(tournament_id, None)
+    OverlayControlService.set_idle_content(tournament_id, "logo")
+    return jsonify(_build_obs_control_state(tournament_id))
