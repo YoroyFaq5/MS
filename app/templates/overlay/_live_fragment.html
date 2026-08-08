@@ -72,7 +72,7 @@
     <div class="ovl-broadcast-bar__left">
       <span class="ovl-live-badge"><span class="ovl-live-badge__dot" aria-hidden="true"></span>LIVE</span>
       {% if current_game %}
-      <span class="ovl-micro">Тур №{{ current_game_number }}{% if current_game.round_number %} · Раунд {{ '%02d'|format(current_game.round_number) }}{% endif %}</span>
+      <span class="ovl-tour-badge">Тур №{{ current_game_number }}{% if current_game.round_number %}<span class="ovl-tour-badge__round"> · Раунд {{ '%02d'|format(current_game.round_number) }}</span>{% endif %}</span>
       {% endif %}
     </div>
     <span class="ovl-micro">Mafia Style · Kazan Club</span>

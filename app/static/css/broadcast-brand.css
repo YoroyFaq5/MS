@@ -403,6 +403,38 @@
   50%      { opacity: 1; }
 }
 
+/* ── Tour badge — Live-Game's own chip next to LIVE ────────────────────
+   Used to be plain .ovl-micro text (technical-corner-label sized —
+   meant for things like the brand tag, not the one number a caster is
+   actually referencing on-air). A real chip instead: display-face
+   numerals at a size that reads at a glance, a red left edge (the same
+   "event" accent language as the rest of the brand) instead of a filled
+   background so it stays a supporting element next to LIVE, not a
+   second badge competing with it. */
+.ovl-tour-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .45rem;
+  padding: .3rem .8rem .3rem .65rem;
+  background: rgba(20,17,15,.55);
+  border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
+  border-left: 3px solid var(--ovl-signal, #E31E24);
+  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--ms-text, #F2F2F2);
+}
+.ovl-tour-badge__round {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: .74rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ms-muted, #8A8A8A);
+}
+
 /* ── Donation bar — Live scenes only ───────────────────────────────────
    Just a tag/label — deliberately NOT a fixed-size box to hold the
    widget. An earlier version reserved a fixed 460px glass "slot" next to
