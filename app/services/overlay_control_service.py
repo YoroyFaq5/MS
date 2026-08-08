@@ -78,3 +78,17 @@ class OverlayControlService:
         control.idle_content = mode
         db.session.commit()
         return control
+
+    @staticmethod
+    def set_pinned_game(tournament_id: int, game_id) -> OverlayControl:
+        """game_id=None unpins (back to "auto = most recently finished
+        game"). Deliberately no ownership/is_finished check here — the
+        callers only ever offer ids from THIS tournament's own finished-
+        games list, and even a stale/foreign id is harmless: the overlay
+        context builder (_build_live_context's hero_game resolution)
+        re-validates tournament_id/is_finished on every read and silently
+        falls back to auto if the pin doesn't check out."""
+        control = OverlayControlService.get_control(tournament_id)
+        control.pinned_game_id = game_id
+        db.session.commit()
+        return control

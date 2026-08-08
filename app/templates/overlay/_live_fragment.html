@@ -47,12 +47,26 @@
 {% set facts = ([mvp_fact] if mvp_fact else []) + secondary_facts %}
 
 {# Same reasoning — last-game callouts, moved up so the idle hero's
-   'last_game' mode can reuse them alongside the normal reveal panel. #}
+   'last_game' mode can reuse them alongside the normal reveal panel.
+   These stay tied to the TRUE last_game — SECTION 2's auto-popup-on-
+   finish reveal panel always shows the game that actually just
+   finished, never an admin-pinned one. #}
 {% set mvp = (last_slots | sort(attribute='total_score', reverse=true) | list | first) if last_slots else none %}
 {% set has_mvp = mvp and mvp.total_score > 0 %}
 {% set sheriff_slot = (last_slots | selectattr('role.value', 'equalto', 'sheriff') | list | first) if last_slots else none %}
 {% set don_slot = (last_slots | selectattr('role.value', 'equalto', 'don') | list | first) if last_slots else none %}
 {% set win = last_game.win_side.value if last_game else none %}
+
+{# The idle-hero's own 'last_game' slot uses hero_game/hero_slots instead
+   — last_game unless the admin pinned a specific past tour (see
+   OverlayControlService.set_pinned_game / hero_game in overlay.py's
+   _build_live_context). Same shape, computed the same way, just off a
+   possibly-different game. #}
+{% set hero_mvp = (hero_slots | sort(attribute='total_score', reverse=true) | list | first) if hero_slots else none %}
+{% set hero_has_mvp = hero_mvp and hero_mvp.total_score > 0 %}
+{% set hero_sheriff_slot = (hero_slots | selectattr('role.value', 'equalto', 'sheriff') | list | first) if hero_slots else none %}
+{% set hero_don_slot = (hero_slots | selectattr('role.value', 'equalto', 'don') | list | first) if hero_slots else none %}
+{% set hero_win = hero_game.win_side.value if hero_game else none %}
 
 <div class="overlay-fragment" data-sig="{{ sig }}" data-last-finished-id="{{ last_game.id if last_game else '' }}" data-ctl="{{ ctl_sig }}">
 
@@ -220,39 +234,42 @@
         </div>
         {% endif %}
 
-        {% if last_game %}
+        {% if hero_game %}
         <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'last_game' else '' }}" data-idle-slot="last_game">
           {# Structurally the same information as the site's own match card
              (games/_match_card.html) — winner, MVP/Шериф/Дон, full seat list
              with roles — just drawn in this panel's typographic system
-             instead of that component's rounded/gold-token markup. #}
-          <div class="ovl-label">Тур №{{ last_game_number }}</div>
-          <h2 class="ovl-info-headline ovl-info-headline--{{ win }}">
-            {% if win == 'city' %}Победа города
-            {% elif win == 'mafia' %}Победа мафии
+             instead of that component's rounded/gold-token markup.
+             hero_game is last_game unless the admin pinned a specific past
+             tour (see the "pin a tour" picker on /control and the OBS
+             dock) — everything below just follows whichever one that is. #}
+          <div class="ovl-label">Тур №{{ hero_game_number }}{{ ' · закреплено' if control.pinned_game_id else '' }}</div>
+          <h2 class="ovl-info-headline ovl-info-headline--{{ hero_win }}">
+            {% if hero_win == 'city' %}Победа города
+            {% elif hero_win == 'mafia' %}Победа мафии
             {% else %}Ничья{% endif %}
           </h2>
           <div class="ovl-info-rule"></div>
-          {% if has_mvp %}
+          {% if hero_has_mvp %}
           <div class="ovl-info-feature">
             <span class="ovl-label">MVP</span>
-            <span class="ovl-info-feature__value ovl-display">{{ mvp.total_score|round(2) }}</span>
-            <span class="ovl-info-feature__name">{{ player_name(mvp.player, equipped_bulk.get(mvp.player_id, {})) if mvp.player else '?' }}</span>
+            <span class="ovl-info-feature__value ovl-display">{{ hero_mvp.total_score|round(2) }}</span>
+            <span class="ovl-info-feature__name">{{ player_name(hero_mvp.player, equipped_bulk.get(hero_mvp.player_id, {})) if hero_mvp.player else '?' }}</span>
           </div>
           {% endif %}
-          {% if sheriff_slot or don_slot %}
+          {% if hero_sheriff_slot or hero_don_slot %}
           <div class="ovl-info-subrow">
-            {% if don_slot %}
-            <span class="ovl-info-subrow__item"><span class="ovl-info-subrow__label reveal-card__role--don">Дон</span> {{ player_name(don_slot.player, equipped_bulk.get(don_slot.player_id, {})) if don_slot.player else '?' }}</span>
+            {% if hero_don_slot %}
+            <span class="ovl-info-subrow__item"><span class="ovl-info-subrow__label reveal-card__role--don">Дон</span> {{ player_name(hero_don_slot.player, equipped_bulk.get(hero_don_slot.player_id, {})) if hero_don_slot.player else '?' }}</span>
             {% endif %}
-            {% if sheriff_slot %}
-            <span class="ovl-info-subrow__item"><span class="ovl-info-subrow__label reveal-card__role--sheriff">Шериф</span> {{ player_name(sheriff_slot.player, equipped_bulk.get(sheriff_slot.player_id, {})) if sheriff_slot.player else '?' }}</span>
+            {% if hero_sheriff_slot %}
+            <span class="ovl-info-subrow__item"><span class="ovl-info-subrow__label reveal-card__role--sheriff">Шериф</span> {{ player_name(hero_sheriff_slot.player, equipped_bulk.get(hero_sheriff_slot.player_id, {})) if hero_sheriff_slot.player else '?' }}</span>
             {% endif %}
           </div>
           {% endif %}
           <div class="ovl-info-rule ovl-info-rule--sm"></div>
           <div class="ovl-info-list">
-            {% for slot in last_slots %}
+            {% for slot in hero_slots %}
             <div class="ovl-info-row ovl-info-row--seat" style="--d:{{ loop.index0 * 40 }}ms">
               <span class="ovl-info-row__rank">{{ slot.seat_number }}</span>
               <span class="ovl-info-row__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) if slot.player else '?' }}</span>

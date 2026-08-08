@@ -180,6 +180,18 @@ body {
   font-weight: 500;
 }
 
+.dock-select {
+  width: 100%;
+  min-height: 40px;
+  padding: .4rem .5rem;
+  background: var(--dock-surface);
+  border: 1px solid var(--dock-border);
+  color: var(--dock-text);
+  font-family: inherit;
+  font-size: .8rem;
+}
+.dock-select:disabled { opacity: .45; }
+
 .dock-btn--on {
   background: var(--dock-green-dim);
   border-color: var(--dock-green);

@@ -66,6 +66,14 @@
           <button type="button" class="dock-btn" data-idle="last_game">Прошлая игра<span class="dock-btn__key">3</span></button>
           <button type="button" class="dock-btn" data-idle="ticker">Интересные факты<span class="dock-btn__key">4</span></button>
         </div>
+        {# "Прошлая игра" defaults to always following the most recently
+           finished game — this pins it to a specific past tour instead.
+           Options are filled in by JS from polled state.finished_games
+           (a static server-rendered list would go stale the moment
+           another game finishes while the dock stays open). #}
+        <select id="dock-pinned-game" class="dock-select" style="margin-top:.5rem;">
+          <option value="">Прошлая игра: авто (последняя)</option>
+        </select>
       </div>
 
       <div class="dock-section">

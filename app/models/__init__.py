@@ -217,6 +217,20 @@ class OverlayControl(db.Model):
     # panels during actual gameplay, this is a separate, bigger, centered
     # presentation for the commentators-layout hero (see layout_mode below).
     idle_content = Column(String(10), default="logo", nullable=False)
+    # Pins the idle-hero's "last_game" slot to a SPECIFIC finished game
+    # (any past tour, admin-picked) instead of always auto-following
+    # whichever game most recently finished. NULL (the default) means
+    # "auto" — keeps today's behavior unchanged. Deliberately no FK
+    # ondelete=CASCADE-driven cleanup dependency here in code: see
+    # _build_live_context's hero_game resolution, which already falls
+    # back to the real last_game whenever this points at a game that's
+    # missing/unfinished/from a different tournament, so a stale value
+    # here is always harmless rather than something that needs active
+    # cleanup. Only affects the idle-hero slot — the auto-popup reveal
+    # panel on Live-Game always shows the TRUE last finished game.
+    pinned_game_id = Column(
+        Integer, ForeignKey("games.id", ondelete="SET NULL"), nullable=True
+    )
     # Admin-picked, NOT auto-derived from current_game: "commentators" shows
     # the idle hero (cam/chat placeholder frames + the switchable idle_content
     # center panel) and hides the seat strip entirely; "game" shows the plain
@@ -242,6 +256,7 @@ class OverlayControl(db.Model):
             "standings_scope": self.standings_scope,
             "reveal_override": self.reveal_override,
             "idle_content": self.idle_content,
+            "pinned_game_id": self.pinned_game_id,
             "layout_mode": self.layout_mode,
             "updated_at": self.updated_at.isoformat(),
         }

@@ -46,7 +46,7 @@ from app.auth_decorators import admin_required
 overlay_bp = Blueprint("overlay", __name__)
 
 
-def _build_sig(tournament: Tournament, current_game, last_game, standings_scope: str) -> str:
+def _build_sig(tournament: Tournament, current_game, last_game, standings_scope: str, pinned_game_id=None) -> str:
     """Cheap change-detection string for the client poller — not a hash,
     never shown to viewers. A new finished game always changes this sig,
     so 'DOM replaced' and 'a game just finished' are the same poll cycle
@@ -57,14 +57,18 @@ def _build_sig(tournament: Tournament, current_game, last_game, standings_scope:
     deliberate admin decision, not something toggled every few seconds
     like standings_mode, so a full redraw on change is an acceptable
     trade-off for not having to keep 2x the standings markup in the DOM
-    at all times."""
+    at all times. pinned_game_id needs the same full-redraw treatment as
+    cg/lg (not a ctl_sig class-toggle) — the idle-hero's last_game slot's
+    actual CONTENT (names/roles/scores) changes, not just which slot is
+    visible, so overlay.js needs to replace the fragment's DOM, same as
+    when a new game genuinely finishes."""
     if current_game:
         seat_pids = tuple(s.player_id for s in sorted(current_game.slots, key=lambda s: s.seat_number))
         cg_part = f"{current_game.id}:{seat_pids}"
     else:
         cg_part = "none"
     lg_part = str(last_game.id) if last_game else "none"
-    return f"cg={cg_part}|lg={lg_part}|hs={int(tournament.hide_standings)}|sc={standings_scope}"
+    return f"cg={cg_part}|lg={lg_part}|pg={pinned_game_id or 0}|hs={int(tournament.hide_standings)}|sc={standings_scope}"
 
 
 def _build_ctl_sig(control, effective_idle_content: str) -> str:
@@ -83,6 +87,19 @@ def _build_ctl_sig(control, effective_idle_content: str) -> str:
         f"|sm={control.standings_mode}|rv={control.reveal_override or 'auto'}"
         f"|ic={effective_idle_content}"
     )
+
+
+def _finished_games_list(tournament: Tournament) -> list:
+    """Newest-first {id, number, round_number} dicts for this tournament's
+    finished games — same "Тур №N" ordinal as everywhere else (see
+    _build_live_context's game_number_by_id). Backs the "pin a specific
+    tour" picker on both /control and the OBS dock."""
+    game_number_by_id = {g.id: i + 1 for i, g in enumerate(sorted(tournament.games, key=lambda g: g.id))}
+    return [
+        {"id": g.id, "number": game_number_by_id[g.id], "round_number": g.round_number}
+        for g in sorted(tournament.games, key=lambda g: g.id, reverse=True)
+        if g.is_finished
+    ]
 
 
 def _resolve_series_context(tournament_id: int, current_game, last_game):
@@ -172,6 +189,26 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
     control = OverlayControlService.get_control(tournament_id)
     series_tournament, current_series = _resolve_series_context(tournament_id, current_game, last_game)
 
+    # Admin can pin ANY finished game (not just the auto "most recent") to
+    # show in the idle-hero's last_game slot — see
+    # OverlayControlService.set_pinned_game. Falls back to last_game/
+    # last_slots when nothing's pinned, or the pinned game got deleted, or
+    # belongs to a different tournament. SECTION 2's auto-reveal-on-finish
+    # panel in the template always uses the real last_game/last_slots
+    # above, untouched by this — pinning only affects the idle-hero slot
+    # on Live-Commentators.
+    pinned_game = (
+        db.session.query(Game)
+        .filter(Game.id == control.pinned_game_id, Game.tournament_id == tournament_id, Game.is_finished == True)
+        .first()
+        if control.pinned_game_id else None
+    )
+    hero_game = pinned_game or last_game
+    hero_slots = sorted(hero_game.slots, key=lambda s: s.seat_number) if hero_game else []
+    hero_game_number = game_number_by_id.get(hero_game.id) if hero_game else None
+
+    finished_games = _finished_games_list(tournament)
+
     # ── Privacy gate ─────────────────────────────────────────────────────
     # Deliberately does NOT call tournaments._can_view_standings /
     # _is_tournament_participant — those let a non-participant ADMIN see
@@ -222,6 +259,7 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
     all_player_ids = (
         {s.player_id for s in current_slots}
         | {s.player_id for s in last_slots}
+        | {s.player_id for s in hero_slots}
         | {r.player_id for r in full_ratings}
     )
     equipped_bulk = ShopService.get_equipped_bulk(list(all_player_ids))
@@ -237,7 +275,7 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
     effective_idle_content = control.idle_content
     if effective_idle_content == "standings" and not (can_show_standings and full_ratings):
         effective_idle_content = "logo"
-    elif effective_idle_content == "last_game" and not last_game:
+    elif effective_idle_content == "last_game" and not hero_game:
         effective_idle_content = "logo"
     elif effective_idle_content == "ticker" and not has_facts:
         effective_idle_content = "logo"
@@ -248,6 +286,8 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
         current_game_number=current_game_number,
         last_game=last_game, last_slots=last_slots,
         last_game_number=last_game_number,
+        hero_game=hero_game, hero_slots=hero_slots, hero_game_number=hero_game_number,
+        finished_games=finished_games,
         equipped_bulk=equipped_bulk, ratings_by_pid=ratings_by_pid,
         superlatives=superlatives,
         hot_streak_rating=hot_streak_rating, hot_streak_count=hot_streak_count,
@@ -255,7 +295,7 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
         full_ratings=full_ratings, standings_title=standings_title,
         control=control,
         effective_idle_content=effective_idle_content,
-        sig=_build_sig(tournament, current_game, last_game, standings_scope),
+        sig=_build_sig(tournament, current_game, last_game, standings_scope, control.pinned_game_id),
         ctl_sig=_build_ctl_sig(control, effective_idle_content),
     )
 
@@ -416,6 +456,7 @@ def overlay_control(tournament_id: int):
         control=control,
         series_tournament=series_tournament,
         is_active_broadcast=is_active_broadcast,
+        finished_games=_finished_games_list(tournament),
     )
 
 
@@ -484,6 +525,18 @@ def overlay_set_idle_content(tournament_id: int):
     return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
 
 
+@overlay_bp.route("/<int:tournament_id>/control/pinned-game", methods=["POST"])
+@admin_required
+def overlay_set_pinned_game(tournament_id: int):
+    game_id = request.form.get("game_id", type=int)  # absent/empty -> None -> unpin (auto)
+    control = OverlayControlService.set_pinned_game(tournament_id, game_id)
+    if control.pinned_game_id:
+        flash("В панели «Прошлая игра» (Live — Комментаторы) закреплён выбранный тур.", "success")
+    else:
+        flash("Панель «Прошлая игра» снова показывает последнюю завершённую игру автоматически.", "success")
+    return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
+
+
 @overlay_bp.route("/<int:tournament_id>/control/timer", methods=["POST"])
 @admin_required
 def overlay_start_timer(tournament_id: int):
@@ -542,6 +595,8 @@ def _build_obs_control_state(tournament_id: int):
     # keeps the number shown on the dock consistent with what's on stream.
     game_number_by_id = {g.id: i + 1 for i, g in enumerate(sorted(tournament.games, key=lambda g: g.id))}
 
+    finished_games = _finished_games_list(tournament)
+
     return dict(
         tournament_id=tournament.id,
         tournament_name=tournament.name,
@@ -553,6 +608,8 @@ def _build_obs_control_state(tournament_id: int):
         standings_scope=control.standings_scope,
         reveal_override=control.reveal_override,
         idle_content=control.idle_content,
+        pinned_game_id=control.pinned_game_id,
+        finished_games=finished_games,
         hide_standings=tournament.hide_standings,
         timer_duration=timer_state["timer_duration"],
         timer_started_at=timer_state["timer_started_at"],
@@ -708,6 +765,20 @@ def overlay_obs_control_set_idle_content(tournament_id):
     return jsonify(state)
 
 
+@overlay_bp.route("/<int:tournament_id>/obs-control/pinned-game", methods=["POST"])
+@overlay_bp.route("/current/obs-control/pinned-game", methods=["POST"], defaults={"tournament_id": None})
+@admin_required
+def overlay_obs_control_set_pinned_game(tournament_id):
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    game_id = _obs_control_json_body().get("game_id")  # None/absent -> unpin (auto)
+    OverlayControlService.set_pinned_game(resolved_id, int(game_id) if game_id else None)
+    state = _build_obs_control_state(resolved_id)
+    state["active"] = True
+    return jsonify(state)
+
+
 @overlay_bp.route("/<int:tournament_id>/obs-control/timer", methods=["POST"])
 @overlay_bp.route("/current/obs-control/timer", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
@@ -783,6 +854,7 @@ def overlay_obs_control_reset(tournament_id):
     OverlayControlService.set_standings_mode(resolved_id, "top5")
     OverlayControlService.set_reveal_override(resolved_id, None)
     OverlayControlService.set_idle_content(resolved_id, "logo")
+    OverlayControlService.set_pinned_game(resolved_id, None)
     state = _build_obs_control_state(resolved_id)
     state["active"] = True
     return jsonify(state)

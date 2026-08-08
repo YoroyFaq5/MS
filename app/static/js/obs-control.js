@@ -26,6 +26,7 @@
   const scopeSection = document.getElementById('dock-scope-section');
   const hideStandingsHint = document.getElementById('dock-hide-standings-hint');
   const idleButtons = Array.from(document.querySelectorAll('#dock-idle-content [data-idle]'));
+  const pinnedGameSelect = document.getElementById('dock-pinned-game');
   const seatsBtn = document.getElementById('dock-seats');
   const tickerBtn = document.getElementById('dock-ticker');
   const standingsButtons = Array.from(document.querySelectorAll('#dock-standings-mode [data-mode]'));
@@ -111,6 +112,7 @@
     }
 
     idleButtons.forEach((btn) => btn.classList.toggle('dock-btn--active', btn.dataset.idle === state.idle_content));
+    paintPinnedGame(state);
 
     paintToggle(seatsBtn, state.show_seats);
     paintToggle(tickerBtn, state.show_ticker);
@@ -125,6 +127,33 @@
     hideStandingsHint.hidden = !state.hide_standings;
 
     paintTimer(state);
+  }
+
+  // Rebuilds the <option>s from polled state every time (not just once at
+  // load) — the list of finished games grows through the broadcast, and a
+  // dock left open all night needs to keep offering newly-finished tours
+  // without a page reload. Only touches the DOM when the actual set of
+  // games or the selection changed, so a mid-broadcast poll doesn't yank
+  // an open dropdown out from under the admin's cursor.
+  let lastPinnedOptionsKey = null;
+  function paintPinnedGame(state) {
+    if (!pinnedGameSelect) return;
+    const key = JSON.stringify(state.finished_games) + '|' + state.pinned_game_id;
+    if (key === lastPinnedOptionsKey) return;
+    lastPinnedOptionsKey = key;
+
+    pinnedGameSelect.innerHTML = '';
+    const autoOpt = document.createElement('option');
+    autoOpt.value = '';
+    autoOpt.textContent = 'Прошлая игра: авто (последняя)';
+    pinnedGameSelect.appendChild(autoOpt);
+    (state.finished_games || []).forEach((g) => {
+      const opt = document.createElement('option');
+      opt.value = String(g.id);
+      opt.textContent = `Тур №${g.number}` + (g.round_number ? ` (Раунд ${g.round_number})` : '');
+      pinnedGameSelect.appendChild(opt);
+    });
+    pinnedGameSelect.value = state.pinned_game_id ? String(state.pinned_game_id) : '';
   }
 
   function paintToggle(btn, isOn) {
@@ -188,6 +217,11 @@
   }
 
   idleButtons.forEach((btn) => btn.addEventListener('click', () => act('/idle-content', { mode: btn.dataset.idle })));
+  if (pinnedGameSelect) {
+    pinnedGameSelect.addEventListener('change', () => {
+      act('/pinned-game', { game_id: pinnedGameSelect.value || null });
+    });
+  }
   if (seatsBtn) seatsBtn.addEventListener('click', () => act('/seats', {}));
   if (tickerBtn) tickerBtn.addEventListener('click', () => act('/ticker', {}));
   standingsButtons.forEach((btn) => btn.addEventListener('click', () => act('/standings', { mode: btn.dataset.mode })));
