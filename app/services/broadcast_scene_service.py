@@ -1,18 +1,17 @@
 """
 BroadcastSceneService
 ======================
-Which full-screen broadcast scene (Starting Soon / Live / BRB / Ending) is
-currently showing on /overlay/<tournament_id>, plus the Starting Soon
-countdown. Deliberately stored as a small per-tournament JSON file under
-the Flask instance folder (already gitignored, already used for local
-runtime state) — NOT a DB column, and NOT a plain in-memory dict:
+The Starting Soon countdown timer for /overlay/<tournament_id>/starting-soon.
+Deliberately stored as a small per-tournament JSON file under the Flask
+instance folder (already gitignored, already used for local runtime state)
+— NOT a DB column, and NOT a plain in-memory dict:
 
   - not a DB column: the project has no real Alembic migration history yet
-    (migrations/versions/ is empty — see README.md "Разработка" and
-    deploy.sh) so an ALTER TABLE here would need either a hand-rolled
-    one-off script run manually against the live DB, or a first-ever
-    `flask db migrate` autogenerate with no prior baseline — neither is
-    something to do blind without DB access.
+    (migrations/versions/ is empty — see README.md "Разработка") so an
+    ALTER TABLE here would need either a hand-rolled one-off script run
+    manually against the live DB, or a first-ever `flask db migrate`
+    autogenerate with no prior baseline — neither is something to do blind
+    without DB access.
   - not a plain module-level dict: production runs multiple Gunicorn/uWSGI
     worker processes, each with its own memory — an admin's click landing
     on worker A would be invisible to a viewer's poll landing on worker B.
@@ -22,10 +21,12 @@ Each tournament gets its OWN file (not one shared file for all tournaments)
 specifically so two different broadcasts being controlled at the same time
 can't clobber each other's state via a stale read-modify-write. Writes are
 atomic (write to a temp file, then os.replace()) so a poll never reads a
-half-written file; a race between two admins clicking the SAME tournament's
-buttons at the same instant is still possible (last write wins) but that's
-an acceptable, low-stakes trade-off for "which scene is live right now" —
-the same trade-off any naive unlocked update would have.
+half-written file.
+
+Note: which broadcast SCENE is showing (Starting Soon/Live/BRB/Ending) used
+to live in this same file, but each scene is now its own Browser Source URL
+in OBS (see app/routes/overlay.py's module docstring) — OBS itself is the
+source of truth for that, so this service only tracks the timer.
 """
 import json
 import os
@@ -34,12 +35,11 @@ from pathlib import Path
 
 from flask import current_app
 
-SCENES = ("starting_soon", "live", "brb", "ending")
 DEFAULT_TIMER_SECONDS = 900
 
 
 def _default_state() -> dict:
-    return {"scene": "live", "timer_duration": DEFAULT_TIMER_SECONDS, "timer_started_at": None}
+    return {"timer_duration": DEFAULT_TIMER_SECONDS, "timer_started_at": None}
 
 
 def _state_dir() -> Path:
@@ -72,15 +72,6 @@ class BroadcastSceneService:
     @staticmethod
     def get(tournament_id: int) -> dict:
         return _load(tournament_id)
-
-    @staticmethod
-    def set_scene(tournament_id: int, scene: str) -> dict:
-        if scene not in SCENES:
-            scene = "live"
-        state = _load(tournament_id)
-        state["scene"] = scene
-        _save(tournament_id, state)
-        return state
 
     @staticmethod
     def start_timer(tournament_id: int, duration_seconds: int) -> dict:

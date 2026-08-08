@@ -50,14 +50,6 @@
 
 <div class="overlay-fragment" data-sig="{{ sig }}" data-last-finished-id="{{ last_game.id if last_game else '' }}" data-ctl="{{ ctl_sig }}">
 
-  {# ── Live scene: everything that already existed before broadcast scenes
-     were added — seat strip, reveal, ticker, standings. Wrapped so it can
-     be hidden as a unit when the caster switches to Starting Soon/BRB/
-     Ending (see .ms-scene in broadcast-scenes.css / setActive in
-     broadcast-scenes.js). Untouched internally — every selector inside
-     still resolves the same way, just one level deeper. #}
-  <div class="ms-scene ms-scene--live {{ 'is-active' if broadcast_state.scene == 'live' else '' }}" data-scene-panel="live">
-
   <!-- Full-viewport flash burst for the results reveal (Totem-of-Undying
        style impact) — always present, empty, purely CSS-animated when
        overlay.js adds .reveal-active to this same root element. Three
@@ -80,15 +72,14 @@
        "residual energy" for as long as the results stay on screen. -->
   <div class="ovl-embers" aria-hidden="true"></div>
 
-  <!-- SECTION 1: seat strip (bottom bar) — only in "game" layout_mode
-       (admin-picked, see control.html — NOT derived from current_game;
-       "commentators" mode below hides this entirely regardless of
-       whether a game is actually running). Current in-progress game
-       only when there is one. Roles are intentionally never rendered
-       here: current_game is always is_finished=False by the query in
-       overlay.py, so there's nothing to accidentally leak while the
-       game is still being played. -->
-  {% if control.layout_mode == 'game' %}
+  <!-- SECTION 1: seat strip (bottom bar) — only on the Live-Game page
+       (layout_mode, passed in by the route — see app/routes/overlay.py;
+       Live-Commentators is now a separate URL/page entirely, see the
+       idle-hero block below). Current in-progress game only when there is
+       one. Roles are intentionally never rendered here: current_game is
+       always is_finished=False by the query in overlay.py, so there's
+       nothing to accidentally leak while the game is still being played. -->
+  {% if layout_mode == 'game' %}
   {% if current_game %}
   <div class="overlay-seat-strip {{ '' if control.show_seats else 'is-hidden' }}">
     <div class="overlay-seat-strip__ignite" aria-hidden="true"></div>
@@ -114,18 +105,17 @@
   {% endif %}
   {% endif %}
 
-  <!-- IDLE HERO: only in "commentators" layout_mode (admin-picked,
-       independent of whether a game is currently running) — reserves
-       screen space for the caster's own webcam (left) and Twitch chat
-       (right; both are separate OBS Browser/Video Capture Sources
-       positioned to match these frames, not rendered by this page) and
-       shows one of several things in the middle, switched from the
-       control page (control.idle_content): the tournament logo
-       (default), the full standings, the last game's results, or the
-       ticker's facts — all reusing the exact same markup/classes as
-       their "normal" corner/reveal-panel counterparts so they inherit
-       that styling for free. -->
-  {% if control.layout_mode == 'commentators' %}
+  <!-- IDLE HERO: only on the Live-Commentators page (layout_mode passed in
+       by the route, independent of whether a game is currently running) —
+       reserves screen space for the caster's own webcam (left) and Twitch
+       chat (right; both are separate native OBS sources positioned to
+       match these frames, not rendered by this page) and shows one of
+       several things in the middle, switched from the control page
+       (control.idle_content): the tournament logo (default), the full
+       standings, the last game's results, or the ticker's facts — all
+       reusing the exact same markup/classes as their "normal" corner/
+       reveal-panel counterparts so they inherit that styling for free. -->
+  {% if layout_mode == 'commentators' %}
   <div class="overlay-idle-hero">
     <div class="overlay-idle-hero__cam" aria-hidden="false">
       <span class="overlay-idle-hero__slot-icon" aria-hidden="true">🎙️</span>
@@ -138,13 +128,11 @@
          toggles this via ctl_sig (data-ctl's `ic=` field) on every poll,
          same mechanism as show_ticker/standings_mode, so switching which
          one is visible is a CSS opacity crossfade instead of the full
-         page replace a data-sig change would cause (that used to make
-         the whole page visibly flash on every click in the control
-         panel). -->
+         page replace a data-sig change would cause. -->
     <div class="overlay-idle-hero__center">
       <div class="overlay-idle-hero__slot {{ 'is-active' if effective_idle_content == 'logo' else '' }}" data-idle-slot="logo">
         <div class="overlay-idle-hero__logo">
-          <img src="{{ url_for('static', filename='img/MS_1_.png') }}" alt="Mafia Style" class="overlay-idle-hero__logo-img">
+          <img src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="Mafia Style" class="overlay-idle-hero__logo-img">
         </div>
         <h1 class="overlay-idle-hero__wordmark">MAFIA STYLE</h1>
         <p class="overlay-idle-hero__tagline">{{ tournament.name }}</p>
@@ -315,64 +303,5 @@
     </table>
   </div>
   {% endif %}
-
-  </div>
-  {# ── /Live scene ── #}
-
-  {# ── Starting Soon: pre-game waiting scene — aurora canvas, glass panel,
-     3D logo, countdown, socials. Timer state comes from BroadcastSceneService
-     (in-memory, see that module) via data-timer-*; broadcast-scenes.js reads
-     them once on init()/DOM-swap and free-runs the countdown client-side
-     between polls (no per-second server round-trip). #}
-  <div class="ms-scene ms-scene--starting-soon {{ 'is-active' if broadcast_state.scene == 'starting_soon' else '' }}"
-       data-scene-panel="starting_soon"
-       data-timer-duration="{{ broadcast_state.timer_duration }}"
-       data-timer-started-at="{{ broadcast_state.timer_started_at or '' }}">
-    <canvas class="bc-aurora" data-aurora-canvas aria-hidden="true"></canvas>
-    <div class="bc-vignette" aria-hidden="true"></div>
-    <div class="bc-scene-content">
-      <div class="bc-panel">
-        <div class="bc-logo-3d">
-          <img class="bc-logo-3d__mark" src="{{ url_for('static', filename='img/MS_1_.png') }}" alt="Mafia Style">
-          <div class="bc-logo-3d__sheen" aria-hidden="true"></div>
-        </div>
-        <h1 class="bc-wordmark">MAFIA STYLE</h1>
-        <p class="bc-tagline">{{ tournament.name }}</p>
-        <div class="bc-timer">
-          <span class="bc-timer__label">до начала эфира</span>
-          <span class="bc-timer__value tabular" data-timer-value>00:00</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {# ── BRB: calmest scene, near-static aurora, occasional light sweep. #}
-  <div class="ms-scene ms-scene--brb {{ 'is-active' if broadcast_state.scene == 'brb' else '' }}" data-scene-panel="brb">
-    <canvas class="bc-aurora" data-aurora-canvas aria-hidden="true"></canvas>
-    <div class="bc-vignette" aria-hidden="true"></div>
-    <div class="bc-sweep" aria-hidden="true"></div>
-    <div class="bc-scene-content">
-      <div class="bc-logo-3d bc-logo-3d--small">
-        <img class="bc-logo-3d__mark" src="{{ url_for('static', filename='img/MS_1_.png') }}" alt="Mafia Style">
-        <div class="bc-logo-3d__sheen" aria-hidden="true"></div>
-      </div>
-      <h1 class="bc-wordmark bc-wordmark--glow">Скоро вернёмся</h1>
-      <p class="bc-tagline">Небольшой перерыв — эфир продолжится через пару минут</p>
-    </div>
-  </div>
-
-  {# ── Ending: thanks for watching, socials. #}
-  <div class="ms-scene ms-scene--ending {{ 'is-active' if broadcast_state.scene == 'ending' else '' }}" data-scene-panel="ending">
-    <canvas class="bc-aurora" data-aurora-canvas aria-hidden="true"></canvas>
-    <div class="bc-vignette" aria-hidden="true"></div>
-    <div class="bc-scene-content">
-      <div class="bc-logo-3d">
-        <img class="bc-logo-3d__mark" src="{{ url_for('static', filename='img/MS_1_.png') }}" alt="Mafia Style">
-        <div class="bc-logo-3d__sheen" aria-hidden="true"></div>
-      </div>
-      <h1 class="bc-wordmark">Спасибо за просмотр</h1>
-      <p class="bc-tagline">До встречи на следующей игре</p>
-    </div>
-  </div>
 
 </div>

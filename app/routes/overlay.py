@@ -1,12 +1,17 @@
 """
 Overlay Blueprint
 =================
-Public, unauthenticated stream-overlay page for OBS Browser Source —
-one URL per tournament (`/overlay/<tournament_id>`) showing the current
-game's seat strip, an animated last-game-results reveal, a rotating
-stats ticker and (privacy-gated) a mini standings table. No session/auth
-in practice (OBS loads it cold), so both routes are intentionally public,
-same precedent as `games.api_game`.
+Public, unauthenticated stream-overlay pages for OBS Browser Source — one
+Flask route per broadcast scene (Live-Game, Live-Commentators, Starting
+Soon, BRB, Ending), each meant to be added as its OWN Browser Source in
+OBS. Scene switching itself (and turning native sources like a webcam
+capture on/off) happens in OBS, not on this page — these routes only
+decide what to render for whichever scene's URL is currently open, plus a
+`/fragment` poll endpoint per "live" scene so admin-controlled panel
+visibility (ticker/standings/seats/idle-content) updates without OBS
+having to reload the Browser Source. No session/auth in practice (OBS
+loads it cold), so all scene routes are intentionally public, same
+precedent as `games.api_game`.
 
 Also hosts the admin-only control page (`/overlay/<id>/control` +
 its POST actions) that lets an admin/caster show or hide the ticker,
@@ -30,7 +35,7 @@ from app.auth_decorators import admin_required
 overlay_bp = Blueprint("overlay", __name__)
 
 
-def _build_sig(tournament: Tournament, current_game, last_game, standings_scope: str, layout_mode: str) -> str:
+def _build_sig(tournament: Tournament, current_game, last_game, standings_scope: str) -> str:
     """Cheap change-detection string for the client poller — not a hash,
     never shown to viewers. A new finished game always changes this sig,
     so 'DOM replaced' and 'a game just finished' are the same poll cycle
@@ -41,43 +46,31 @@ def _build_sig(tournament: Tournament, current_game, last_game, standings_scope:
     deliberate admin decision, not something toggled every few seconds
     like standings_mode, so a full redraw on change is an acceptable
     trade-off for not having to keep 2x the standings markup in the DOM
-    at all times. layout_mode (commentators/game — which of those two
-    structurally different layouts is shown at all, admin-picked rather
-    than derived from current_game) is the same kind of rare admin
-    decision, so it's folded in here too. idle_content is deliberately
-    NOT here (see _build_ctl_sig) — switching it is common enough while
-    casting that a full DOM replace on every change was visibly janky
-    (the whole page flashed), so it gets the same class-toggle treatment
-    as ticker/standings-mode instead."""
+    at all times."""
     if current_game:
         seat_pids = tuple(s.player_id for s in sorted(current_game.slots, key=lambda s: s.seat_number))
         cg_part = f"{current_game.id}:{seat_pids}"
     else:
         cg_part = "none"
     lg_part = str(last_game.id) if last_game else "none"
-    return f"cg={cg_part}|lg={lg_part}|hs={int(tournament.hide_standings)}|sc={standings_scope}|lm={layout_mode}"
+    return f"cg={cg_part}|lg={lg_part}|hs={int(tournament.hide_standings)}|sc={standings_scope}"
 
 
-def _build_ctl_sig(control, broadcast_state: dict, effective_idle_content: str) -> str:
+def _build_ctl_sig(control, effective_idle_content: str) -> str:
     """Separate, small change-detection string for admin-controlled panel
     visibility — deliberately NOT folded into `_build_sig()`. That sig
     drives a full DOM replace in overlay.js; this one is diffed on its own
     and applied as a class toggle on the already-existing panel elements,
     so show/hide animates instead of snapping on every unrelated poll.
-    sc/td/ts (scene, timer duration, timer started-at) come from
-    BroadcastSceneService, not OverlayControl — see that module for why
-    they're in-memory rather than a DB column. effective_idle_content is
-    control.idle_content with the same data-availability fallback to
-    'logo' the template itself uses (see _build_overlay_context) — all
-    four idle-hero center variants are always in the DOM (like the
-    ticker/standings panels), this just says which one currently has
-    the .is-active class."""
-    started_at = broadcast_state["timer_started_at"]
+    effective_idle_content is control.idle_content with the same
+    data-availability fallback to 'logo' the template itself uses (see
+    _build_live_context) — only meaningful on the Live-Commentators page,
+    but harmless to always include (the Live-Game page simply has no
+    [data-idle-slot] elements for it to match against)."""
     return (
         f"tk={int(control.show_ticker)}|sh={int(control.show_seats)}"
         f"|sm={control.standings_mode}|rv={control.reveal_override or 'auto'}"
-        f"|sc={broadcast_state['scene']}|td={broadcast_state['timer_duration']}"
-        f"|ts={started_at if started_at else 0}|ic={effective_idle_content}"
+        f"|ic={effective_idle_content}"
     )
 
 
@@ -105,7 +98,13 @@ def _resolve_series_context(tournament_id: int, current_game, last_game):
     return series_tournament, current_series
 
 
-def _build_overlay_context(tournament_id: int) -> dict:
+def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
+    """Shared context for the Live-Game and Live-Commentators pages —
+    `layout_mode` ("game"/"commentators") picks which of those two this
+    call is for. It's a plain call argument rather than an admin-editable
+    DB field: since the two layouts are now separate Browser Source URLs
+    (see module docstring), which one is showing is simply "which URL is
+    open in OBS", not something to also track server-side."""
     tournament = db.session.get(Tournament, tournament_id) or abort(404)
 
     current_game = (
@@ -149,7 +148,6 @@ def _build_overlay_context(tournament_id: int) -> dict:
             hot_streak_rating = ratings_by_pid.get(pid)
 
     control = OverlayControlService.get_control(tournament_id)
-    broadcast_state = BroadcastSceneService.get(tournament_id)
     series_tournament, current_series = _resolve_series_context(tournament_id, current_game, last_game)
 
     # ── Privacy gate ─────────────────────────────────────────────────────
@@ -207,8 +205,8 @@ def _build_overlay_context(tournament_id: int) -> dict:
     equipped_bulk = ShopService.get_equipped_bulk(list(all_player_ids))
 
     # Mirrors the has-data checks the template itself uses to gate each
-    # idle-hero slot — see effective_idle_content's docstring in
-    # _build_ctl_sig for why this needs to exist in Python too.
+    # idle-hero slot (Live-Commentators only) — see effective_idle_content's
+    # docstring in _build_ctl_sig for why this needs to exist in Python too.
     has_facts = bool(
         superlatives.get("mvp") or superlatives.get("don") or superlatives.get("sheriff")
         or superlatives.get("civilian") or superlatives.get("mafia")
@@ -223,7 +221,7 @@ def _build_overlay_context(tournament_id: int) -> dict:
         effective_idle_content = "logo"
 
     return dict(
-        tournament=tournament,
+        tournament=tournament, layout_mode=layout_mode,
         current_game=current_game, current_slots=current_slots,
         last_game=last_game, last_slots=last_slots,
         equipped_bulk=equipped_bulk, ratings_by_pid=ratings_by_pid,
@@ -231,21 +229,69 @@ def _build_overlay_context(tournament_id: int) -> dict:
         hot_streak_rating=hot_streak_rating, hot_streak_count=hot_streak_count,
         can_show_standings=can_show_standings, top_ratings=top_ratings,
         full_ratings=full_ratings, standings_title=standings_title,
-        control=control, broadcast_state=broadcast_state,
+        control=control,
         effective_idle_content=effective_idle_content,
-        sig=_build_sig(tournament, current_game, last_game, standings_scope, control.layout_mode),
-        ctl_sig=_build_ctl_sig(control, broadcast_state, effective_idle_content),
+        sig=_build_sig(tournament, current_game, last_game, standings_scope),
+        ctl_sig=_build_ctl_sig(control, effective_idle_content),
     )
 
 
+def _build_starting_soon_context(tournament_id: int) -> dict:
+    tournament = db.session.get(Tournament, tournament_id) or abort(404)
+    state = BroadcastSceneService.get(tournament_id)
+    started_at = state["timer_started_at"]
+    sig = f"td={state['timer_duration']}|ts={started_at if started_at else 0}"
+    return dict(tournament=tournament, broadcast_state=state, sig=sig)
+
+
+# ── Live — Game (default URL, unchanged from before the OBS-scene split) ──
+
 @overlay_bp.route("/<int:tournament_id>")
 def overlay_page(tournament_id: int):
-    return render_template("overlay/page.html", **_build_overlay_context(tournament_id))
+    return render_template("overlay/live_page.html", **_build_live_context(tournament_id, "game"))
 
 
 @overlay_bp.route("/<int:tournament_id>/fragment")
 def overlay_fragment(tournament_id: int):
-    return render_template("overlay/_fragment.html", **_build_overlay_context(tournament_id))
+    return render_template("overlay/_live_fragment.html", **_build_live_context(tournament_id, "game"))
+
+
+# ── Live — Commentators ────────────────────────────────────────────────────
+
+@overlay_bp.route("/<int:tournament_id>/commentators")
+def overlay_commentators_page(tournament_id: int):
+    return render_template("overlay/commentators_page.html", **_build_live_context(tournament_id, "commentators"))
+
+
+@overlay_bp.route("/<int:tournament_id>/commentators/fragment")
+def overlay_commentators_fragment(tournament_id: int):
+    return render_template("overlay/_live_fragment.html", **_build_live_context(tournament_id, "commentators"))
+
+
+# ── Starting Soon ───────────────────────────────────────────────────────────
+
+@overlay_bp.route("/<int:tournament_id>/starting-soon")
+def overlay_starting_soon_page(tournament_id: int):
+    return render_template("overlay/starting_soon_page.html", **_build_starting_soon_context(tournament_id))
+
+
+@overlay_bp.route("/<int:tournament_id>/starting-soon/fragment")
+def overlay_starting_soon_fragment(tournament_id: int):
+    return render_template("overlay/_starting_soon_fragment.html", **_build_starting_soon_context(tournament_id))
+
+
+# ── BRB / Ending — static, no live data, no polling ─────────────────────────
+
+@overlay_bp.route("/<int:tournament_id>/brb")
+def overlay_brb_page(tournament_id: int):
+    tournament = db.session.get(Tournament, tournament_id) or abort(404)
+    return render_template("overlay/brb.html", tournament=tournament)
+
+
+@overlay_bp.route("/<int:tournament_id>/ending")
+def overlay_ending_page(tournament_id: int):
+    tournament = db.session.get(Tournament, tournament_id) or abort(404)
+    return render_template("overlay/ending.html", tournament=tournament)
 
 
 # ── Admin control panel ──────────────────────────────────────────────────
@@ -255,13 +301,11 @@ def overlay_fragment(tournament_id: int):
 def overlay_control(tournament_id: int):
     tournament = db.session.get(Tournament, tournament_id) or abort(404)
     control = OverlayControlService.get_control(tournament_id)
-    broadcast_state = BroadcastSceneService.get(tournament_id)
     series_tournament = db.session.query(SeriesTournament).filter_by(tournament_id=tournament_id).first()
     return render_template(
         "overlay/control.html",
         tournament=tournament,
         control=control,
-        broadcast_state=broadcast_state,
         series_tournament=series_tournament,
     )
 
@@ -318,27 +362,7 @@ def overlay_set_idle_content(tournament_id: int):
     mode = request.form.get("mode", "logo")
     control = OverlayControlService.set_idle_content(tournament_id, mode)
     labels = {"logo": "Лого турнира", "standings": "Турнирная таблица", "last_game": "Прошлая игра", "ticker": "Интересные факты"}
-    flash(f"Экран ожидания (без игры): {labels.get(control.idle_content, control.idle_content)}.", "success")
-    return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
-
-
-@overlay_bp.route("/<int:tournament_id>/control/layout-mode", methods=["POST"])
-@admin_required
-def overlay_set_layout_mode(tournament_id: int):
-    mode = request.form.get("mode", "game")
-    control = OverlayControlService.set_layout_mode(tournament_id, mode)
-    labels = {"commentators": "С комментаторами", "game": "Игра"}
-    flash(f"Режим эфира: {labels.get(control.layout_mode, control.layout_mode)}.", "success")
-    return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
-
-
-@overlay_bp.route("/<int:tournament_id>/control/scene", methods=["POST"])
-@admin_required
-def overlay_set_scene(tournament_id: int):
-    scene = request.form.get("scene", "live")
-    state = BroadcastSceneService.set_scene(tournament_id, scene)
-    labels = {"starting_soon": "Starting Soon", "live": "Live", "brb": "BRB (скоро вернёмся)", "ending": "Ending"}
-    flash(f"Сцена трансляции: {labels.get(state['scene'], state['scene'])}.", "success")
+    flash(f"Экран ожидания (без игры) на сцене Live — Комментаторы: {labels.get(control.idle_content, control.idle_content)}.", "success")
     return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
 
 

@@ -1,13 +1,16 @@
 // broadcast-scenes.js — Starting Soon / BRB / Ending full-screen overlay
-// scenes: aurora canvas backgrounds + the Starting Soon countdown. Switched
-// from the admin control page (/overlay/<id>/control → "Сцена трансляции"),
-// state lives server-side in BroadcastSceneService (in-memory — see that
-// module) and reaches this page through the same data-ctl string overlay.js
-// already polls for ticker/seats/standings (see parseCtl/applyCtl there).
+// scenes: aurora canvas backgrounds + the Starting Soon countdown. Each
+// scene is its own Browser Source page (see app/routes/overlay.py) — no
+// in-page scene switching here, `init()` just (re)starts whatever aurora
+// canvases/timer exist in the current page's DOM. Starting Soon's timer
+// state lives server-side in BroadcastSceneService (see that module) and
+// reaches its page through the same data-ctl string overlay.js already
+// polls for ticker/seats/standings on the Live pages (see parseCtl there).
 //
-// Kept in its own file purely for size/readability — same page, same
-// execution context as overlay.js, no module boundary, plain vanilla JS to
-// match the rest of the overlay (no build step, no dependencies).
+// Kept in its own file purely for size/readability — loaded alongside
+// overlay.js on the Starting Soon page (and standalone, without overlay.js,
+// on the static BRB/Ending pages), plain vanilla JS to match the rest of
+// the overlay (no build step, no dependencies).
 (function () {
   const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -119,15 +122,9 @@
     }
   }
 
-  function setActive(sceneName) {
-    document.querySelectorAll('[data-scene-panel]').forEach((panel) => {
-      panel.classList.toggle('is-active', panel.dataset.scenePanel === sceneName);
-    });
-  }
-
   function setTimer(durationSeconds, startedAtEpochSeconds) {
     runTimer(durationSeconds, startedAtEpochSeconds);
   }
 
-  window.MSBroadcastScenes = { init, setActive, setTimer };
+  window.MSBroadcastScenes = { init, setTimer };
 })();

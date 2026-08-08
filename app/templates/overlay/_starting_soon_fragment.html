@@ -1,0 +1,31 @@
+{# Starting Soon — pre-game waiting scene: aurora canvas, glass panel, 3D
+   logo, countdown, tournament name. Its own Browser Source URL (see
+   app/routes/overlay.py) — no other scene is ever in this page's DOM, so
+   there's no is-active gating here, it's just always on screen. Timer
+   state comes from BroadcastSceneService (see that module) via
+   data-timer-*; broadcast-scenes.js reads them once on init()/DOM-swap and
+   free-runs the countdown client-side between polls (no per-second server
+   round-trip). #}
+<div class="ms-scene ms-scene--starting-soon"
+     data-scene-panel="starting_soon"
+     data-sig="{{ sig }}"
+     data-ctl="td={{ broadcast_state.timer_duration }}|ts={{ broadcast_state.timer_started_at or 0 }}"
+     data-timer-duration="{{ broadcast_state.timer_duration }}"
+     data-timer-started-at="{{ broadcast_state.timer_started_at or '' }}">
+  <canvas class="bc-aurora" data-aurora-canvas aria-hidden="true"></canvas>
+  <div class="bc-vignette" aria-hidden="true"></div>
+  <div class="bc-scene-content">
+    <div class="bc-panel">
+      <div class="bc-logo-3d">
+        <img class="bc-logo-3d__mark" src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="Mafia Style">
+        <div class="bc-logo-3d__sheen" aria-hidden="true"></div>
+      </div>
+      <h1 class="bc-wordmark">MAFIA STYLE</h1>
+      <p class="bc-tagline">{{ tournament.name }}</p>
+      <div class="bc-timer">
+        <span class="bc-timer__label">до начала эфира</span>
+        <span class="bc-timer__value tabular" data-timer-value>00:00</span>
+      </div>
+    </div>
+  </div>
+</div>

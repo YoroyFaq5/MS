@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Оверлей — BRB — {{ tournament.name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/overlay.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/broadcast-scenes.css') }}">
+</head>
+<body>
+  <div id="overlay-root">
+    {# BRB — calmest scene, near-static aurora, occasional light sweep.
+       Static page: no admin-controlled content on this scene, so no
+       poller/fragment endpoint — it's just loaded once by OBS. #}
+    <div class="ms-scene ms-scene--brb" data-scene-panel="brb">
+      <canvas class="bc-aurora" data-aurora-canvas aria-hidden="true"></canvas>
+      <div class="bc-vignette" aria-hidden="true"></div>
+      <div class="bc-sweep" aria-hidden="true"></div>
+      <div class="bc-scene-content">
+        <div class="bc-logo-3d bc-logo-3d--small">
+          <img class="bc-logo-3d__mark" src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="Mafia Style">
+          <div class="bc-logo-3d__sheen" aria-hidden="true"></div>
+        </div>
+        <h1 class="bc-wordmark bc-wordmark--glow">Скоро вернёмся</h1>
+        <p class="bc-tagline">Небольшой перерыв — эфир продолжится через пару минут</p>
+      </div>
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='js/broadcast-scenes.js') }}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.MSBroadcastScenes) window.MSBroadcastScenes.init();
+    });
+  </script>
+</body>
+</html>

@@ -23,43 +23,30 @@
 
 <div class="row g-4">
 
-  <div class="col-md-4">
+  <div class="col-12">
     <div class="card h-100">
-      <div class="card-header fw-semibold">🎬 Сцена трансляции</div>
-      <div class="card-body">
-        <p class="text-muted small">Полноэкранные сцены до/после эфира — переключаются на этой же странице оверлея, без второго источника в OBS.</p>
-        <div class="d-flex flex-column gap-2">
-          {% for scene, label in [('starting_soon', 'Starting Soon'), ('live', 'Live'), ('brb', 'BRB'), ('ending', 'Ending')] %}
-          <form method="POST" action="{{ url_for('overlay.overlay_set_scene', tournament_id=tournament.id) }}">
-            <input type="hidden" name="scene" value="{{ scene }}">
-            <button type="submit" class="btn w-100 {{ 'btn-success' if broadcast_state.scene == scene else 'btn-outline-secondary' }}">
-              {{ label }}{{ ' ✓' if broadcast_state.scene == scene else '' }}
-            </button>
-          </form>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-md-4">
-    <div class="card h-100">
-      <div class="card-header fw-semibold">🎙 Режим эфира (Live)</div>
+      <div class="card-header fw-semibold">🔗 Источники для OBS</div>
       <div class="card-body">
         <p class="text-muted small">
-          Переключается вручную, не зависит от того, идёт ли сейчас игра.
-          «С комментаторами» — плейсхолдеры под камеру/чат Twitch и
-          переключаемый центральный блок (см. карточку ниже). «Игра» —
-          обычная полоса карточек игроков, без плейсхолдеров.
+          Каждая сцена — отдельный Browser Source. Переключение сцен
+          (и вкл/выкл вебкамеры/чата как нативных источников) делается в
+          самом OBS, а не отсюда — здесь только видимость/выбор того, что
+          показано внутри уже открытой сцены. При добавлении источника
+          выключите «Обновлять браузер, когда сцена становится активной»
+          и настройте свой Stinger как Scene Transition в OBS.
         </p>
-        <div class="d-flex flex-column gap-2">
-          {% for mode, label in [('commentators', 'С комментаторами'), ('game', 'Игра')] %}
-          <form method="POST" action="{{ url_for('overlay.overlay_set_layout_mode', tournament_id=tournament.id) }}">
-            <input type="hidden" name="mode" value="{{ mode }}">
-            <button type="submit" class="btn w-100 {{ 'btn-success' if control.layout_mode == mode else 'btn-outline-secondary' }}">
-              {{ label }}{{ ' ✓' if control.layout_mode == mode else '' }}
-            </button>
-          </form>
+        <div class="row g-2">
+          {% for label, url in [
+            ('Live — Игра', url_for('overlay.overlay_page', tournament_id=tournament.id, _external=true)),
+            ('Live — Комментаторы', url_for('overlay.overlay_commentators_page', tournament_id=tournament.id, _external=true)),
+            ('Starting Soon', url_for('overlay.overlay_starting_soon_page', tournament_id=tournament.id, _external=true)),
+            ('BRB', url_for('overlay.overlay_brb_page', tournament_id=tournament.id, _external=true)),
+            ('Ending', url_for('overlay.overlay_ending_page', tournament_id=tournament.id, _external=true)),
+          ] %}
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label small text-muted mb-1">{{ label }}</label>
+            <input type="text" class="form-control form-control-sm" value="{{ url }}" readonly onclick="this.select()">
+          </div>
           {% endfor %}
         </div>
       </div>
@@ -157,9 +144,9 @@
       <div class="card-header fw-semibold">⏳ Центр экрана «С комментаторами»</div>
       <div class="card-body">
         <p class="text-muted small">
-          Что показывать по центру, пока включён режим эфира
-          «С комментаторами» (см. карточку выше) — не зависит от того,
-          идёт ли сейчас игра.
+          Что показывать по центру на сцене Live — Комментаторы (отдельный
+          источник, см. карточку "Источники для OBS" выше) — не зависит от
+          того, идёт ли сейчас игра.
         </p>
         <div class="d-flex flex-column gap-2">
           {% for mode, label in [('logo', 'Лого турнира'), ('standings', 'Турнирная таблица'), ('last_game', 'Прошлая игра'), ('ticker', 'Интересные факты')] %}

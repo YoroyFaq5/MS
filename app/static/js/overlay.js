@@ -33,7 +33,7 @@
 
   function parseCtl(str) {
     const parts = {};
-    (str || 'tk=1|sh=1|sm=top5|rv=auto|sc=live|td=900|ts=0|ic=logo').split('|').forEach((pair) => {
+    (str || 'tk=1|sh=1|sm=top5|rv=auto|td=900|ts=0|ic=logo').split('|').forEach((pair) => {
       const [key, value] = pair.split('=');
       parts[key] = value;
     });
@@ -42,9 +42,9 @@
       showSeats: parts.sh !== '0', // default to visible if the field is ever missing
       standingsMode: parts.sm || 'top5',
       revealOverride: parts.rv || 'auto',
-      // Broadcast scene (Starting Soon/Live/BRB/Ending) + its countdown —
-      // see app/services/broadcast_scene_service.py and broadcast-scenes.js.
-      scene: parts.sc || 'live',
+      // Starting Soon countdown — only present on that page's ctl string
+      // (see app/services/broadcast_scene_service.py and
+      // broadcast-scenes.js); harmlessly absent/default elsewhere.
       timerDuration: parseFloat(parts.td || '0'),
       timerStartedAt: parseFloat(parts.ts || '0') || null,
       // Which of the (always-in-DOM) idle-hero center slots is active —
@@ -282,8 +282,6 @@
     if (ctl.revealOverride === 'on') triggerReveal(true);
     else if (ctl.revealOverride === 'off') hideReveal();
     // 'auto' — leave whatever the lastFinishedId-driven trigger already set.
-
-    if (window.MSBroadcastScenes) window.MSBroadcastScenes.setActive(ctl.scene);
   }
 
   async function poll() {
@@ -324,7 +322,6 @@
         || currentCtl.showSeats !== newCtl.showSeats
         || currentCtl.standingsMode !== newCtl.standingsMode
         || currentCtl.revealOverride !== newCtl.revealOverride
-        || currentCtl.scene !== newCtl.scene
         || currentCtl.idleContent !== newCtl.idleContent) {
       applyCtl(newCtl);
       currentCtl = newCtl;

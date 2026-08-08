@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Оверлей — Starting Soon — {{ tournament.name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/overlay.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/broadcast-scenes.css') }}">
+</head>
+<body>
+  <div id="overlay-root"
+       data-fragment-url="{{ url_for('overlay.overlay_starting_soon_fragment', tournament_id=tournament.id) }}"
+       data-poll-interval-ms="5000">
+    {% include "overlay/_starting_soon_fragment.html" %}
+  </div>
+  <script src="{{ url_for('static', filename='js/broadcast-scenes.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/overlay.js') }}" defer></script>
+</body>
+</html>
