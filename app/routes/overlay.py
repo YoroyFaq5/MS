@@ -46,7 +46,7 @@ from app.auth_decorators import admin_required
 overlay_bp = Blueprint("overlay", __name__)
 
 
-def _build_sig(tournament: Tournament, current_game, last_game, standings_scope: str, pinned_game_id=None) -> str:
+def _build_sig(tournament: Tournament, current_game, last_game, standings_scope: str) -> str:
     """Cheap change-detection string for the client poller — not a hash,
     never shown to viewers. A new finished game always changes this sig,
     so 'DOM replaced' and 'a game just finished' are the same poll cycle
@@ -57,18 +57,18 @@ def _build_sig(tournament: Tournament, current_game, last_game, standings_scope:
     deliberate admin decision, not something toggled every few seconds
     like standings_mode, so a full redraw on change is an acceptable
     trade-off for not having to keep 2x the standings markup in the DOM
-    at all times. pinned_game_id needs the same full-redraw treatment as
-    cg/lg (not a ctl_sig class-toggle) — the idle-hero's last_game slot's
-    actual CONTENT (names/roles/scores) changes, not just which slot is
-    visible, so overlay.js needs to replace the fragment's DOM, same as
-    when a new game genuinely finishes."""
+    at all times. Deliberately NOT where pinned_game_id lives (see
+    _build_ctl_sig) — a full DOM replace here would also replay the
+    camera frame/broadcast bar/seat strip/ambient-motion entrances, which
+    read as "the whole page reloaded" for what should be a small, quiet
+    content swap inside one panel."""
     if current_game:
         seat_pids = tuple(s.player_id for s in sorted(current_game.slots, key=lambda s: s.seat_number))
         cg_part = f"{current_game.id}:{seat_pids}"
     else:
         cg_part = "none"
     lg_part = str(last_game.id) if last_game else "none"
-    return f"cg={cg_part}|lg={lg_part}|pg={pinned_game_id or 0}|hs={int(tournament.hide_standings)}|sc={standings_scope}"
+    return f"cg={cg_part}|lg={lg_part}|hs={int(tournament.hide_standings)}|sc={standings_scope}"
 
 
 def _build_ctl_sig(control, effective_idle_content: str) -> str:
@@ -81,10 +81,17 @@ def _build_ctl_sig(control, effective_idle_content: str) -> str:
     data-availability fallback to 'logo' the template itself uses (see
     _build_live_context) — only meaningful on the Live-Commentators page,
     but harmless to always include (the Live-Game page simply has no
-    [data-idle-slot] elements for it to match against)."""
+    [data-idle-slot] elements for it to match against). pg= (pinned_game_id)
+    rides along here too: a class toggle alone can't update WHAT the
+    last_game slot shows, so overlay.js special-cases a pg change to
+    splice in fresh innerHTML for just that one slot from the fragment
+    HTML it already re-fetches every poll — see poll()'s pinnedGame
+    handling — instead of the full-page replace _build_sig's cg/lg
+    changes trigger."""
     return (
         f"tk={int(control.show_ticker)}|sh={int(control.show_seats)}"
         f"|sm={control.standings_mode}|rv={control.reveal_override or 'auto'}"
+        f"|pg={control.pinned_game_id or 0}"
         f"|ic={effective_idle_content}"
     )
 
@@ -295,7 +302,7 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
         full_ratings=full_ratings, standings_title=standings_title,
         control=control,
         effective_idle_content=effective_idle_content,
-        sig=_build_sig(tournament, current_game, last_game, standings_scope, control.pinned_game_id),
+        sig=_build_sig(tournament, current_game, last_game, standings_scope),
         ctl_sig=_build_ctl_sig(control, effective_idle_content),
     )
 

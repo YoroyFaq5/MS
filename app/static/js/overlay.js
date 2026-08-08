@@ -50,6 +50,11 @@
       // Which of the (always-in-DOM) idle-hero center slots is active —
       // see app/routes/overlay.py's effective_idle_content.
       idleContent: parts.ic || 'logo',
+      // Admin-pinned "show this specific past tour" for the last_game
+      // slot (see OverlayControlService.set_pinned_game) — '0' means
+      // "auto" (no pin). Only the id, just to detect a change; see
+      // poll()'s pinnedGame handling for what actually happens with it.
+      pinnedGame: parts.pg || '0',
     };
   }
 
@@ -333,6 +338,20 @@
       fitSeatNames();
       spawnCardEntranceBursts();
       if (window.MSBroadcastScenes) window.MSBroadcastScenes.init();
+    } else if (currentCtl && currentCtl.pinnedGame !== newCtl.pinnedGame) {
+      // Admin pinned/unpinned a specific past tour (see
+      // OverlayControlService.set_pinned_game) — the last_game slot's
+      // actual CONTENT changed (names/roles/scores), not just which slot
+      // is visible, so applyCtl's class toggles below can't handle it.
+      // Splice in fresh innerHTML for just that one slot from the
+      // fragment HTML this poll already fetched (newRoot), instead of
+      // replacing the whole page the way a genuine cg/lg change does —
+      // that used to also replay the camera frame/broadcast bar/seat
+      // strip/ambient-motion entrances for what should be a small, quiet
+      // update inside one panel.
+      const freshSlot = newRoot.querySelector('[data-idle-slot="last_game"]');
+      const liveSlot = root.querySelector('[data-idle-slot="last_game"]');
+      if (freshSlot && liveSlot) liveSlot.innerHTML = freshSlot.innerHTML;
     }
 
     if (newLastFinishedId !== lastFinishedId) {
@@ -344,7 +363,8 @@
         || currentCtl.showSeats !== newCtl.showSeats
         || currentCtl.standingsMode !== newCtl.standingsMode
         || currentCtl.revealOverride !== newCtl.revealOverride
-        || currentCtl.idleContent !== newCtl.idleContent) {
+        || currentCtl.idleContent !== newCtl.idleContent
+        || currentCtl.pinnedGame !== newCtl.pinnedGame) {
       applyCtl(newCtl);
       currentCtl = newCtl;
     }
