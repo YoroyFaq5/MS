@@ -107,10 +107,10 @@
 
   <!-- IDLE HERO: only on the Live-Commentators page (layout_mode passed in
        by the route, independent of whether a game is currently running) —
-       reserves screen space for the caster's own webcam (left) and Twitch
-       chat (right; both are separate native OBS sources positioned to
-       match these frames, not rendered by this page) and shows one of
-       several things in the middle, switched from the control page
+       reserves screen space for the caster's own webcam (left; a separate
+       native OBS source positioned to match this frame, not rendered by
+       this page) and shows one of several things in the remaining area,
+       switched from the control page
        (control.idle_content): the tournament logo (default), the full
        standings, the last game's results, or the ticker's facts — all
        reusing the exact same markup/classes as their "normal" corner/
@@ -180,10 +180,6 @@
       {% endif %}
     </div>
 
-    <div class="overlay-idle-hero__chat" aria-hidden="false">
-      <span class="overlay-idle-hero__slot-icon" aria-hidden="true">💬</span>
-      <span class="overlay-idle-hero__slot-label">Чат Twitch</span>
-    </div>
   </div>
   {% endif %}
 

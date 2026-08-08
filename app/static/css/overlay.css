@@ -1162,15 +1162,14 @@ html, body {
   inset: 0;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(300px, 28vw) minmax(0, 1fr) minmax(260px, 24vw);
+  grid-template-columns: minmax(420px, 40vw) minmax(0, 1fr);
   align-items: center;
   gap: clamp(1rem, 2vw, 2.5rem);
   padding: 0 clamp(1.5rem, 3vw, 4rem);
   animation: fade-in-up .5s ease both;
 }
 
-.overlay-idle-hero__cam,
-.overlay-idle-hero__chat {
+.overlay-idle-hero__cam {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1180,13 +1179,8 @@ html, body {
   border-radius: var(--ovl-radius-lg, 18px);
   background: var(--ovl-glass-bg, rgba(15,14,12,.6));
   color: var(--ms-muted, #8A8A8A);
-}
-.overlay-idle-hero__cam {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 16 / 9;
   width: 100%;
-}
-.overlay-idle-hero__chat {
-  height: min(64vh, 620px);
 }
 .overlay-idle-hero__slot-icon { font-size: 2rem; opacity: .6; }
 .overlay-idle-hero__slot-label {
