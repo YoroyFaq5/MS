@@ -253,18 +253,38 @@
     }, SHIELD_TIMING.out);
 
     // Phase 3 — REASSEMBLY. New slot mounts active with the punchier
-    // .is-shield-in entrance (overrides the plain page-load fade for as
-    // long as this class stays on).
+    // .is-shield-in entrance. Re-add via remove+reflow+add (same trick as
+    // the scan/flash elements above) since this slot may still be
+    // carrying .is-shield-in from an EARLIER visit (see the cleanup
+    // comment below for why that class is never removed) — without the
+    // forced reflow, re-adding an already-present class is a no-op and
+    // the piece-in animation simply wouldn't play at all.
     setTimeout(() => {
       if (flash) flash.classList.remove('is-flashing');
-      newSlot.classList.add('is-active', 'is-shield-in');
+      newSlot.classList.add('is-active');
+      newSlot.classList.remove('is-shield-in');
+      void newSlot.offsetWidth;
+      newSlot.classList.add('is-shield-in');
       activeIdleContent = target;
     }, SHIELD_TIMING.out + SHIELD_TIMING.flash);
 
-    // Cleanup — hand back to the idle/ambient rules, then either settle
-    // or immediately chase whatever target arrived while this was running.
+    // Cleanup — hand back to the panel's idle/ambient rules, then either
+    // settle or immediately chase whatever target arrived while this was
+    // running. Deliberately does NOT remove .is-shield-in: that class and
+    // the plain LEVEL-3 .is-active-only rules (overlay.css) both provide
+    // an `animation` for the same elements (headline/value/rows/etc) under
+    // different keyframe names — the moment .is-shield-in stops matching,
+    // the cascade falls back to the .is-active-only rule, which counts as
+    // a BRAND NEW animation (different animation-name) and restarts it
+    // from its 0% keyframe. That's what "the content appears, then blinks
+    // again like it's refreshing" was: the punchy entrance finishing,
+    // immediately followed by every piece silently re-playing the plain
+    // page-load fade-in-up from scratch. Leaving .is-shield-in on
+    // permanently once a slot has been through a shield transition avoids
+    // that fallback entirely — .is-shield-in's own rules keep winning
+    // (same specificity, later in the stylesheet) for as long as the
+    // class stays put, so there's nothing left to fall back to.
     setTimeout(() => {
-      newSlot.classList.remove('is-shield-in');
       panel.classList.remove('is-shield-transition');
       delete panel.dataset.shieldKind;
       shieldBusy = false;
