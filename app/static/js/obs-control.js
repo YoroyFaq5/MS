@@ -29,6 +29,7 @@
   const pinnedGameSelect = document.getElementById('dock-pinned-game');
   const seatsBtn = document.getElementById('dock-seats');
   const tickerBtn = document.getElementById('dock-ticker');
+  const marqueeBtn = document.getElementById('dock-marquee');
   const standingsButtons = Array.from(document.querySelectorAll('#dock-standings-mode [data-mode]'));
   const revealButtons = Array.from(document.querySelectorAll('#dock-reveal [data-reveal]'));
   const scopeButtons = Array.from(document.querySelectorAll('#dock-scope [data-scope]'));
@@ -116,6 +117,7 @@
 
     paintToggle(seatsBtn, state.show_seats);
     paintToggle(tickerBtn, state.show_ticker);
+    paintToggle(marqueeBtn, state.show_marquee);
 
     standingsButtons.forEach((btn) => btn.classList.toggle('dock-btn--on', btn.dataset.mode === state.standings_mode));
     revealButtons.forEach((btn) => {
@@ -224,6 +226,7 @@
   }
   if (seatsBtn) seatsBtn.addEventListener('click', () => act('/seats', {}));
   if (tickerBtn) tickerBtn.addEventListener('click', () => act('/ticker', {}));
+  if (marqueeBtn) marqueeBtn.addEventListener('click', () => act('/marquee', {}));
   standingsButtons.forEach((btn) => btn.addEventListener('click', () => act('/standings', { mode: btn.dataset.mode })));
   revealButtons.forEach((btn) => btn.addEventListener('click', () => act('/reveal', { override: btn.dataset.reveal || '' })));
   scopeButtons.forEach((btn) => btn.addEventListener('click', () => act('/standings-scope', { scope: btn.dataset.scope })));
@@ -259,10 +262,11 @@
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
-    const idleByKey = { '1': 'logo', '2': 'standings', '3': 'last_game', '4': 'ticker' };
+    const idleByKey = { '1': 'logo', '2': 'standings', '3': 'last_game', '4': 'ticker', '5': 'chat' };
     if (idleByKey[e.key]) { act('/idle-content', { mode: idleByKey[e.key] }); return; }
     if (e.key === 's' || e.key === 'S') { act('/seats', {}); return; }
     if (e.key === 't' || e.key === 'T') { act('/ticker', {}); return; }
+    if (e.key === 'm' || e.key === 'M') { act('/marquee', {}); return; }
     if (e.key === 'h' || e.key === 'H') { act('/hide-all', {}); return; }
   });
 

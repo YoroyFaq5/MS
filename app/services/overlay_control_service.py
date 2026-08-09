@@ -11,7 +11,7 @@ from app.models import OverlayControl
 STANDINGS_MODES = ("top5", "full", "hidden")
 STANDINGS_SCOPES = ("evening", "series")
 REVEAL_OVERRIDES = (None, "on", "off")
-IDLE_CONTENT_MODES = ("logo", "standings", "last_game", "ticker")
+IDLE_CONTENT_MODES = ("logo", "standings", "last_game", "ticker", "chat")
 
 
 class OverlayControlService:
@@ -40,6 +40,13 @@ class OverlayControlService:
     def toggle_seats(tournament_id: int) -> OverlayControl:
         control = OverlayControlService.get_control(tournament_id)
         control.show_seats = not control.show_seats
+        db.session.commit()
+        return control
+
+    @staticmethod
+    def toggle_marquee(tournament_id: int) -> OverlayControl:
+        control = OverlayControlService.get_control(tournament_id)
+        control.show_marquee = not control.show_marquee
         db.session.commit()
         return control
 

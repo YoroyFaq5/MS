@@ -90,6 +90,7 @@ def _build_ctl_sig(control, effective_idle_content: str) -> str:
     changes trigger."""
     return (
         f"tk={int(control.show_ticker)}|sh={int(control.show_seats)}"
+        f"|mq={int(control.show_marquee)}"
         f"|sm={control.standings_mode}|rv={control.reveal_override or 'auto'}"
         f"|pg={control.pinned_game_id or 0}"
         f"|ic={effective_idle_content}"
@@ -216,6 +217,14 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
 
     finished_games = _finished_games_list(tournament)
 
+    # Bottom scrolling stats marquee — Live-Commentators only (per the
+    # brief: there's no free real estate at the bottom of the Live-Game
+    # layout, the seat strip already owns it). Skipped entirely on the
+    # other layout so that page doesn't pay for the extra aggregation.
+    marquee_stats = (
+        RatingService.get_marquee_stats(tournament_id) if layout_mode == "commentators" else None
+    )
+
     # ── Privacy gate ─────────────────────────────────────────────────────
     # Deliberately does NOT call tournaments._can_view_standings /
     # _is_tournament_participant — those let a non-participant ADMIN see
@@ -263,11 +272,16 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
     top_ratings = standings_source[:5] if can_show_standings else []
     full_ratings = standings_source if can_show_standings else []
 
+    marquee_entries = (
+        marquee_stats.top_total + marquee_stats.top_pu_avg + marquee_stats.top_clean + marquee_stats.top_avg_score
+        if marquee_stats else []
+    )
     all_player_ids = (
         {s.player_id for s in current_slots}
         | {s.player_id for s in last_slots}
         | {s.player_id for s in hero_slots}
         | {r.player_id for r in full_ratings}
+        | {e.rating.player_id for e in marquee_entries}
     )
     equipped_bulk = ShopService.get_equipped_bulk(list(all_player_ids))
 
@@ -295,6 +309,7 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
         last_game_number=last_game_number,
         hero_game=hero_game, hero_slots=hero_slots, hero_game_number=hero_game_number,
         finished_games=finished_games,
+        marquee_stats=marquee_stats,
         equipped_bulk=equipped_bulk, ratings_by_pid=ratings_by_pid,
         superlatives=superlatives,
         hot_streak_rating=hot_streak_rating, hot_streak_count=hot_streak_count,
@@ -492,6 +507,14 @@ def overlay_toggle_seats(tournament_id: int):
     return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
 
 
+@overlay_bp.route("/<int:tournament_id>/control/marquee", methods=["POST"])
+@admin_required
+def overlay_toggle_marquee(tournament_id: int):
+    control = OverlayControlService.toggle_marquee(tournament_id)
+    flash(f"Бегущая строка статистики теперь {'видна 👁' if control.show_marquee else 'скрыта 🙈'}.", "success")
+    return redirect(url_for("overlay.overlay_control", tournament_id=tournament_id))
+
+
 @overlay_bp.route("/<int:tournament_id>/control/standings-scope", methods=["POST"])
 @admin_required
 def overlay_set_standings_scope(tournament_id: int):
@@ -611,6 +634,7 @@ def _build_obs_control_state(tournament_id: int):
         has_series=series_tournament is not None,
         show_ticker=control.show_ticker,
         show_seats=control.show_seats,
+        show_marquee=control.show_marquee,
         standings_mode=control.standings_mode,
         standings_scope=control.standings_scope,
         reveal_override=control.reveal_override,
@@ -715,6 +739,19 @@ def overlay_obs_control_toggle_seats(tournament_id):
     if resolved_id is None:
         abort(409)
     OverlayControlService.toggle_seats(resolved_id)
+    state = _build_obs_control_state(resolved_id)
+    state["active"] = True
+    return jsonify(state)
+
+
+@overlay_bp.route("/<int:tournament_id>/obs-control/marquee", methods=["POST"])
+@overlay_bp.route("/current/obs-control/marquee", methods=["POST"], defaults={"tournament_id": None})
+@admin_required
+def overlay_obs_control_toggle_marquee(tournament_id):
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    OverlayControlService.toggle_marquee(resolved_id)
     state = _build_obs_control_state(resolved_id)
     state["active"] = True
     return jsonify(state)
@@ -836,6 +873,8 @@ def overlay_obs_control_hide_all(tournament_id):
         OverlayControlService.toggle_ticker(resolved_id)
     if control.show_seats:
         OverlayControlService.toggle_seats(resolved_id)
+    if control.show_marquee:
+        OverlayControlService.toggle_marquee(resolved_id)
     OverlayControlService.set_standings_mode(resolved_id, "hidden")
     OverlayControlService.set_reveal_override(resolved_id, "off")
     state = _build_obs_control_state(resolved_id)
@@ -858,6 +897,8 @@ def overlay_obs_control_reset(tournament_id):
         OverlayControlService.toggle_ticker(resolved_id)
     if not control.show_seats:
         OverlayControlService.toggle_seats(resolved_id)
+    if not control.show_marquee:
+        OverlayControlService.toggle_marquee(resolved_id)
     OverlayControlService.set_standings_mode(resolved_id, "top5")
     OverlayControlService.set_reveal_override(resolved_id, None)
     OverlayControlService.set_idle_content(resolved_id, "logo")

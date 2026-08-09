@@ -22,6 +22,8 @@
        data-ticker-interval-ms="8000">
     {% include "overlay/_live_fragment.html" %}
   </div>
+  <script src="{{ url_for('static', filename='js/overlay-marquee.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/overlay-chat.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/overlay.js') }}" defer></script>
 </body>
 </html>

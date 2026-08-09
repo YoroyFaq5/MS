@@ -65,6 +65,7 @@
           <button type="button" class="dock-btn" data-idle="standings">Турнирная таблица<span class="dock-btn__key">2</span></button>
           <button type="button" class="dock-btn" data-idle="last_game">Прошлая игра<span class="dock-btn__key">3</span></button>
           <button type="button" class="dock-btn" data-idle="ticker">Интересные факты<span class="dock-btn__key">4</span></button>
+          <button type="button" class="dock-btn" data-idle="chat">Чат Twitch<span class="dock-btn__key">5</span></button>
         </div>
         {# "Прошлая игра" defaults to always following the most recently
            finished game — this pins it to a specific past tour instead.
@@ -85,6 +86,10 @@
           </button>
           <button type="button" class="dock-btn dock-btn--toggle" id="dock-ticker">
             <span>📊 Тикер статистики <span class="dock-btn__key">T</span></span>
+            <span class="dock-toggle-pill"></span>
+          </button>
+          <button type="button" class="dock-btn dock-btn--toggle" id="dock-marquee">
+            <span>📰 Бегущая строка <span class="dock-btn__key">M</span></span>
             <span class="dock-toggle-pill"></span>
           </button>
         </div>
@@ -137,7 +142,7 @@
     </div>
 
     <div class="dock-hotkeys">
-      <kbd>1</kbd>–<kbd>4</kbd> центр экрана (Комментаторы) · <kbd>S</kbd> игроки · <kbd>T</kbd> тикер · <kbd>H</kbd> скрыть всё
+      <kbd>1</kbd>–<kbd>5</kbd> центр экрана (Комментаторы) · <kbd>S</kbd> игроки · <kbd>T</kbd> тикер · <kbd>M</kbd> бегущая строка · <kbd>H</kbd> скрыть всё
     </div>
 
   </div>

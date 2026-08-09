@@ -131,6 +131,20 @@
 
   <div class="col-md-4">
     <div class="card h-100">
+      <div class="card-header fw-semibold">📰 Бегущая строка статистики</div>
+      <div class="card-body">
+        <p class="text-muted small">Топ-3 турнира / средний балл ПУ / меньше минусов / средний балл — низ сцены Live-Комментаторы.</p>
+        <form method="POST" action="{{ url_for('overlay.overlay_toggle_marquee', tournament_id=tournament.id) }}">
+          <button type="submit" class="btn w-100 {{ 'btn-success' if control.show_marquee else 'btn-outline-secondary' }}">
+            {% if control.show_marquee %}👁 Видна — нажмите, чтобы скрыть{% else %}🙈 Скрыта — нажмите, чтобы показать{% endif %}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100">
       <div class="card-header fw-semibold">🏆 Таблица</div>
       <div class="card-body">
         <p class="text-muted small">Топ-5 в углу, полная таблица по центру, или скрыто совсем.</p>
@@ -184,7 +198,7 @@
           того, идёт ли сейчас игра.
         </p>
         <div class="d-flex flex-column gap-2">
-          {% for mode, label in [('logo', 'Лого турнира'), ('standings', 'Турнирная таблица'), ('last_game', 'Прошлая игра'), ('ticker', 'Интересные факты')] %}
+          {% for mode, label in [('logo', 'Лого турнира'), ('standings', 'Турнирная таблица'), ('last_game', 'Прошлая игра'), ('ticker', 'Интересные факты'), ('chat', 'Чат Twitch')] %}
           <form method="POST" action="{{ url_for('overlay.overlay_set_idle_content', tournament_id=tournament.id) }}">
             <input type="hidden" name="mode" value="{{ mode }}">
             <button type="submit" class="btn w-100 {{ 'btn-success' if control.idle_content == mode else 'btn-outline-secondary' }}">

@@ -47,6 +47,7 @@
     return {
       ticker: parts.tk === '1',
       showSeats: parts.sh !== '0', // default to visible if the field is ever missing
+      showMarquee: parts.mq !== '0', // bottom stats marquee (Live-Commentators only) — same default-visible convention
       standingsMode: parts.sm || 'top5',
       revealOverride: parts.rv || 'auto',
       // Starting Soon countdown — only present on that page's ctl string
@@ -454,6 +455,9 @@
     const seats = root.querySelector('.overlay-seat-strip');
     if (seats) seats.classList.toggle('is-hidden', !ctl.showSeats);
 
+    const marquee = root.querySelector('.overlay-marquee');
+    if (marquee) marquee.classList.toggle('is-hidden', !ctl.showMarquee);
+
     const top5 = root.querySelector('.overlay-mini-standings');
     if (top5) top5.classList.toggle('is-hidden', ctl.standingsMode !== 'top5');
 
@@ -501,6 +505,8 @@
       fitSeatNames();
       spawnCardEntranceBursts();
       if (window.MSBroadcastScenes) window.MSBroadcastScenes.init();
+      if (window.MSOverlayMarquee) window.MSOverlayMarquee.init();
+      if (window.MSOverlayChat) window.MSOverlayChat.init();
     } else if (currentCtl && currentCtl.pinnedGame !== newCtl.pinnedGame) {
       // Admin pinned/unpinned a specific past tour (see
       // OverlayControlService.set_pinned_game) — the last_game slot's
@@ -524,6 +530,7 @@
 
     if (!currentCtl || currentCtl.ticker !== newCtl.ticker
         || currentCtl.showSeats !== newCtl.showSeats
+        || currentCtl.showMarquee !== newCtl.showMarquee
         || currentCtl.standingsMode !== newCtl.standingsMode
         || currentCtl.revealOverride !== newCtl.revealOverride
         || currentCtl.idleContent !== newCtl.idleContent
@@ -543,5 +550,7 @@
   spawnCardEntranceBursts();
   scheduleInfoPulse();
   if (window.MSBroadcastScenes) window.MSBroadcastScenes.init();
+  if (window.MSOverlayMarquee) window.MSOverlayMarquee.init();
+  if (window.MSOverlayChat) window.MSOverlayChat.init();
   setInterval(poll, POLL_MS);
 })();

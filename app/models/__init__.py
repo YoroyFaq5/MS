@@ -199,6 +199,11 @@ class OverlayControl(db.Model):
     # a caster may want to hide the players' faces (e.g. during a sponsor
     # break) without touching the ticker/standings/reveal state at all.
     show_seats = Column(Boolean, default=True, nullable=False)
+    # Scrolling tournament-stats marquee, Live-Commentators only (see
+    # _build_live_context's marquee_stats) — independent toggle since it's
+    # a separate strip along the bottom of that page, not part of the
+    # idle-hero panel's own show/hide state.
+    show_marquee = Column(Boolean, default=True, nullable=False)
     # top5 | full | hidden — Tournament.hide_standings still wins over this
     # regardless of value (privacy beats any broadcast-control convenience).
     standings_mode = Column(String(10), default="top5", nullable=False)
@@ -252,6 +257,7 @@ class OverlayControl(db.Model):
             "tournament_id": self.tournament_id,
             "show_ticker": self.show_ticker,
             "show_seats": self.show_seats,
+            "show_marquee": self.show_marquee,
             "standings_mode": self.standings_mode,
             "standings_scope": self.standings_scope,
             "reveal_override": self.reveal_override,

@@ -299,9 +299,75 @@
           {% endif %}
         </div>
         {% endif %}
+
+        <!-- Twitch chat — the only idle-hero slot with NO server-rendered
+             content: a live external feed, not tournament data, so it's
+             just an empty mount point overlay-chat.js attaches a WebSocket
+             renderer to (see that file for the connect/parse/render/
+             reconnect logic). Always present in the DOM like the other
+             four slots — .is-active only controls visibility, never
+             whether the socket is open, so switching AWAY from chat and
+             back doesn't drop/reconnect the connection or lose scrollback. -->
+        <div class="overlay-idle-hero__slot overlay-idle-hero__slot--chat {{ 'is-active' if effective_idle_content == 'chat' else '' }}" data-idle-slot="chat">
+          <div class="ovl-label">Чат Twitch</div>
+          <div class="ovl-info-rule"></div>
+          <div class="ovl-chat-log" id="ovl-chat-log" aria-hidden="true"></div>
+          <div class="ovl-chat-status" id="ovl-chat-status" aria-hidden="true"></div>
+        </div>
       </div>
     </div>
 
+  </div>
+  {% endif %}
+
+  <!-- Bottom stats marquee — Live-Commentators only, a REAL horizontally-
+       scrolling strip (not the split-flap "Интересные факты" ticker
+       above) with the tournament-scoped stats the commentators asked
+       for. One copy of the content rendered server-side; overlay-
+       marquee.js clones it once for the seamless loop and sets the
+       scroll duration from the measured width (avoids double-rendering
+       ~20 rows of Jinja for a purely cosmetic looping mechanic). Guarded
+       on having at least one non-empty block — an early tournament with
+       no finished games yet would otherwise show an empty scrolling
+       strip. -->
+  {% if layout_mode == 'commentators' and marquee_stats and (marquee_stats.top_total or marquee_stats.top_pu_avg or marquee_stats.top_clean or marquee_stats.top_avg_score) %}
+  <div class="overlay-marquee {{ '' if control.show_marquee else 'is-hidden' }}" id="overlay-marquee">
+    <div class="overlay-marquee__edge overlay-marquee__edge--l" aria-hidden="true"></div>
+    <div class="overlay-marquee__track" id="overlay-marquee-track">
+      <!-- .content is the element the CSS scroll animation actually
+           moves (translateX 0 -> -50%). It starts holding ONE .set (the
+           real, server-rendered stat blocks); overlay-marquee.js clones
+           that .set once as a second sibling INSIDE this same .content
+           element — not as a sibling of .content itself — so -50% of
+           .content's own (now-doubled) width lands exactly at the seam
+           between the two copies, the standard seamless-marquee
+           construction. See that file for the width measurement/clone. -->
+      <div class="overlay-marquee__content" id="overlay-marquee-content">
+        <div class="overlay-marquee__set">
+          {% for block_label, entries in [
+            ('Топ-3 турнира', marquee_stats.top_total),
+            ('Лучший средний балл ПУ', marquee_stats.top_pu_avg),
+            ('Меньше всего минусов', marquee_stats.top_clean),
+            ('Лучшие по среднему баллу', marquee_stats.top_avg_score),
+          ] %}
+          {% if entries %}
+          <span class="overlay-marquee__block">
+            <span class="overlay-marquee__block-label">{{ block_label }}</span>
+            {% for entry in entries %}
+            <span class="overlay-marquee__item">
+              <span class="overlay-marquee__rank">{{ loop.index }}</span>
+              <span class="overlay-marquee__name">{{ player_name(entry.rating, equipped_bulk.get(entry.rating.player_id, {})) }}</span>
+              <span class="overlay-marquee__value">{{ entry.value|round(2) }}</span>
+            </span>
+            {% endfor %}
+          </span>
+          <span class="overlay-marquee__sep" aria-hidden="true"></span>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="overlay-marquee__edge overlay-marquee__edge--r" aria-hidden="true"></div>
   </div>
   {% endif %}
 
