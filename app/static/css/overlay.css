@@ -21,19 +21,13 @@ html, body {
   color: var(--ms-text, #F2F2F2);
 }
 
-/* Custom properties fed into conic-gradient()/mask() angles and percentages
-   need to be *registered* with a concrete syntax before the browser will
-   smoothly interpolate them frame-by-frame — without this, animating them
-   would just hard-jump between values instead of producing a real spinning
-   gradient / sweeping mask. This is what makes the metallic card ring and
-   the reveal-panel "chasing light" trace read as continuous motion instead
-   of a flicker. */
+/* Custom properties fed into conic-gradient() angles need to be
+   *registered* with a concrete syntax before the browser will smoothly
+   interpolate them frame-by-frame — without this, animating them would
+   just hard-jump between values instead of producing a real spinning
+   gradient. This is what makes the metallic card ring read as continuous
+   motion instead of a flicker. */
 @property --frame-angle {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 0deg;
-}
-@property --ovl-trace-angle {
   syntax: '<angle>';
   inherits: false;
   initial-value: 0deg;
@@ -622,49 +616,80 @@ html, body {
 @keyframes totem-chroma-g  { 0% { transform: translate(0, -4px);     opacity: .6; } 100% { transform: translate(0,0); opacity: 0; } }
 @keyframes totem-chroma-b  { 0% { transform: translate(10px, -2px);  opacity: .9; } 100% { transform: translate(0,0); opacity: 0; } }
 
-/* The panel: rests fully closed (a zero-radius iris, tilted back slightly
-   in 3D) and *opens* through that iris rather than scaling up from
-   nothing. On close, note there's deliberately no keyframe animation on
-   this base rule — just a transition. When .reveal-active is removed the
-   element falls back to these closed values and the transition animates
-   the iris shutting on its own; the entrance keyframe only needs to run
-   forward, never in reverse. */
+/* ── THE STANDARD — banner shell ───────────────────────────────────────
+   Replaces the old iris-open glass card. .results-reveal-panel is now
+   just a static positioning box (fixed/centered/sized, opacity+visibility
+   toggle only, NEVER an animated `transform` of its own — see the
+   ovl-scene-frame lesson in this file for why a centering transform and
+   an animated one can't safely share an element). All the actual "flag"
+   drama — crossbar extending, cloth unfurling into the shield taper,
+   residual sway — lives on the children below, each animating a
+   property nothing else on that element needs.
+
+   TUNABLE PARAMETERS (safe to tweak without touching the keyframes):
+     --banner-taper   how deep the bottom point cuts in (px, constant
+                       regardless of panel height — see the clip-path
+                       comment below for why this is px, not %)
+     --banner-unfurl-dur / --banner-unfurl-ease   main cloth reveal timing
+     --banner-sway-dur                             residual settle tail
+   */
 .results-reveal-panel {
+  --banner-taper: 58px;
+  --banner-unfurl-dur: .62s;
+  --banner-unfurl-ease: cubic-bezier(.22, 1.12, .36, 1);
+  --banner-sway-dur: .6s;
+  /* Same silhouette family as --ovl-shield-clip (broadcast-brand.css) —
+     flat top, near-vertical sides, single tapered point at the bottom —
+     re-derived for a wide, content-heavy panel instead of the compact
+     badge's 9%/91% margins (those exist to frame the badge's own
+     rounded artwork, not because the "shield" identity requires them).
+     calc(100% - var(--banner-taper)) keeps the taper a CONSTANT pixel
+     depth no matter how tall the panel renders (8 players vs 16), so a
+     fixed bottom padding on the content is always enough clearance —
+     a pure percentage taper would grow/shrink with content length and
+     could eat into the last row on a tall roster. */
+  --banner-clip: polygon(
+    0 0, 100% 0,
+    100% calc(100% - var(--banner-taper)),
+    50% 100%,
+    0 calc(100% - var(--banner-taper))
+  );
+  /* The gathered-at-the-bar resting shape — same 5-vertex topology as
+     --banner-clip (required for clean interpolation, see banner-unfurl's
+     comment) collapsed to a narrow ribbon hugging the crossbar. Doubles
+     as both keyframe 0% for the open ANIMATION and the base-rule value
+     the CLOSE transition falls back to — one shape definition, two jobs. */
+  --banner-clip-closed: polygon(42% 0, 58% 0, 58% 5%, 50% 5%, 42% 5%);
   position: fixed;
   top: 50%; left: 50%;
   z-index: 15;
   width: min(1220px, 90vw);
   max-height: 62vh;
   overflow-y: auto;
-  background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
-  border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
-  border-radius: var(--ovl-radius-lg, 18px);
-  padding: 1.7rem 2.1rem;
+  overflow-x: hidden;
+  padding: 2.6rem 2.3rem calc(1.8rem + var(--banner-taper)) 2.3rem;
+  /* The header/callouts/seats text has no close animation of its own —
+     it only ever plays its entrance ONCE, on mount (see
+     .results-reveal-panel__header etc. below), not on every .reveal-
+     active toggle — so THIS opacity is the only thing that ever takes it
+     off screen again. Tuned to fade at roughly the same pace as .cloth's
+     own close (.34s, no delay) rather than lagging behind it: an earlier
+     pass delayed this fade until AFTER the fabric had fully retracted,
+     which left the text floating fully readable with no backdrop under
+     it for ~200ms — worse than the small, forgivable flip side (the
+     crossbar's thin bar outliving the text by ~150-200ms, which reads
+     fine as "the rod is the last thing left" rather than as a glitch).
+     `visibility` waits for the single LONGEST child close animation
+     (crossbar: .2s delay + .26s = .46s) before fully removing the panel. */
   opacity: 0;
   visibility: hidden;
-  clip-path: circle(0% at 50% 45%);
-  transform: translate(-50%, -50%) perspective(1400px) rotateX(-9deg) scale(.9);
-  transition: clip-path .4s cubic-bezier(.4,0,1,1), transform .4s cubic-bezier(.4,0,1,1),
-              opacity .35s ease .05s, visibility 0s linear .4s;
-  backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
-  -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
-  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient);
-  will-change: clip-path, transform;
+  transform: translate(-50%, -50%);
+  transition: opacity .26s ease, visibility 0s linear .48s;
 }
 .overlay-fragment.reveal-active .results-reveal-panel {
   opacity: 1;
   visibility: visible;
   transition: opacity .1s ease;
-  animation: totem-iris-open .85s cubic-bezier(.16,.9,.2,1) .18s both;
-}
-@keyframes totem-iris-open {
-  0%   { clip-path: circle(0% at 50% 45%);
-         transform: translate(-50%, -50%) perspective(1400px) rotateX(-9deg) scale(.9);
-         box-shadow: 0 0 0 rgba(216,216,216,0); }
-  55%  { clip-path: circle(62% at 50% 45%); }
-  100% { clip-path: circle(100% at 50% 45%);
-         transform: translate(-50%, -50%) perspective(1400px) rotateX(0deg) scale(1);
-         box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), 0 0 40px rgba(216,216,216,.4); }
 }
 
 .overlay-fragment.reveal-active .overlay-ticker,
@@ -680,44 +705,254 @@ html, body {
   pointer-events: none;
 }
 
-/* Border "trace" — the same ring-via-double-mask technique as the card's
-   __frame, but instead of a static rotating ring, a bright comet chases
-   once fast around it as the iris opens (the border "igniting itself
-   into existence"), then keeps chasing slowly for as long as the panel
-   is on screen — the panel's own idle life. */
+/* ── The frame — thin metal edge hugging the shield silhouette ─────────
+   Sits BEHIND the cloth (DOM order), inset:0 to the panel's full taper
+   shape, while the cloth below sits inset by a few px inside it — so
+   this shows through as a slim metal/red rim, not a rectangular border
+   fighting the diagonal taper. filter:drop-shadow (not box-shadow) is
+   what lets the glow actually hug the clipped silhouette, including the
+   point, instead of glowing the box's rectangular bounds. */
 .results-reveal-panel__iris-trace {
-  position: absolute; inset: -1px;
-  border-radius: inherit;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   pointer-events: none;
-  padding: 1.5px;
+  clip-path: var(--banner-clip-closed);
+  background: linear-gradient(155deg,
+    var(--ovl-chrome-light, #FFFFFF) 0%, var(--ovl-chrome-dark, #9A9A9A) 32%,
+    var(--ovl-signal, #E31E24) 52%, var(--ovl-chrome-dark, #9A9A9A) 74%,
+    var(--ovl-chrome, #D8D8D8) 100%);
+  filter: drop-shadow(0 0 15px var(--ovl-signal-glow, rgba(227,30,36,.28)));
   opacity: 0;
-  background: conic-gradient(from var(--ovl-trace-angle, 0deg),
-    rgba(216,216,216,0) 0%, rgba(255,255,255,.95) 8%, rgba(216,216,216,.15) 30%,
-    rgba(216,216,216,0) 50%, rgba(255,255,255,.7) 78%, rgba(216,216,216,0) 100%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
+  /* Fallback CLOSE path — while .reveal-active is present the keyframe
+     animation below drives clip-path and this transition is suppressed
+     (an active CSS animation always wins its property over a transition);
+     the instant .reveal-active is removed the animation stops applying
+     and the element snaps back to this base rule's static values, which
+     THIS transition then animates smoothly — the frame retracting back
+     into the bar instead of just vanishing. Same "transition on the base
+     rule, keyframe only ever runs forward" split the old iris panel used. */
+  transition: clip-path .32s cubic-bezier(.4,0,1,1), opacity .3s ease;
 }
 .overlay-fragment.reveal-active .results-reveal-panel__iris-trace {
+  opacity: 1;
+  animation: banner-unfurl var(--banner-unfurl-dur) var(--banner-unfurl-ease) .16s both;
+}
+
+/* ── The crossbar — the rod the banner hangs from ──────────────────────
+   Extends from center outward (item 1 of the brief's sequence), then
+   the finials pop and the crest settles a beat later (items 2), all
+   BEFORE the cloth starts unfurling below. Brushed-metal gradient with
+   a thin red reflection band, same token family as the seat card frame/
+   camera edge elsewhere on this page — never a thick neon bar. */
+.results-reveal-panel__crossbar {
+  position: absolute;
+  top: 0; left: 4%; right: 4%;
+  height: 10px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    var(--ovl-chrome-light, #FFFFFF) 0%, var(--ovl-chrome, #D8D8D8) 22%,
+    var(--ovl-signal, #E31E24) 48%, var(--ovl-chrome-dark, #9A9A9A) 76%, #3a3a3a 100%);
+  border-radius: 1px;
+  box-shadow: 0 3px 10px rgba(0,0,0,.55), 0 0 12px 1px var(--ovl-signal-glow, rgba(227,30,36,.22));
+  transform: scaleX(0);
+  transform-origin: 50% 50%;
+  transition: transform .26s cubic-bezier(.4,0,1,1) .2s;
+}
+.overlay-fragment.reveal-active .results-reveal-panel__crossbar {
+  animation: banner-bar-extend .3s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes banner-bar-extend {
+  0%   { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}
+
+.results-reveal-panel__finial {
+  position: absolute;
+  top: 50%;
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--ovl-chrome-light, #FFFFFF), var(--ovl-chrome-dark, #9A9A9A) 60%, #2c2c2c 100%);
+  box-shadow: 0 0 8px 1px var(--ovl-signal-glow, rgba(227,30,36,.28));
+  opacity: 0;
+  transform: translateY(-50%) scale(.3);
+  transition: opacity .18s ease .16s, transform .18s ease .16s;
+}
+.results-reveal-panel__finial--l { left: -6px; }
+.results-reveal-panel__finial--r { right: -6px; }
+.overlay-fragment.reveal-active .results-reveal-panel__finial {
+  animation: banner-finial-pop .3s cubic-bezier(.3,1.6,.4,1) .34s both;
+}
+@keyframes banner-finial-pop {
+  0%   { opacity: 0; transform: translateY(-50%) scale(.3); }
+  70%  { opacity: 1; transform: translateY(-50%) scale(1.15); }
+  100% { opacity: 1; transform: translateY(-50%) scale(1); }
+}
+
+/* Small crest at bar-center — reuses the project's own badge asset (per
+   the brief: use an existing Mafia Style asset rather than inventing a
+   new emblem), not the huge idle-hero/logo-slot rendering — just a
+   ~30px accent marking the bar's midpoint. */
+.results-reveal-panel__crest {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(.4);
+  width: 30px; height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,.6));
+  transition: opacity .18s ease .1s, transform .18s ease .1s;
+}
+.results-reveal-panel__crest-img { width: 100%; height: auto; display: block; }
+.overlay-fragment.reveal-active .results-reveal-panel__crest {
+  animation: banner-crest-in .3s cubic-bezier(.3,1.5,.4,1) .42s both;
+}
+@keyframes banner-crest-in {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.4); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* ── The cloth — the fabric itself ─────────────────────────────────────
+   Inset a few px inside the frame so the metal edge (.iris-trace, behind
+   it in DOM/z-order) rims it. Nearly black with a soft red wash bleeding
+   down from the bar — never grey. Hangs from the crossbar's own
+   transform-origin (top center) for the residual sway, entirely separate
+   from the unfurl's clip-path animation (different properties, so the
+   two never fight for control of the same one — the exact bug this
+   file's comments elsewhere warn about). */
+.results-reveal-panel__cloth {
+  position: absolute;
+  inset: 3px;
+  z-index: 2;
+  pointer-events: none;
+  clip-path: var(--banner-clip-closed);
+  transform-origin: 50% 0%;
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%, var(--ovl-signal-glow, rgba(227,30,36,.28)) 0%, transparent 62%),
+    linear-gradient(178deg, var(--ovl-burgundy-light, #4A121A) 0%, var(--ovl-black, #0A0908) 38%, var(--ovl-ink, #050505) 100%);
+  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient);
+  backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  opacity: 0;
+  /* Same base-rule-transition CLOSE fallback as .iris-trace above — the
+     fabric gathers back up toward the bar instead of just fading out. */
+  transition: clip-path .34s cubic-bezier(.4,0,1,1), opacity .3s ease;
+}
+.overlay-fragment.reveal-active .results-reveal-panel__cloth {
+  opacity: 1;
   animation:
-    totem-trace-chase 1.1s cubic-bezier(.2,.8,.2,1) .18s 1 both,
-    totem-trace-idle 6s linear 1.3s infinite;
+    banner-unfurl var(--banner-unfurl-dur) var(--banner-unfurl-ease) .2s both,
+    banner-sway var(--banner-sway-dur) cubic-bezier(.36,.07,.19,.97) calc(var(--banner-unfurl-dur) + .2s) both;
 }
-@keyframes totem-trace-chase {
-  0%   { opacity: 0; --ovl-trace-angle: -120deg; }
-  20%  { opacity: 1; }
-  100% { opacity: .8; --ovl-trace-angle: 360deg; }
+/* Same shape family as --banner-clip on the outer panel (see its
+   comment) — a constant-px taper regardless of how tall this box ends
+   up rendering. Point count stays fixed across every keyframe below
+   (always 5 vertices, same winding order) purely so the browser can
+   interpolate each vertex's position smoothly instead of hard-cutting
+   between mismatched shapes — a real constraint of clip-path animation,
+   not a style choice. The overshoot at 78% (taper briefly deeper/wider
+   than the resting shape) is the "fabric settles past its final point
+   before relaxing back" beat the brief asks for, in one property instead
+   of a separate settle animation. */
+@keyframes banner-unfurl {
+  0%   { clip-path: var(--banner-clip-closed); }
+  30%  { clip-path: polygon(16% 0, 84% 0, 81% 34%, 50% 40%, 19% 34%); }
+  58%  { clip-path: polygon(2% 0, 98% 0, 95% 68%, 50% 82%, 5% 68%); }
+  78%  { clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--banner-taper) + 9px), 50% calc(100% + 7px), 0 calc(100% - var(--banner-taper) + 9px)); }
+  100% { clip-path: var(--banner-clip); }
 }
-@keyframes totem-trace-idle {
-  from { --ovl-trace-angle: 360deg; }
-  to   { --ovl-trace-angle: 720deg; }
+/* Residual sway — fabric hanging from the bar, quickly damping. Only the
+   decorative cloth moves; the header/callouts/seats printed on top of it
+   never get this transform, so names/scores stay perfectly still and
+   readable the instant they land (see the brief's readability note). */
+@keyframes banner-sway {
+  0%   { transform: skewY(0deg) scaleY(1); }
+  22%  { transform: skewY(-.85deg) scaleY(1.007); }
+  46%  { transform: skewY(.55deg) scaleY(.996); }
+  70%  { transform: skewY(-.25deg) scaleY(1.002); }
+  100% { transform: skewY(0deg) scaleY(1); }
+}
+
+/* Fold layers — two soft diagonal streaks near the left/right edges,
+   brighter than the base cloth ("края чуть более подсвеченные"), each on
+   its own slightly-offset delay so the two sides don't read as
+   perfectly synchronized — the "edges are never perfectly linear"
+   texture the brief asks for, without needing real per-vertex physics. */
+/* Fold/grain/sheen deliberately do NOT carry their own clip-path — the
+   parent .cloth's clip-path already clips its entire subtree to the
+   current (possibly still-unfurling) shape, so a second independently-
+   animated clip-path here would just desync from the parent's for the
+   ~100ms their delays differ, double-clipping into a jagged edge for no
+   benefit. Plain rectangles that ride along inside whatever shape the
+   parent currently is. */
+.results-reveal-panel__cloth-fold {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(100deg, transparent 40%, rgba(255,255,255,.07) 48%, rgba(255,255,255,.02) 52%, transparent 62%);
+}
+.results-reveal-panel__cloth-fold--l { left: 0; }
+.results-reveal-panel__cloth-fold--r { right: 0; transform: scaleX(-1); }
+.overlay-fragment.reveal-active .results-reveal-panel__cloth-fold--l {
+  animation: banner-fold-glow .5s ease-out .48s both;
+}
+.overlay-fragment.reveal-active .results-reveal-panel__cloth-fold--r {
+  animation: banner-fold-glow .5s ease-out .56s both;
+}
+@keyframes banner-fold-glow {
+  0%, 100% { opacity: 0; }
+  45%      { opacity: 1; }
+}
+
+/* Texture — the same tiled turbulence noise already budgeted for the
+   seat cards/scene grain elsewhere on this page, at low opacity so it
+   reads as fabric weave rather than visible static. */
+.results-reveal-panel__cloth-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .05;
+  mix-blend-mode: overlay;
+  background-image: var(--ovl-grain-uri);
+  background-size: 130px 130px;
+}
+
+/* One confident diagonal light pass right as the cloth finishes settling
+   — "light catching the fabric" — never a looping shimmer. */
+.results-reveal-panel__cloth-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(75deg, transparent 42%, rgba(255,255,255,.18) 50%, transparent 58%);
+  opacity: 0;
+  transform: translateX(-60%);
+}
+.overlay-fragment.reveal-active .results-reveal-panel__cloth-sheen {
+  animation: banner-sheen-pass .6s ease-out calc(var(--banner-unfurl-dur) + .1s) both;
+}
+@keyframes banner-sheen-pass {
+  0%   { opacity: 0; transform: translateX(-60%); }
+  35%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(60%); }
 }
 
 /* Title — a plotter-style wipe with a bright leading caret, like the
    headline is being drawn rather than fading in. */
 .results-reveal-panel__header {
   position: relative;
+  /* Content prints ON the cloth, not beside it — needs an explicit
+     z-index above .cloth/.cloth-fold/.iris-trace (z-index 1-2) since
+     those are positioned with a HIGHER stacking priority than a plain
+     position:relative element left at the default z-index:auto. Same
+     reasoning applies to __callouts/__seats below. */
+  z-index: 4;
   overflow: hidden;
   font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
   font-weight: 700;
@@ -751,6 +986,8 @@ html, body {
 }
 
 .results-reveal-panel__callouts {
+  position: relative;
+  z-index: 4;
   display: flex;
   gap: 1.8rem;
   flex-wrap: wrap;
@@ -794,6 +1031,8 @@ html, body {
 /* Two columns, not a wrapped tile grid — a flat row list like the idle-
    hero's own seat list, not a dashboard-style card grid. */
 .results-reveal-panel__seats {
+  position: relative;
+  z-index: 4;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0 2.5rem;
@@ -1933,7 +2172,7 @@ html, body {
   .overlay-seat-strip, .overlay-seat-strip__ignite,
   .totem-flash, .totem-flash__ring, .totem-flash__chroma, .totem-flash__chroma-r,
   .totem-flash__chroma-g, .totem-flash__chroma-b,
-  .results-reveal-panel, .results-reveal-panel__iris-trace, .results-reveal-panel__header,
+  .results-reveal-panel__header,
   .results-reveal-panel__header::after, .callout, .reveal-card__inner,
   .ovl-info-row,
   .overlay-idle-hero__logo, .overlay-idle-hero__wordmark, .overlay-idle-hero__tagline,
@@ -1954,6 +2193,35 @@ html, body {
   .overlay-full-standings { transform: translate(-50%, -50%) !important; }
   .ms-seat-card:hover, .ms-seat-card:hover .ms-seat-card__img { transform: none !important; }
   .ovl-embers, .ovl-hud-bracket { opacity: 0 !important; }
+
+  /* THE STANDARD (results-reveal-panel): the shield-taper silhouette is
+     the permanent brand shape, not a motion artifact, so — same
+     treatment as .overlay-idle-hero__info below — it's forced back to
+     its resting var(--banner-clip)/var(--banner-clip-closed) shape
+     instead of falling under the blanket clip-path:none above (which
+     would flatten the fabric/frame into a plain rectangle). Children are
+     safe to force fully opaque/untransformed unconditionally since the
+     whole subtree still only actually shows when the parent panel's own
+     opacity does (see .overlay-fragment.reveal-active .results-reveal-panel
+     above) — the unfurl/sway/bar-extend motion is gone, the banner just
+     snaps straight to its fully-open resting pose. */
+  .results-reveal-panel__iris-trace, .results-reveal-panel__cloth {
+    clip-path: var(--banner-clip) !important;
+    opacity: 1 !important;
+  }
+  .results-reveal-panel__crossbar {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .results-reveal-panel__finial { opacity: 1 !important; transform: translateY(-50%) !important; }
+  .results-reveal-panel__crest { opacity: 1 !important; transform: translate(-50%, -50%) !important; }
+  /* Fold/sheen are pure one-shot motion accents (a brief glow pulse, a
+     light sweep) with no "resting" pose worth freezing into — left
+     invisible, same call as the idle-hero panel's own ambient layers
+     just below. */
+  .results-reveal-panel__cloth-fold, .results-reveal-panel__cloth-sheen {
+    opacity: 0 !important;
+  }
 
   /* Info panel: the shield-cut shape and red edge are the permanent brand
      frame, not motion artifacts, so they're kept (not reset to none/0)

@@ -328,6 +328,30 @@
        data-last-finished-id changes). -->
   {% if last_game %}
   <div class="results-reveal-panel">
+    <!-- THE STANDARD — banner scaffold. A rigid crossbar the fabric hangs
+         from (never itself clipped to the shield taper below) plus small
+         end finials and a center crest reusing the site's own badge
+         asset — see broadcast-brand.css's --ovl-shield-clip for the
+         silhouette this component's taper is derived from. -->
+    <div class="results-reveal-panel__crossbar" aria-hidden="true">
+      <span class="results-reveal-panel__finial results-reveal-panel__finial--l"></span>
+      <span class="results-reveal-panel__crest">
+        <img src="{{ url_for('static', filename='img/mafia-style-badge.png') }}" alt="" class="results-reveal-panel__crest-img">
+      </span>
+      <span class="results-reveal-panel__finial results-reveal-panel__finial--r"></span>
+    </div>
+    <!-- The fabric — background/blur/texture/silhouette all live here
+         (moved off .results-reveal-panel itself, which stays a plain
+         static positioning box) so the shape-unfurl animation's own
+         `transform`/`clip-path` never has to share the property with the
+         panel's opacity/visibility toggle — see the ovl-scene-frame
+         lesson elsewhere in overlay.css for why that split matters. -->
+    <div class="results-reveal-panel__cloth" aria-hidden="true">
+      <span class="results-reveal-panel__cloth-fold results-reveal-panel__cloth-fold--l" aria-hidden="true"></span>
+      <span class="results-reveal-panel__cloth-fold results-reveal-panel__cloth-fold--r" aria-hidden="true"></span>
+      <span class="results-reveal-panel__cloth-grain" aria-hidden="true"></span>
+      <span class="results-reveal-panel__cloth-sheen" aria-hidden="true"></span>
+    </div>
     <div class="results-reveal-panel__iris-trace" aria-hidden="true"></div>
     <div class="results-reveal-panel__header results-reveal-panel__header--{{ win }}">
       {% if win == 'city' %}Победа города
