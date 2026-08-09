@@ -963,7 +963,18 @@ html, body {
   padding-bottom: .5rem;
   margin-bottom: .5rem;
   border-bottom: 1px solid rgba(216,216,216,.3);
+  /* Closed/resting shape — was previously the STARTING keyframe of an
+     unconditional animation that only ever ran once (on DOM mount), so
+     every reveal AFTER the first showed the headline already fully
+     printed while only the cloth/crossbar behind it visibly moved — the
+     exact "you just changed the shape, nothing else" complaint. Scoping
+     the animation below to .reveal-active (like .cloth/.crossbar already
+     are) makes it replay in full for every single game, in sync with the
+     fabric arriving; this base clip-path is what it snaps back to
+     between reveals. */
   clip-path: inset(0 100% 0 0);
+}
+.overlay-fragment.reveal-active .results-reveal-panel__header {
   animation: totem-header-wipe .55s cubic-bezier(.65,0,.15,1) .55s both;
 }
 .results-reveal-panel__header::after {
@@ -972,6 +983,9 @@ html, body {
   width: 3px;
   background: linear-gradient(180deg, transparent, rgba(255,255,255,.95), transparent);
   box-shadow: 0 0 12px 2px rgba(255,255,255,.8);
+  opacity: 0;
+}
+.overlay-fragment.reveal-active .results-reveal-panel__header::after {
   animation: totem-header-caret .55s cubic-bezier(.65,0,.15,1) .55s both;
 }
 @keyframes totem-header-wipe  { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
@@ -1004,11 +1018,16 @@ html, body {
   flex-direction: column;
   gap: .15rem;
   opacity: 0;
+}
+/* Scoped to .reveal-active for the same reason as the header above — an
+   unconditional animation only ever plays once, on mount, so it must be
+   re-scoped to the toggle to actually replay for every game. */
+.overlay-fragment.reveal-active .callout {
   animation: totem-callout-drop .5s cubic-bezier(.34,1.7,.4,1) both;
 }
-.results-reveal-panel__callouts .callout:nth-child(1) { animation-delay: .78s; }
-.results-reveal-panel__callouts .callout:nth-child(2) { animation-delay: .86s; }
-.results-reveal-panel__callouts .callout:nth-child(3) { animation-delay: .94s; }
+.overlay-fragment.reveal-active .results-reveal-panel__callouts .callout:nth-child(1) { animation-delay: .78s; }
+.overlay-fragment.reveal-active .results-reveal-panel__callouts .callout:nth-child(2) { animation-delay: .86s; }
+.overlay-fragment.reveal-active .results-reveal-panel__callouts .callout:nth-child(3) { animation-delay: .94s; }
 @keyframes totem-callout-drop {
   0%   { opacity: 0; transform: translateY(-22px) scale(.7); }
   60%  { opacity: 1; transform: translateY(4px) scale(1.05); }
@@ -1064,6 +1083,14 @@ html, body {
   font-size: 1.05rem;
   opacity: 0;
   will-change: transform, filter, opacity;
+}
+/* Scoped to .reveal-active — see the header's comment above for why:
+   this used to be unconditional and only ever resolved once, on mount,
+   leaving every SUBSEQUENT game's seat list just sitting there already
+   fully formed while the JS-spawned dust particles (spawnRevealBursts,
+   overlay.js — that part DOES re-fire every time) converged into a card
+   that had nothing left to visibly resolve into. */
+.overlay-fragment.reveal-active .reveal-card__inner {
   animation: totem-resolve .55s cubic-bezier(.2,.8,.2,1) both;
   animation-delay: calc(var(--d, 0ms) + 1.05s);
 }
@@ -2172,8 +2199,6 @@ html, body {
   .overlay-seat-strip, .overlay-seat-strip__ignite,
   .totem-flash, .totem-flash__ring, .totem-flash__chroma, .totem-flash__chroma-r,
   .totem-flash__chroma-g, .totem-flash__chroma-b,
-  .results-reveal-panel__header,
-  .results-reveal-panel__header::after, .callout, .reveal-card__inner,
   .ovl-info-row,
   .overlay-idle-hero__logo, .overlay-idle-hero__wordmark, .overlay-idle-hero__tagline,
   .ovl-label, .ovl-info-headline, .ovl-info-rule,
@@ -2221,6 +2246,20 @@ html, body {
      just below. */
   .results-reveal-panel__cloth-fold, .results-reveal-panel__cloth-sheen {
     opacity: 0 !important;
+  }
+  /* Header/callouts/seats now only ever animate while .reveal-active is
+     present (see their comments above — re-scoped from an unconditional
+     mount-once animation so they replay every game); forcing them
+     unconditionally opaque here would resurrect that same "visible even
+     when nothing's active" bug for reduced-motion users specifically, so
+     this stays scoped exactly like .results-reveal-panel itself. */
+  .overlay-fragment.reveal-active .results-reveal-panel__header,
+  .overlay-fragment.reveal-active .results-reveal-panel__header::after,
+  .overlay-fragment.reveal-active .callout,
+  .overlay-fragment.reveal-active .reveal-card__inner {
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
   }
 
   /* Info panel: the shield-cut shape and red edge are the permanent brand
