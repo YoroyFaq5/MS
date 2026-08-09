@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="а с тобой." />
+  <title>а с тобой.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400&display=swap"
+    rel="stylesheet"
+  />
+  <script type="module" crossorigin src="./assets/index-I78MH8AX.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BpwJwk8B.css">
+</head>
+<body class="is-loading">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <filter id="frame-warp" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence id="frame-warp-turb" type="fractalNoise" baseFrequency="0.004 0.01" numOctaves="2" seed="7" result="noise" />
+        <feDisplacementMap id="frame-warp-disp" in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
+  <div id="app">
+
+    <canvas id="ocean-canvas"></canvas>
+
+    <div id="grain" aria-hidden="true"></div>
+    <div id="vignette" aria-hidden="true"></div>
+    <div id="break-flash" aria-hidden="true"></div>
+
+    <div id="frame" aria-hidden="true">
+      <span class="frame-edge frame-edge--t"></span>
+      <span class="frame-edge frame-edge--r"></span>
+      <span class="frame-edge frame-edge--b"></span>
+      <span class="frame-edge frame-edge--l"></span>
+      <div class="frame-glare"></div>
+      <div class="frame-scan"></div>
+    </div>
+
+    <main id="poem" aria-label="письмо">
+      <section class="verse" data-scene="1">
+        <p class="line" data-line>Ты в шторм ушла с отцом — туда, где нет следа,</p>
+        <p class="line" data-line>где соль на языке и в волосах вода.</p>
+      </section>
+
+      <section class="verse" data-scene="2">
+        <p class="line" data-line>А я писал тебе привычное «как дела»,</p>
+        <p class="line" data-line>а между строк совсем другая мысль была.</p>
+      </section>
+
+      <section class="verse" data-scene="3">
+        <p class="line" data-line>Ты падала с доски и поднималась снова,</p>
+        <p class="line" data-line>искала свой баланс, доверившись волне.</p>
+        <p class="line" data-line>Я пересматривал — и не хватало слова,</p>
+        <p class="line" data-line>чтоб объяснить, чего так не хватает мне.</p>
+      </section>
+
+      <section class="verse" data-scene="4">
+        <p class="line line--solo" data-line>Ведь это я сказал, что можно по-разному скучать,</p>
+        <p class="line" data-line>и произнёс легко — почти что пошутил.</p>
+        <p class="line" data-line>Но за небрежностью я попросту скрывал,</p>
+        <p class="line" data-line>насколько по-другому я всё это ощутил.</p>
+      </section>
+
+      <section class="verse" data-scene="5">
+        <p class="line" data-line>И дело не в том, что оно родилось на днях —</p>
+        <p class="line" data-line>ты знаешь всё сама, я это не скрывал.</p>
+        <p class="line" data-line>Но с некоторых пор ему тесно в словах,</p>
+        <p class="line" data-line>и в этой тесноте я сам себя узнал.</p>
+      </section>
+
+      <section class="verse" data-scene="6">
+        <p class="line" data-line>Мне мало видеть, как тебя качает на волне,</p>
+        <p class="line" data-line>мне мало этих кадров, долетающих ко мне.</p>
+        <p class="line" data-line>Хочу услышать сам и этот ветер, и прибой,</p>
+        <p class="line" data-line>и быть не по ту сторону экрана — а с тобой.</p>
+      </section>
+    </main>
+
+    <div id="final-word" aria-hidden="true"><span>а с тобой.</span></div>
+
+    <div id="scene0-veil"></div>
+
+    <div id="scroll-hint"><span>прокрути, чтобы начать</span></div>
+
+    <button id="sound-toggle" type="button" aria-pressed="false" aria-label="Включить звук">
+      <span class="sound-toggle__dot"></span>
+      <span class="sound-toggle__label">звук</span>
+    </button>
+
+    <div id="scroll-space" aria-hidden="true"></div>
+  </div>
+
+</body>
+</html>
