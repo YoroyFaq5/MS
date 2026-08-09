@@ -41,8 +41,8 @@
 {% set secondary_facts = [] %}
 {% if superlatives.don %}{% set _ = secondary_facts.append({'label': 'Лучший Дон', 'role_class': 'reveal-card__role--don', 'rating': superlatives.don.rating, 'value': superlatives.don.value}) %}{% endif %}
 {% if superlatives.sheriff %}{% set _ = secondary_facts.append({'label': 'Лучший Шериф', 'role_class': 'reveal-card__role--sheriff', 'rating': superlatives.sheriff.rating, 'value': superlatives.sheriff.value}) %}{% endif %}
-{% if superlatives.civilian %}{% set _ = secondary_facts.append({'label': 'Лучший Мирный', 'role_class': 'reveal-card__role--civilian', 'rating': superlatives.civilian.rating, 'value': superlatives.civilian.value}) %}{% endif %}
-{% if superlatives.mafia %}{% set _ = secondary_facts.append({'label': 'Лучший Мафия', 'role_class': 'reveal-card__role--mafia', 'rating': superlatives.mafia.rating, 'value': superlatives.mafia.value}) %}{% endif %}
+{% if superlatives.civilian %}{% set _ = secondary_facts.append({'label': 'Лучший Красный', 'role_class': 'reveal-card__role--civilian', 'rating': superlatives.civilian.rating, 'value': superlatives.civilian.value}) %}{% endif %}
+{% if superlatives.mafia %}{% set _ = secondary_facts.append({'label': 'Лучший Чёрный', 'role_class': 'reveal-card__role--mafia', 'rating': superlatives.mafia.rating, 'value': superlatives.mafia.value}) %}{% endif %}
 {% if hot_streak_rating and hot_streak_count >= 2 %}{% set _ = secondary_facts.append({'label': 'Серия побед', 'role_class': '', 'rating': hot_streak_rating, 'value': hot_streak_count}) %}{% endif %}
 {% set facts = ([mvp_fact] if mvp_fact else []) + secondary_facts %}
 
