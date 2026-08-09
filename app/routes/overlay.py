@@ -273,7 +273,8 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
     full_ratings = standings_source if can_show_standings else []
 
     marquee_entries = (
-        marquee_stats.top_total + marquee_stats.top_pu_avg + marquee_stats.top_clean + marquee_stats.top_avg_score
+        marquee_stats.top_total + marquee_stats.top_pu_avg + marquee_stats.top_clean
+        + marquee_stats.top_dirty + marquee_stats.top_avg_score
         if marquee_stats else []
     )
     all_player_ids = (

@@ -330,7 +330,7 @@
        on having at least one non-empty block — an early tournament with
        no finished games yet would otherwise show an empty scrolling
        strip. -->
-  {% if layout_mode == 'commentators' and marquee_stats and (marquee_stats.top_total or marquee_stats.top_pu_avg or marquee_stats.top_clean or marquee_stats.top_avg_score) %}
+  {% if layout_mode == 'commentators' and marquee_stats and (marquee_stats.top_total or marquee_stats.top_pu_avg or marquee_stats.top_clean or marquee_stats.top_dirty or marquee_stats.top_avg_score) %}
   <div class="overlay-marquee {{ '' if control.show_marquee else 'is-hidden' }}" id="overlay-marquee">
     <div class="overlay-marquee__edge overlay-marquee__edge--l" aria-hidden="true"></div>
     <div class="overlay-marquee__track" id="overlay-marquee-track">
@@ -348,6 +348,7 @@
             ('Топ-3 турнира', marquee_stats.top_total),
             ('Лучший средний балл ПУ', marquee_stats.top_pu_avg),
             ('Меньше всего минусов', marquee_stats.top_clean),
+            ('Больше всего минусов', marquee_stats.top_dirty),
             ('Лучшие по среднему баллу', marquee_stats.top_avg_score),
           ] %}
           {% if entries %}

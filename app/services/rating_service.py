@@ -173,12 +173,13 @@ class MarqueeEntry:
 @dataclass
 class MarqueeStats:
     """Backs the Live-Commentators bottom marquee (see
-    RatingService.get_marquee_stats) — four independently-ranked top-3
+    RatingService.get_marquee_stats) — five independently-ranked top-3
     lists, tournament-scoped, no games-played floor (the tournament
     itself is the sample size)."""
     top_total: list        # top 3 by total_score (== the standings order)
     top_pu_avg: list       # top 3 by avg ПУ bonus, games where is_pu=True only
     top_clean: list        # top 3 "fewest minuses" — least-negative bonus_score sum first
+    top_dirty: list        # top 3 "most minuses" — most-negative bonus_score sum first
     top_avg_score: list    # top 3 by avg_score (total_score / games_played)
 
 
@@ -562,15 +563,16 @@ class RatingService:
 
     @staticmethod
     def get_marquee_stats(tournament_id: int) -> "MarqueeStats":
-        """Four top-3 lists for the scrolling stats marquee — tournament-
+        """Five top-3 lists for the scrolling stats marquee — tournament-
         scoped, no games-played floor (per the brief: within one
         tournament the sample IS the tournament, no separate threshold
         needed the way a lifetime/all-time stat would want one).
 
         Reuses get_tournament_rating (already ranked by total_score) +
         get_role_breakdown's per-player sums (pu_bonus_sum/pu_count for
-        the ПУ average, negative_bonus_sum for "fewest minuses") — no new
-        queries, just different sort keys over data both already fetch.
+        the ПУ average, negative_bonus_sum for the two "minuses" lists) —
+        no new queries, just different sort keys/filters over data both
+        already fetch.
         """
         ratings = [r for r in RatingService.get_tournament_rating(tournament_id) if r.games_played > 0]
         role_stats = RatingService.get_role_breakdown(tournament_id=tournament_id)
@@ -584,12 +586,19 @@ class RatingService:
                 pu_entries.append(MarqueeEntry(rating=r, value=stats.pu_bonus_sum / stats.pu_count))
         pu_entries.sort(key=lambda e: -e.value)
 
-        clean_entries = [
+        # Everyone with a role_stats row (i.e. at least one game) — 0 is a
+        # perfectly meaningful "fewest minuses" answer (nobody's cleaner
+        # than never having a negative bonus at all).
+        neg_entries = [
             MarqueeEntry(rating=r, value=role_stats[r.player_id].negative_bonus_sum)
             for r in ratings if r.player_id in role_stats
         ]
         # Least negative (closest to/at 0) first — "fewest minuses".
-        clean_entries.sort(key=lambda e: -e.value)
+        clean_entries = sorted(neg_entries, key=lambda e: -e.value)
+        # Most negative first — "most minuses". Filtered to actual
+        # offenders (< 0) same as the ПУ list filters to pu_count > 0 —
+        # a three-way tie at 0 isn't an interesting "worst" ranking.
+        dirty_entries = sorted((e for e in neg_entries if e.value < 0), key=lambda e: e.value)
 
         avg_entries = sorted(
             (MarqueeEntry(rating=r, value=r.avg_score) for r in ratings),
@@ -600,6 +609,7 @@ class RatingService:
             top_total=top_total,
             top_pu_avg=pu_entries[:3],
             top_clean=clean_entries[:3],
+            top_dirty=dirty_entries[:3],
             top_avg_score=avg_entries[:3],
         )
 
