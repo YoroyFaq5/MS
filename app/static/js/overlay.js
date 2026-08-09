@@ -110,7 +110,10 @@
   }
 
   // Timed so the converging dust finishes collapsing into each reveal
-  // card right as totem-resolve (overlay.css) lands.
+  // card right as totem-resolve (overlay.css) lands — that animation's
+  // own delay is `--d + 1.6s` with a .75s duration landing at ~55%
+  // (.41s in), so dust spawned ~500ms (its own average duration) before
+  // that arrives right on cue.
   function spawnRevealBursts() {
     if (REDUCED_MOTION) return;
     root.querySelectorAll('.reveal-card').forEach((card) => {
@@ -119,7 +122,7 @@
       const d = readDelayMs(card);
       setTimeout(() => {
         spawnParticles(particlesEl, { kind: 'converge', count: 5, size: [2, 3.5], dur: [400, 600], distance: [20, 46] });
-      }, d + 880);
+      }, d + 1510);
     });
   }
 

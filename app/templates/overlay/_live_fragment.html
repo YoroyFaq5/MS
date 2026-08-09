@@ -103,23 +103,6 @@
     </span>
   </div>
 
-  <!-- Full-viewport flash burst for the results reveal (Totem-of-Undying
-       style impact) — always present, empty, purely CSS-animated when
-       overlay.js adds .reveal-active to this same root element. Three
-       independent layers: ::before/::after on .totem-flash (radial bloom +
-       rotating ray burst, see overlay.css), .totem-flash__ring (an
-       expanding shockwave border), and .totem-flash__chroma (a 3-channel
-       RGB-split "sensor hit" flash — three tinted layers snapping back
-       into alignment). -->
-  <div class="totem-flash">
-    <div class="totem-flash__ring" aria-hidden="true"></div>
-    <div class="totem-flash__chroma" aria-hidden="true">
-      <span class="totem-flash__chroma-r"></span>
-      <span class="totem-flash__chroma-g"></span>
-      <span class="totem-flash__chroma-b"></span>
-    </div>
-  </div>
-
   <!-- Ambient ember stream — populated/emptied by overlay.js only while
        .reveal-active, drifting embers rising from the reveal panel as
        "residual energy" for as long as the results stay on screen. -->
