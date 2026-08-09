@@ -20,6 +20,12 @@
   const POLL_MS   = parseInt(root.dataset.pollIntervalMs, 10)   || 5000;
   const REVEAL_MS = parseInt(root.dataset.revealDurationMs, 10) || 25000;
   const TICKER_MS = parseInt(root.dataset.tickerIntervalMs, 10) || 8000;
+  // How long the results-reveal banner's staged CLOSE sequence takes
+  // (rows dissolve → callouts pop away → header un-wipes → cloth+frame
+  // retract → crest → finials → crossbar) — see the .is-hiding rules in
+  // overlay.css's SECTION 2. Keep in step with the LAST close there (the
+  // crossbar: 1.5s delay + .32s duration = 1.82s), plus a small buffer.
+  const REVEAL_CLOSE_MS = 1900;
 
   const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -28,6 +34,7 @@
   let currentCtl = root.firstElementChild ? parseCtl(root.firstElementChild.dataset.ctl) : null;
   let currentTimerStartedAt = currentCtl ? currentCtl.timerStartedAt : null;
   let revealTimeoutHandle = null;
+  let revealCloseTimeoutHandle = null;
   let tickerHandle = null;
   let emberHandle = null;
 
@@ -384,10 +391,34 @@
     }, TICKER_MS);
   }
 
+  // Staged CLOSE — mirrors THE STANDARD's entrance backwards (rows →
+  // callouts → header → cloth+frame → crest → finials → crossbar) via
+  // real @keyframes on .is-hiding (see overlay.css SECTION 2's CLOSE
+  // comments for why a plain `transition` falling back from the entrance
+  // `animation` doesn't work: a CSS transition only fires when an
+  // element's own SPECIFIED value changes, and these elements' specified
+  // opacity/transform/clip-path never did — only what the entrance
+  // animation was computing on top of them did). `.reveal-active` comes
+  // off immediately (so nothing re-triggers the entrance mid-close) and
+  // `.is-hiding` rides along for exactly as long as that reverse sequence
+  // takes, then both are cleared for a clean slate before the next reveal.
+  function closeReveal(fragmentRoot) {
+    if (revealCloseTimeoutHandle) { clearTimeout(revealCloseTimeoutHandle); revealCloseTimeoutHandle = null; }
+    fragmentRoot.classList.remove('reveal-active');
+    fragmentRoot.classList.add('is-hiding');
+    stopEmbers();
+    revealCloseTimeoutHandle = setTimeout(() => {
+      fragmentRoot.classList.remove('is-hiding');
+      revealCloseTimeoutHandle = null;
+    }, REVEAL_CLOSE_MS);
+  }
+
   function triggerReveal(pin) {
     const fragmentRoot = root.querySelector('.overlay-fragment');
     if (!fragmentRoot || !fragmentRoot.querySelector('.results-reveal-panel')) return;
     if (revealTimeoutHandle) { clearTimeout(revealTimeoutHandle); revealTimeoutHandle = null; }
+    if (revealCloseTimeoutHandle) { clearTimeout(revealCloseTimeoutHandle); revealCloseTimeoutHandle = null; }
+    fragmentRoot.classList.remove('is-hiding'); // cancel any close still mid-flight — re-opening wins
     const wasActive = fragmentRoot.classList.contains('reveal-active');
     fragmentRoot.classList.add('reveal-active');
     if (!wasActive) {
@@ -395,10 +426,7 @@
       startEmbers();
     }
     if (!pin) {
-      revealTimeoutHandle = setTimeout(() => {
-        fragmentRoot.classList.remove('reveal-active');
-        stopEmbers();
-      }, REVEAL_MS);
+      revealTimeoutHandle = setTimeout(() => closeReveal(fragmentRoot), REVEAL_MS);
     }
   }
 
@@ -406,8 +434,13 @@
     const fragmentRoot = root.querySelector('.overlay-fragment');
     if (!fragmentRoot) return;
     if (revealTimeoutHandle) { clearTimeout(revealTimeoutHandle); revealTimeoutHandle = null; }
-    fragmentRoot.classList.remove('reveal-active');
-    stopEmbers();
+    // Nothing open (already fully closed, or a previous close is already
+    // mid-flight) — closeReveal() already removed 'reveal-active' as its
+    // first step, so this guard also stops a repeat call (e.g. the next
+    // poll while revealOverride stays 'off') from restarting the close
+    // timer before the current one ever finishes.
+    if (!fragmentRoot.classList.contains('reveal-active')) return;
+    closeReveal(fragmentRoot);
   }
 
   // Applies the admin-controlled ticker/standings-mode/reveal-override

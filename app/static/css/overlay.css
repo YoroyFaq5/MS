@@ -589,28 +589,25 @@ html, body {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 2.6rem 2.3rem calc(1.8rem + var(--banner-taper)) 2.3rem;
-  /* The header/callouts/seats text has no close animation of its own —
-     it only ever plays its entrance ONCE, on mount (see
-     .results-reveal-panel__header etc. below), not on every .reveal-
-     active toggle — so THIS opacity is the only thing that ever takes it
-     off screen again. Tuned to fade at roughly the same pace as .cloth's
-     own close (.34s, no delay) rather than lagging behind it: an earlier
-     pass delayed this fade until AFTER the fabric had fully retracted,
-     which left the text floating fully readable with no backdrop under
-     it for ~200ms — worse than the small, forgivable flip side (the
-     crossbar's thin bar outliving the text by ~150-200ms, which reads
-     fine as "the rod is the last thing left" rather than as a glitch).
-     `visibility` waits for the single LONGEST child close animation
-     (crossbar: .2s delay + .26s = .46s) before fully removing the panel. */
-  opacity: 0;
+  /* No opacity of its own — every child now handles its OWN close (rows
+     dissolve, callouts pop away, header un-wipes, cloth+frame retract,
+     crest/finials/crossbar let go, each on its own delay — see their
+     individual CLOSE comments) in a sequence that mirrors the entrance
+     backwards: rows → callouts → header → cloth+frame → crest → finials
+     → crossbar. A second opacity fade here would just race that whole
+     staged unwind and, if it finished first, cut it off invisibly early
+     — exactly the trap an earlier pass fell into. `visibility` alone
+     keeps this out of paint/hit-testing, delayed until the LAST piece
+     (the crossbar: 1.5s delay + .32s = 1.82s) has finished. */
+  opacity: 1;
   visibility: hidden;
   transform: translate(-50%, -50%);
-  transition: opacity .26s ease, visibility 0s linear .48s;
+  transition: visibility 0s linear 1.9s;
 }
 .overlay-fragment.reveal-active .results-reveal-panel {
   opacity: 1;
   visibility: visible;
-  transition: opacity .1s ease;
+  transition: none;
 }
 
 .overlay-fragment.reveal-active .overlay-ticker,
@@ -645,19 +642,25 @@ html, body {
     var(--ovl-chrome, #D8D8D8) 100%);
   filter: drop-shadow(0 0 15px var(--ovl-signal-glow, rgba(227,30,36,.28)));
   opacity: 0;
-  /* Fallback CLOSE path — while .reveal-active is present the keyframe
-     animation below drives clip-path and this transition is suppressed
-     (an active CSS animation always wins its property over a transition);
-     the instant .reveal-active is removed the animation stops applying
-     and the element snaps back to this base rule's static values, which
-     THIS transition then animates smoothly — the frame retracting back
-     into the bar instead of just vanishing. Same "transition on the base
-     rule, keyframe only ever runs forward" split the old iris panel used. */
-  transition: clip-path .32s cubic-bezier(.4,0,1,1), opacity .3s ease;
 }
 .overlay-fragment.reveal-active .results-reveal-panel__iris-trace {
   opacity: 1;
   animation: banner-unfurl var(--banner-unfurl-dur) var(--banner-unfurl-ease) .25s both;
+}
+/* CLOSE — a real @keyframes triggered by .is-hiding, not a `transition`
+   (see .reveal-card__inner's CLOSE comment for the full reasoning — a
+   transition here silently never fired in testing, since this rule's
+   OWN specified clip-path/opacity never actually changed; only what the
+   entrance animation computed on top of them did). Delay 1.05s — the
+   reverse-close order is rows → callouts → header → (frame+cloth, here)
+   → crest → finials → crossbar, mirroring the entrance's crossbar →
+   finials → crest → cloth → header → callouts → rows backwards. */
+.overlay-fragment.is-hiding .results-reveal-panel__iris-trace {
+  animation: banner-furl .4s cubic-bezier(.4,0,1,1) 1.05s both;
+}
+@keyframes banner-furl {
+  0%   { opacity: 1; clip-path: var(--banner-clip); }
+  100% { opacity: 0; clip-path: var(--banner-clip-closed); }
 }
 
 /* ── The crossbar — the rod the banner hangs from ──────────────────────
@@ -682,14 +685,24 @@ html, body {
   box-shadow: 0 3px 10px rgba(0,0,0,.55), 0 0 12px 1px var(--ovl-signal-glow, rgba(227,30,36,.22));
   transform: scaleX(0);
   transform-origin: 50% 50%;
-  transition: transform .26s cubic-bezier(.4,0,1,1) .2s;
 }
 .overlay-fragment.reveal-active .results-reveal-panel__crossbar {
   animation: banner-bar-extend .45s cubic-bezier(.2,.8,.2,1) .1s both;
 }
+/* CLOSE — real @keyframes via .is-hiding (see .reveal-card__inner's
+   comment for why a `transition` here silently never fired). Closes
+   LAST of everything — the rod the whole flag hung from, mirroring how
+   it was the first thing to appear. */
+.overlay-fragment.is-hiding .results-reveal-panel__crossbar {
+  animation: banner-bar-retract .32s cubic-bezier(.4,0,1,1) 1.5s both;
+}
 @keyframes banner-bar-extend {
   0%   { transform: scaleX(0); }
   100% { transform: scaleX(1); }
+}
+@keyframes banner-bar-retract {
+  0%   { transform: scaleX(1); }
+  100% { transform: scaleX(0); }
 }
 
 .results-reveal-panel__finial {
@@ -701,17 +714,25 @@ html, body {
   box-shadow: 0 0 8px 1px var(--ovl-signal-glow, rgba(227,30,36,.28));
   opacity: 0;
   transform: translateY(-50%) scale(.3);
-  transition: opacity .18s ease .16s, transform .18s ease .16s;
 }
 .results-reveal-panel__finial--l { left: -6px; }
 .results-reveal-panel__finial--r { right: -6px; }
 .overlay-fragment.reveal-active .results-reveal-panel__finial {
   animation: banner-finial-pop .45s cubic-bezier(.3,1.6,.4,1) .5s both;
 }
+/* CLOSE — real @keyframes via .is-hiding. Second-to-last: after the
+   crest, before the bar itself. */
+.overlay-fragment.is-hiding .results-reveal-panel__finial {
+  animation: banner-finial-away .22s ease 1.4s both;
+}
 @keyframes banner-finial-pop {
   0%   { opacity: 0; transform: translateY(-50%) scale(.3); }
   70%  { opacity: 1; transform: translateY(-50%) scale(1.15); }
   100% { opacity: 1; transform: translateY(-50%) scale(1); }
+}
+@keyframes banner-finial-away {
+  0%   { opacity: 1; transform: translateY(-50%) scale(1); }
+  100% { opacity: 0; transform: translateY(-50%) scale(.3); }
 }
 
 /* Small crest at bar-center — reuses the project's own badge asset (per
@@ -728,15 +749,25 @@ html, body {
   justify-content: center;
   opacity: 0;
   filter: drop-shadow(0 2px 5px rgba(0,0,0,.6));
-  transition: opacity .18s ease .1s, transform .18s ease .1s;
 }
 .results-reveal-panel__crest-img { width: 100%; height: auto; display: block; }
 .overlay-fragment.reveal-active .results-reveal-panel__crest {
   animation: banner-crest-in .45s cubic-bezier(.3,1.5,.4,1) .62s both;
 }
+/* CLOSE — real @keyframes via .is-hiding. First of the hardware group
+   to close (it was the LAST of the three to appear — crossbar, then
+   finials, then crest) — see the frame's close-order comment above for
+   the full reverse sequence. */
+.overlay-fragment.is-hiding .results-reveal-panel__crest {
+  animation: banner-crest-away .22s ease 1.3s both;
+}
 @keyframes banner-crest-in {
   0%   { opacity: 0; transform: translate(-50%, -50%) scale(.4); }
   100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes banner-crest-away {
+  0%   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.4); }
 }
 
 /* ── The cloth — the fabric itself ─────────────────────────────────────
@@ -761,15 +792,18 @@ html, body {
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   opacity: 0;
-  /* Same base-rule-transition CLOSE fallback as .iris-trace above — the
-     fabric gathers back up toward the bar instead of just fading out. */
-  transition: clip-path .34s cubic-bezier(.4,0,1,1), opacity .3s ease;
 }
 .overlay-fragment.reveal-active .results-reveal-panel__cloth {
   opacity: 1;
   animation:
     banner-unfurl var(--banner-unfurl-dur) var(--banner-unfurl-ease) .3s both,
     banner-sway var(--banner-sway-dur) cubic-bezier(.36,.07,.19,.97) calc(var(--banner-unfurl-dur) + .3s) both;
+}
+/* CLOSE — real @keyframes via .is-hiding, same 1.05s delay as the frame
+   above so they retract together — the fabric gathers back up toward
+   the bar instead of just fading out. */
+.overlay-fragment.is-hiding .results-reveal-panel__cloth {
+  animation: banner-furl .4s cubic-bezier(.4,0,1,1) 1.05s both;
 }
 /* Same shape family as --banner-clip on the outer panel (see its
    comment) — a constant-px taper regardless of how tall this box ends
@@ -898,6 +932,13 @@ html, body {
 .overlay-fragment.reveal-active .results-reveal-panel__header {
   animation: totem-header-wipe .8s cubic-bezier(.65,0,.15,1) .85s both;
 }
+/* CLOSE — a real @keyframes triggered by .is-hiding, not a `transition`
+   (see .reveal-card__inner's CLOSE comment above for the full reasoning
+   — a transition here silently never fired in testing). Delay .8s so it
+   starts once the rows/callouts above it have finished dissolving away. */
+.overlay-fragment.is-hiding .results-reveal-panel__header {
+  animation: totem-header-unwipe .35s cubic-bezier(.4,0,1,1) .8s both;
+}
 .results-reveal-panel__header::after {
   content: "";
   position: absolute; top: 0; bottom: 0; left: 0;
@@ -909,8 +950,13 @@ html, body {
 .overlay-fragment.reveal-active .results-reveal-panel__header::after {
   animation: totem-header-caret .8s cubic-bezier(.65,0,.15,1) .85s both;
 }
+/* No CLOSE keyframe needed here — the caret is a one-shot "drawing pen"
+   that's already faded to opacity:0 by the time the header ever finishes
+   wiping in (see totem-header-caret's own `to`), so there's nothing left
+   to un-play. */
 @keyframes totem-header-wipe  { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes totem-header-caret { from { left: 0%; opacity: 1; } to { left: 100%; opacity: 0; } }
+@keyframes totem-header-unwipe { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 100% 0 0); } }
 
 .results-reveal-panel__header--city  { color: var(--ovl-chrome-light, #FFFFFF); }
 .results-reveal-panel__header--mafia { color: var(--ovl-signal-light, #FF3B3B); }
@@ -939,6 +985,7 @@ html, body {
   flex-direction: column;
   gap: .15rem;
   opacity: 0;
+  transform: translateY(-22px) scale(.7);
 }
 /* Scoped to .reveal-active for the same reason as the header above — an
    unconditional animation only ever plays once, on mount, so it must be
@@ -953,6 +1000,22 @@ html, body {
   0%   { opacity: 0; transform: translateY(-22px) scale(.7); }
   60%  { opacity: 1; transform: translateY(4px) scale(1.05); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* CLOSE — a real @keyframes triggered by .is-hiding, not a `transition`
+   (see .reveal-card__inner's CLOSE comment above for why a transition
+   here would silently never fire: this rule's specified opacity/
+   transform never actually changed, only what the entrance ANIMATION
+   was computing on top of them did, and transitions don't react to
+   that). Reverse entrance order: callout 3 pops away first, 1 last. */
+.overlay-fragment.is-hiding .callout {
+  animation: totem-callout-away .3s cubic-bezier(.4,0,.7,.4) both;
+}
+.overlay-fragment.is-hiding .results-reveal-panel__callouts .callout:nth-child(1) { animation-delay: .61s; }
+.overlay-fragment.is-hiding .results-reveal-panel__callouts .callout:nth-child(2) { animation-delay: .53s; }
+.overlay-fragment.is-hiding .results-reveal-panel__callouts .callout:nth-child(3) { animation-delay: .45s; }
+@keyframes totem-callout-away {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-22px) scale(.7); }
 }
 .callout__value {
   font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
@@ -1003,6 +1066,8 @@ html, body {
   font-family: 'Inter', sans-serif;
   font-size: 1.05rem;
   opacity: 0;
+  filter: blur(7px) brightness(2.4) saturate(1.6);
+  transform: scale(.85);
   will-change: transform, filter, opacity;
 }
 /* Scoped to .reveal-active — see the header's comment above for why:
@@ -1015,6 +1080,24 @@ html, body {
   animation: totem-resolve .75s cubic-bezier(.2,.8,.2,1) both;
   animation-delay: calc(var(--d, 0ms) + 1.6s);
 }
+/* CLOSE — a real @keyframes triggered by .is-hiding (set by
+   overlay.js's hideReveal — see its comment there), NOT a `transition`
+   falling back from the entrance animation above. That was the first
+   approach here and it silently never animated: a CSS transition only
+   fires when an element's own SPECIFIED value changes, and this rule's
+   specified opacity/filter/transform were 0/blur/scale(.85) the whole
+   time — the animation above just computed something else on top of
+   them temporarily. The instant .reveal-active stopped matching, the
+   value "changed" back to what it already specified, which transitions
+   don't see as a change at all — so it snapped instead of animating.
+   A fresh @keyframes bound to a genuinely NEW class match doesn't have
+   that problem (confirmed against a minimal repro outside this file).
+   Reverse-staggered via --d-rev (loop.revindex0 in the template): the
+   row that appeared LAST dissolves FIRST. */
+.overlay-fragment.is-hiding .reveal-card__inner {
+  animation: totem-dissolve .32s ease both;
+  animation-delay: var(--d-rev, 0ms);
+}
 /* First row in each of the two columns (assumes a 2-column grid) — no
    hairline above the very top of the list. */
 .results-reveal-panel__seats .reveal-card:nth-child(-n+2) .reveal-card__inner { border-top: none; }
@@ -1022,6 +1105,10 @@ html, body {
   0%   { opacity: 0; filter: blur(7px) brightness(2.4) saturate(1.6); transform: scale(.85); }
   55%  { opacity: 1; filter: blur(2px) brightness(1.6) saturate(1.2); transform: scale(1.03); }
   100% { opacity: 1; filter: blur(0) brightness(1) saturate(1);       transform: scale(1); }
+}
+@keyframes totem-dissolve {
+  0%   { opacity: 1; filter: blur(0) brightness(1) saturate(1);       transform: scale(1); }
+  100% { opacity: 0; filter: blur(7px) brightness(2.4) saturate(1.6); transform: scale(.85); }
 }
 
 .reveal-card__seat { color: var(--ms-muted, #8A8A8A); font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -2179,6 +2266,7 @@ html, body {
     opacity: 1 !important;
     transform: none !important;
     clip-path: none !important;
+    filter: none !important;
   }
 
   /* Info panel: the shield-cut shape and red edge are the permanent brand

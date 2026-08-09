@@ -367,7 +367,12 @@
     {% endif %}
     <div class="results-reveal-panel__seats">
       {% for slot in last_slots %}
-      <div class="reveal-card" style="--d:{{ loop.index0 * 90 }}ms">
+      {# --d-rev: closing-stagger delay, mirrored — the row that appeared
+         LAST (highest loop.index0) gets the SMALLEST close delay so it's
+         the first to dissolve when the banner hides; loop.revindex0 is
+         exactly that inverted index, already 0-based. See
+         .reveal-card__inner's close transition in overlay.css. #}
+      <div class="reveal-card" style="--d:{{ loop.index0 * 90 }}ms; --d-rev:{{ loop.revindex0 * 45 }}ms">
         <div class="reveal-card__particles" aria-hidden="true"></div>
         <div class="reveal-card__inner">
           <span class="reveal-card__seat">#{{ slot.seat_number }}</span>
