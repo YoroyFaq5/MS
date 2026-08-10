@@ -1165,9 +1165,14 @@ html, body {
   top: clamp(4.4rem, 8vh, 6.4rem); right: 1.1rem;
   z-index: 2;
   /* Narrower AND shorter than the old centered card — a dense HUD
-     instrument, not a trophy card with room to breathe. */
+     instrument, not a trophy card with room to breathe. Tuned to the
+     content's own natural height (eyebrow + rule + player + metric,
+     see .ticker-fact's gap below) rather than a rounder number — a
+     taller floor here just reproduces the old design's real problem:
+     dead air below the metric row that "space-between" used to spread
+     out across instead of removing. */
   width: clamp(200px, 13vw, 520px);
-  min-height: clamp(150px, 10.2vw, 410px);
+  min-height: clamp(120px, 7.6vw, 300px);
   background: var(--ovl-glass-bg, rgba(15,14,12,.6));
   border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
   clip-path: var(--ovl-panel-clip-sm, none);
@@ -1242,7 +1247,14 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: space-between;
+  /* flex-start + an explicit gap, not space-between — space-between was
+     the actual cause of the "empty space under the text" complaint: it
+     stretched the 3rd gap (player → metric) to eat up whatever was left
+     of the panel's height instead of just... not being there. Content
+     now packs at its own natural height; the panel's min-height above
+     is tuned to match it instead of the other way around. */
+  justify-content: flex-start;
+  gap: .5em;
   text-align: left;
   opacity: 0;
   visibility: hidden;
@@ -1363,7 +1375,8 @@ html, body {
   display: block;
   width: 100%;
   height: 1px;
-  margin: .5em 0;
+  /* Spacing now comes from .ticker-fact's own gap, not a margin here —
+     avoids double-spacing on top of it. */
   background: linear-gradient(90deg, var(--ovl-border-accent, rgba(216,216,216,.4)) 0%, transparent 85%);
   transform: scaleX(0);
   transform-origin: 0% 50%;
