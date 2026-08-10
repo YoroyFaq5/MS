@@ -1131,15 +1131,26 @@ html, body {
 
 /* ═══ SECTION 4: "ИНТЕРЕСНЫЕ ФАКТЫ" — broadcast graphic module, not a
    card ══════════════════════════════════════════════════════════════
-   A compact left-aligned HUD instrument: persistent frame (corner
-   brackets reusing .ovl-hud-bracket, a static red edge segment, an idle
-   scanline reusing the exact same keyframes as .overlay-mini-standings'
-   __scan) around a stack of three reveals — CATEGORY (small/technical),
-   PLAYER (the main visual weight), METRIC (value + a micro caption
-   derived from the value's own type, never fabricated). transform/
-   opacity/clip-path only; the only filter:blur used anywhere below is a
-   two-frame mid-transition pulse on the OUTGOING fact, well within the
-   "brief use during transition only" budget.
+   v2 — v1 still read as "a nice UI card": a uniform border, a plain
+   underline-style red bar, and a card-centered composition with dead
+   air below the metric row once "space-between" was removed. This pass
+   rebuilds three things:
+     1. FRAME: no uniform border/clip-path anymore. Two short asymmetric
+        rule segments (top-left, bottom-right) + two corner brackets
+        (reused .ovl-hud-bracket) + one corner "signal" wedge (a
+        triangle, not an underline) — a constructed frame, not a box.
+     2. COMPOSITION: the player name is the dominant object (bigger),
+        category is a secondary eyebrow with a small per-role MARK
+        glyph, the metric is its own two-line unit (value, then a tick
+        + caption), and a bottom segment strip (real position among the
+        actual rotating facts, via margin-top:auto — pinned to the
+        panel's bottom on purpose, not leftover space).
+     3. MOTION: rotation now has its own directional wipe-collapse
+        (mirrors the entrance wipe backwards) instead of a vertical
+        squash, and the frame itself reacts — brackets flicker, the
+        corner wedge pulses — via :has(), so "the whole module
+        reconfigures" instead of just the text swapping. SHOW/HIDE keep
+        their own separate, simpler motion (see below).
 
    TWO INDEPENDENT SYSTEMS, deliberately never sharing a selector:
      - SHOW/HIDE: .overlay-ticker.is-hidden — operator button only.
@@ -1147,14 +1158,15 @@ html, body {
        startTicker() in overlay.js only, runs on its own interval
        whether the panel is visible or not (so content is never stale
        the moment it's shown again).
-   The category/player/metric reveal itself is keyed purely off
-   ".overlay-ticker:not(.is-hidden) .ticker-fact.active" — which is what
-   lets ONE set of reveal keyframes correctly replay for BOTH triggers
-   (a fresh SHOW, and every auto-rotation) without the two systems ever
-   touching the same class, per the CSS rule "an element replays its
-   animation whenever the matching rule starts matching again" (already
-   relied on throughout this file — see .overlay-mini-standings/
-   .overlay-full-standings above). */
+   The category/player/metric/segments reveal is keyed off
+   ".overlay-ticker:not(.is-hidden) .ticker-fact.active" — one set of
+   keyframes correctly replays for BOTH a fresh SHOW and every
+   auto-rotation, since CSS restarts an animation whenever the matching
+   rule starts matching again (relied on throughout this file — see
+   .overlay-mini-standings/.overlay-full-standings above). The frame
+   reconfigure reaction below uses :has() (well past this project's
+   min-supported Chromium) to read the SAME .is-leaving/.is-entering
+   state from a sibling subtree without any extra JS-added class. */
 .overlay-ticker {
   --tk-show-dur: .42s;
   --tk-hide-dur: .24s;
@@ -1164,23 +1176,18 @@ html, body {
   position: fixed;
   top: clamp(4.4rem, 8vh, 6.4rem); right: 1.1rem;
   z-index: 2;
-  /* Narrower AND shorter than the old centered card — a dense HUD
-     instrument, not a trophy card with room to breathe. Tuned to the
-     content's own natural height (eyebrow + rule + player + metric,
-     see .ticker-fact's gap below) rather than a rounder number — a
-     taller floor here just reproduces the old design's real problem:
-     dead air below the metric row that "space-between" used to spread
-     out across instead of removing. */
-  width: clamp(200px, 13vw, 520px);
-  min-height: clamp(120px, 7.6vw, 300px);
+  /* Tuned to the new (taller — player is now the dominant object)
+     content's own natural height, same reasoning as before: a rounder
+     number here just reproduces dead air somewhere, min-height should
+     track what's actually inside. */
+  width: clamp(210px, 13.6vw, 540px);
+  min-height: clamp(158px, 8.8vw, 350px);
   background: var(--ovl-glass-bg, rgba(15,14,12,.6));
-  border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
-  clip-path: var(--ovl-panel-clip-sm, none);
-  padding: clamp(.85rem, .95vw, 2.3rem) clamp(.9rem, 1vw, 2.4rem);
+  padding: clamp(.85rem, .95vw, 2.3rem) clamp(.95rem, 1.05vw, 2.5rem);
   font-size: clamp(1.05rem, .98vw, 2.5rem);
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
-  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
+  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient);
   overflow: hidden;
   animation: ovl-hud-boot var(--tk-show-dur) cubic-bezier(.65,0,.15,1) both;
 }
@@ -1212,20 +1219,42 @@ html, body {
 }
 .overlay-ticker.is-hidden .overlay-ticker__sweep { animation: none; opacity: 0; }
 
-/* Static frame accents — a slim active-segment on the left edge (the
-   "red active segment" HUD detail) and a faint idle scanline (reusing
-   .overlay-mini-standings' exact keyframes, zero new ones needed). Both
-   sit BEHIND the content (z-index 1) and cost nothing once settled —
-   no permanent blur/shadow, just opacity/position. */
-.overlay-ticker__edge {
-  position: absolute; left: 0; top: 14%; bottom: 14%; width: 2px;
+/* ── The frame — a construction, not a box ──────────────────────────
+   Two short rule segments anchored to OPPOSITE corners (top-left /
+   bottom-right) instead of one line running the full perimeter — an
+   asymmetric, "technical drawing" read rather than a card outline. The
+   two .ovl-hud-bracket corners (reused from .overlay-mini-standings)
+   sit on the OTHER two corners, so all four corners carry something,
+   none of them the same thing twice. */
+.overlay-ticker__rule {
+  position: absolute;
+  height: 1px;
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(180deg, transparent, var(--ovl-signal, #E31E24) 20%, var(--ovl-signal, #E31E24) 80%, transparent);
-  opacity: .6;
-  animation: ovl-tk-edge-breathe 3.6s ease-in-out .5s infinite;
+  background: var(--ovl-border-accent, rgba(216,216,216,.35));
 }
-@keyframes ovl-tk-edge-breathe { 0%, 100% { opacity: .45; } 50% { opacity: .85; } }
+.overlay-ticker__rule--top    { top: 0; left: 0; width: 56%; }
+.overlay-ticker__rule--bottom { bottom: 0; right: 0; width: 56%; }
+
+/* The signal wedge — a small solid triangle in the corner the rule/
+   bracket pair leaves bare, standing in for the old underline bar. Red
+   as an ACCENT confined to one corner (a beacon), not a stripe run
+   along an edge. Idle: a slow, barely-there breathe. During rotation
+   (:has() below) it pulses outward from that same corner. */
+.overlay-ticker__corner-signal {
+  position: absolute; top: 0; right: 0;
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 0 15px 15px 0;
+  border-color: transparent var(--ovl-signal, #E31E24) transparent transparent;
+  z-index: 3;
+  pointer-events: none;
+  transform-origin: 100% 0%;
+  filter: drop-shadow(0 0 3px var(--ovl-signal-glow, rgba(227,30,36,.5)));
+  animation: ovl-tk-corner-idle 4.4s ease-in-out .5s infinite;
+}
+@keyframes ovl-tk-corner-idle { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
+
 .overlay-ticker__scan {
   position: absolute; left: 0; right: 0; top: 0; height: 10px;
   z-index: 1;
@@ -1234,6 +1263,28 @@ html, body {
   animation:
     ovl-hud-scan-boot .5s cubic-bezier(.65,0,.15,1) both,
     ovl-hud-scan-idle 6.5s linear .55s infinite;
+}
+
+/* ── Frame reconfigure — fires purely off the auto-rotation state of a
+   DESCENDANT fact via :has(), no extra class, no JS change. Brief and
+   restrained: a bracket flicker, a corner-wedge pulse — "the module
+   reacted", not a light show. ── */
+.overlay-ticker:has(.ticker-fact.is-leaving) .ovl-hud-bracket,
+.overlay-ticker:has(.ticker-fact.is-entering) .ovl-hud-bracket {
+  animation: ovl-tk-bracket-flicker .28s ease both;
+}
+@keyframes ovl-tk-bracket-flicker {
+  0%   { opacity: 1; transform: scale(1); }
+  40%  { opacity: .25; transform: scale(1.3); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.overlay-ticker:has(.ticker-fact.is-entering) .overlay-ticker__corner-signal {
+  animation: ovl-tk-corner-pulse .32s ease .05s both;
+}
+@keyframes ovl-tk-corner-pulse {
+  0%   { opacity: .7; transform: scale(1); }
+  45%  { opacity: 1; transform: scale(1.4); }
+  100% { opacity: .85; transform: scale(1); }
 }
 
 .overlay-ticker__stage {
@@ -1247,14 +1298,8 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  /* flex-start + an explicit gap, not space-between — space-between was
-     the actual cause of the "empty space under the text" complaint: it
-     stretched the 3rd gap (player → metric) to eat up whatever was left
-     of the panel's height instead of just... not being there. Content
-     now packs at its own natural height; the panel's min-height above
-     is tuned to match it instead of the other way around. */
   justify-content: flex-start;
-  gap: .5em;
+  gap: .55em;
   text-align: left;
   opacity: 0;
   visibility: hidden;
@@ -1266,20 +1311,22 @@ html, body {
   pointer-events: auto;
 }
 
-/* ── ROTATION: outgoing ─────────────────────────────────────────────── */
+/* ── ROTATION: outgoing — a directional wipe-closed (clip-path
+   right-inset growing to 100%), the exact mirror of the entrance wipe
+   used by category/player below, so open and close read as the same
+   mechanism running in reverse rather than two unrelated motions. ── */
 .ticker-fact.is-leaving {
   visibility: visible;
-  /* Starts right as the signal pulse (below) fires, so the collapse
-     reads as its consequence rather than a coincidence. */
-  animation: ovl-tk-collapse .18s cubic-bezier(.5,0,.75,.4) .07s both;
+  animation: ovl-tk-collapse .19s cubic-bezier(.5,0,.75,.4) .07s both;
 }
 @keyframes ovl-tk-collapse {
-  0%   { opacity: 1; transform: translateY(0) scale(1);      clip-path: inset(0 0 0 0);   filter: blur(0); }
-  55%  { opacity: .5; transform: translateY(-3px) scale(.98); clip-path: inset(0 0 4% 0);  filter: blur(1.5px); }
-  100% { opacity: 0; transform: translateY(-6px) scale(.97); clip-path: inset(0 0 100% 0); filter: blur(0); }
+  0%   { opacity: 1; transform: translateY(0) scale(1);       clip-path: inset(0 0 0 0);   filter: blur(0); }
+  60%  { opacity: .65; transform: translateY(-2px) scale(.99); clip-path: inset(0 45% 0 0); filter: blur(1.5px); }
+  100% { opacity: 0; transform: translateY(-4px) scale(.98);  clip-path: inset(0 100% 0 0); filter: blur(0); }
 }
 
-/* ── ROTATION: incoming ─────────────────────────────────────────────── */
+/* ── ROTATION: incoming — light container settle; the per-field wipes
+   below carry the actual reveal character. ── */
 .ticker-fact.is-entering {
   visibility: visible;
   animation: ovl-tk-settle .24s cubic-bezier(.2,.8,.2,1) both;
@@ -1292,7 +1339,7 @@ html, body {
 /* Signal — a thin bright line flashing across the fact's own top edge:
    fires on the outgoing fact right before it collapses AND on the
    incoming fact the instant it arrives, reading as "the module just
-   reconfigured" rather than two unrelated fades. 80ms, never loops. */
+   reconfigured" rather than two unrelated fades. 90ms, never loops. */
 .ticker-fact__signal {
   position: absolute; top: 0; left: 0; right: 0; height: 2px;
   z-index: 5;
@@ -1316,40 +1363,73 @@ html, body {
   100% { opacity: 0; transform: scaleX(1); }
 }
 
-/* ── Content reveal — see the section intro comment for why this is
-   keyed off .active (not .is-entering): it's what makes ONE set of
-   keyframes serve both SHOW and every auto-rotation. Staggered
-   category → player → metric, each a horizontal clip-path wipe (the
-   same "being printed" identity THE STANDARD's header uses elsewhere in
-   this file) rather than a plain fade. Closed/base state declared
-   explicitly (not just as a keyframe 0%) so a fact that gets
-   interrupted mid-reveal (.active removed mid-animation) always has a
-   real value to fall back to, ready to replay correctly next time. ── */
+/* ── Content reveal — keyed off .active (not .is-entering): what makes
+   ONE set of keyframes serve both SHOW and every auto-rotation (see the
+   section intro). Staggered mark+category → player → tick → metric →
+   segments, category/player as horizontal clip-path wipes (the same
+   "being printed" identity THE STANDARD's header uses elsewhere in this
+   file). Closed/base state declared explicitly (not just as a keyframe
+   0%) so an interrupted reveal (.active removed mid-animation) always
+   has a real resting value, ready to replay correctly next time. ── */
 .ticker-fact__eyebrow {
   position: relative;
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: .4em;
-  width: 100%;
+  gap: .5em;
   clip-path: inset(0 100% 0 0);
 }
 .overlay-ticker:not(.is-hidden) .ticker-fact.active .ticker-fact__eyebrow {
-  animation: ovl-tk-wipe .2s cubic-bezier(.65,0,.15,1) both;
+  animation: ovl-tk-wipe .18s cubic-bezier(.65,0,.15,1) both;
 }
-.ticker-fact__dot {
-  width: 5px; height: 5px;
-  border-radius: 50%;
+
+/* A small per-category glyph instead of a plain dot — shape carries the
+   category, color reuses the SAME .reveal-card__role--* tokens applied
+   to .ticker-fact__category below (background/border: currentColor, so
+   there's exactly one source of truth for "what color is this role"
+   per this page, not two). MVP/win-streak carry no role class, so both
+   fall back to the base chrome color — shape alone tells them apart. */
+.ticker-fact__mark {
+  width: 9px; height: 9px;
   flex: none;
-  background: var(--ovl-signal, #E31E24);
-  box-shadow: 0 0 5px 1px var(--ovl-signal-glow, rgba(227,30,36,.6));
+  color: var(--ovl-chrome-light, #FFFFFF);
 }
+.ticker-fact__mark.reveal-card__role--don      { color: var(--ovl-crimson, #C4232D); }
+.ticker-fact__mark.reveal-card__role--sheriff  { color: var(--ovl-steel-light, #B7C0CE); }
+.ticker-fact__mark.reveal-card__role--civilian { color: var(--ms-text, #F2F2F2); }
+.ticker-fact__mark.reveal-card__role--mafia    { color: var(--ovl-signal-light, #FF3B3B); }
+/* MVP — a diamond, "peak result". */
+.ticker-fact__mark--mvp {
+  background: currentColor;
+  transform: rotate(45deg);
+  box-shadow: 0 0 4px 0 currentColor;
+}
+/* Win streak — a small upward chevron, "trending up". */
+.ticker-fact__mark--streak {
+  background: currentColor;
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+}
+/* Дон — a hollow ring, "authority". */
+.ticker-fact__mark--don {
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+}
+/* Шериф — a small hexagon, echoing the club's shield motif. */
+.ticker-fact__mark--sheriff {
+  background: currentColor;
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+}
+/* Лучший Красный (civilian) — a plain filled circle. */
+.ticker-fact__mark--civilian { border-radius: 50%; background: currentColor; }
+/* Лучший Чёрный (mafia) — a sharp filled square. */
+.ticker-fact__mark--mafia { background: currentColor; }
+
 .ticker-fact__category {
   font-family: 'Inter', sans-serif;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .12em;
-  font-size: .84em;
+  font-size: .8em;
   color: var(--ovl-chrome-light, #FFFFFF);
 }
 /* Role tint reuses .reveal-card__role--* verbatim (already defined
@@ -1359,91 +1439,132 @@ html, body {
 .ticker-fact__category.reveal-card__role--sheriff { color: var(--ovl-steel-light, #B7C0CE); }
 .ticker-fact__category.reveal-card__role--civilian{ color: var(--ms-text, #F2F2F2); }
 .ticker-fact__category.reveal-card__role--mafia   { color: var(--ovl-signal-light, #FF3B3B); }
-.ticker-fact__index {
-  margin-left: auto;
-  font-family: 'Inter', sans-serif;
-  font-size: .72em;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: .04em;
-  color: var(--ms-muted, #8A8A8A);
-  flex: none;
-}
 
-.ticker-fact__rule {
-  position: relative;
-  z-index: 2;
-  display: block;
-  width: 100%;
-  height: 1px;
-  /* Spacing now comes from .ticker-fact's own gap, not a margin here —
-     avoids double-spacing on top of it. */
-  background: linear-gradient(90deg, var(--ovl-border-accent, rgba(216,216,216,.4)) 0%, transparent 85%);
-  transform: scaleX(0);
-  transform-origin: 0% 50%;
-}
-.overlay-ticker:not(.is-hidden) .ticker-fact.active .ticker-fact__rule {
-  animation: ovl-tk-draw .18s ease-out .07s both;
-}
-
+/* Player — the dominant object in the composition (per the brief: this
+   is what a viewer's eye should land on first), noticeably bigger than
+   v1's card-sized name. */
 .ticker-fact__player {
   position: relative;
   z-index: 2;
   font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: .01em;
-  font-size: 1.55em;
-  line-height: 1.05;
+  letter-spacing: .005em;
+  font-size: 1.9em;
+  line-height: 1.02;
   color: var(--ms-text, #F2F2F2);
   clip-path: inset(0 100% 0 0);
 }
 .overlay-ticker:not(.is-hidden) .ticker-fact.active .ticker-fact__player {
-  animation: ovl-tk-wipe .22s cubic-bezier(.65,0,.15,1) .08s both;
+  animation: ovl-tk-wipe .24s cubic-bezier(.65,0,.15,1) .08s both;
 }
 
+/* Short red tick leading into the metric — the "signal" motif reused
+   INSIDE the content this time (never a full-width underline), a
+   deliberate bridge between the player name and its number. */
+.ticker-fact__tick {
+  display: block;
+  width: 22px; height: 2px;
+  background: var(--ovl-signal, #E31E24);
+  transform: scaleX(0);
+  transform-origin: 0% 50%;
+}
+.overlay-ticker:not(.is-hidden) .ticker-fact.active .ticker-fact__tick {
+  animation: ovl-tk-draw .14s ease-out .17s both;
+}
+
+/* Metric — two lines, not one crowded inline row: the number reads as
+   its own graphic beat, the unit caption trails a short muted tick
+   underneath it rather than sitting flush against the number. */
 .ticker-fact__metric {
   position: relative;
   z-index: 2;
   display: flex;
-  align-items: baseline;
-  gap: .5em;
+  flex-direction: column;
+  gap: .22em;
   opacity: 0;
   transform: translateY(4px);
 }
 .overlay-ticker:not(.is-hidden) .ticker-fact.active .ticker-fact__metric {
-  animation: ovl-tk-rise .2s ease-out .16s both;
+  animation: ovl-tk-rise .2s ease-out .22s both;
 }
 .ticker-fact__value {
   font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
   font-weight: 700;
-  font-size: 1.35em;
+  font-size: 1.6em;
+  line-height: 1;
   color: var(--ovl-chrome-light, #FFFFFF);
   font-variant-numeric: tabular-nums;
 }
+.ticker-fact__metric-row {
+  display: flex;
+  align-items: center;
+  gap: .45em;
+}
+.ticker-fact__metric-tick {
+  width: 9px; height: 1px;
+  flex: none;
+  background: var(--ms-muted, #8A8A8A);
+}
 .ticker-fact__micro {
   font-family: 'Inter', sans-serif;
-  font-size: .62em;
+  font-size: .58em;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .1em;
   color: var(--ms-muted, #8A8A8A);
 }
 
-@keyframes ovl-tk-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-@keyframes ovl-tk-draw { to { transform: scaleX(1); } }
-@keyframes ovl-tk-rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+/* Segment strip — "which of N facts is this", pinned to the panel's
+   bottom via margin-top:auto (not stretched there by space-between —
+   see the section intro for why that distinction matters) so any extra
+   vertical room becomes a deliberate gap ABOVE a real element instead
+   of dead air below one. N and the current position are both the real
+   facts list (see the template's range(facts|length) loop), never a
+   fixed count. */
+.ticker-fact__segments {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: .3em;
+  margin-top: auto;
+  opacity: 0;
+}
+.overlay-ticker:not(.is-hidden) .ticker-fact.active .ticker-fact__segments {
+  animation: ovl-tk-fade-in .16s ease-out .3s both;
+}
+.ticker-fact__segment {
+  width: 9px; height: 2px;
+  flex: none;
+  background: var(--ovl-border-accent, rgba(216,216,216,.3));
+}
+.ticker-fact__segment.is-current {
+  width: 15px;
+  background: var(--ovl-signal, #E31E24);
+  box-shadow: 0 0 4px 0 var(--ovl-signal-glow, rgba(227,30,36,.5));
+}
+
+@keyframes ovl-tk-wipe    { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes ovl-tk-draw    { to { transform: scaleX(1); } }
+@keyframes ovl-tk-rise    { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes ovl-tk-fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 /* ── HIDE: content collapses first (fast, staggered in reverse —
-   metric/player/category), THEN the frame goes with the panel's own
-   ovl-hud-shutdown clip-path above. Rotation has no equivalent of this
-   — .is-leaving already handles "old content going away" for that
-   case; this rule only ever matches on .is-hidden. ── */
+   segments/metric/tick/player/eyebrow), THEN the frame goes with the
+   panel's own ovl-hud-shutdown clip-path above. Rotation has no
+   equivalent of this — .is-leaving already handles "old content going
+   away" for that case; this rule only ever matches on .is-hidden. ── */
+.overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__segments,
 .overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__metric,
+.overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__tick,
 .overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__player,
 .overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__eyebrow {
   animation: ovl-tk-away .1s ease-in both;
 }
-.overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__player  { animation-delay: .03s; }
+.overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__metric   { animation-delay: .02s; }
+.overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__tick    { animation-delay: .03s; }
+.overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__player  { animation-delay: .04s; }
 .overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__eyebrow { animation-delay: .06s; }
 @keyframes ovl-tk-away { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-3px); } }
 
@@ -2765,10 +2886,13 @@ html, body {
    A ::after works on all of them for free: clip-path on the parent
    already clips its own pseudo-elements to the cut-corner shape, so this
    bar trims itself at the notch automatically, whichever corner it's on. */
-/* .overlay-full-standings deliberately NOT in this list — it now draws
-   its own red accent as part of __frame's gradient (the shield-taper rim
-   would otherwise fight a plain rectangular bottom edge here). */
-.overlay-ticker::after,
+/* .overlay-full-standings and .overlay-ticker deliberately NOT in this
+   list — full-standings draws its own red accent as part of __frame's
+   gradient (the shield-taper rim would otherwise fight a plain
+   rectangular bottom edge here), and the ticker's red is a corner
+   "signal" wedge (.overlay-ticker__corner-signal) on purpose — a full-
+   width bottom bar was exactly the "looks glued on, reads as an
+   underline" complaint this redesign moved away from. */
 .overlay-mini-standings::after {
   content: "";
   position: absolute;
@@ -2797,7 +2921,8 @@ html, body {
   .ovl-label, .ovl-info-headline, .ovl-info-rule,
   .ovl-info-feature__name, .ovl-info-feature__value, .ovl-info-subrow,
   .overlay-ticker, .ticker-fact, .ticker-fact.active,
-  .ticker-fact__eyebrow, .ticker-fact__player, .ticker-fact__rule, .ticker-fact__metric,
+  .ticker-fact__eyebrow, .ticker-fact__player, .ticker-fact__tick, .ticker-fact__metric,
+  .ticker-fact__segments,
   .overlay-mini-standings, .overlay-mini-standings__scan, .ovl-hud-bracket, .overlay-mini-standings tr,
   .overlay-full-standings, .overlay-full-standings__content, .overlay-full-standings__title::after,
   .overlay-full-standings tr,
@@ -2812,14 +2937,13 @@ html, body {
   .ms-seat-card:hover, .ms-seat-card:hover .ms-seat-card__img { transform: none !important; }
   .ovl-embers, .ovl-hud-bracket { opacity: 0 !important; }
 
-  /* "ИНТЕРЕСНЫЕ ФАКТЫ": the cut-corner panel shape is the permanent
-     brand silhouette (same as .overlay-full-standings' taper above),
-     restored after the blanket clip-path:none a few lines up. The
-     one-shot SHOW sweep and idle scanline are pure motion accents with
-     no resting pose worth freezing into — hidden, same call as the
-     idle-hero panel's own ambient layers. The per-fact signal flash is
-     the same kind of one-shot accent. */
-  .overlay-ticker { clip-path: var(--ovl-panel-clip-sm, none) !important; }
+  /* "ИНТЕРЕСНЫЕ ФАКТЫ": no permanent clip-path to restore anymore (v2
+     dropped the corner-cut panel shape in favor of the rule/bracket/
+     corner-signal frame, all of which are static shapes already safe
+     under the blanket reset above). The one-shot SHOW sweep, idle
+     scanline, and per-fact signal flash are pure motion accents with no
+     resting pose worth freezing into — hidden, same call as the
+     idle-hero panel's own ambient layers. */
   .overlay-ticker__sweep, .overlay-ticker__scan, .ticker-fact__signal { opacity: 0 !important; }
 
   /* THE STANDARD (results-reveal-panel): the shield-taper silhouette is

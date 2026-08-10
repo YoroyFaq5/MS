@@ -459,49 +459,77 @@
   {% endif %}
 
   <!-- SECTION 3: rotating stats ticker — "ИНТЕРЕСНЫЕ ФАКТЫ", Live-Game's
-       top-right broadcast graphic module. A compact HUD instrument
-       (persistent corner brackets/edge/scanline — reusing the exact
-       same .ovl-hud-bracket component as .overlay-mini-standings — plus
-       a left-aligned eyebrow/player/metric stack per fact), not a
-       centered text card. All facts are rendered server-side (computed
-       near the top of this file, shared with the idle hero's 'ticker'
-       mode below); JS only toggles which .ticker-fact has .active every
-       ~8s — see startTicker() in overlay.js. SHOW/HIDE
-       (control.show_ticker) and the auto-rotation are two independent
-       systems on purpose: the operator button only ever toggles
-       .is-hidden on the outer .overlay-ticker; it never touches which
-       fact is .active or the rotation interval. See overlay.css for how
-       each is scoped to a different class selector so they physically
-       can't fight each other (no shared state, no possible race). Live-
-       Game only: Live-Commentators already has this same data as one of
-       its idle-hero center slots (control.idle_content), so the corner
-       version here would just be the same facts shown twice on screen
-       at once. -->
+       top-right broadcast graphic module. A constructed HUD frame
+       (corner brackets reusing .ovl-hud-bracket, two short asymmetric
+       rule segments instead of a uniform border, a corner "signal"
+       wedge instead of an underline bar, an idle scanline) around a
+       stack that uses its own vertical space on purpose: a small role
+       MARK + category (secondary), the PLAYER name as the dominant
+       object, a short red tick leading into the METRIC, and a bottom
+       segment strip standing in for "which of N facts is this" — real
+       data (loop position over the actual facts list), not a hardcoded
+       counter. All facts are rendered server-side (computed near the
+       top of this file, shared with the idle hero's 'ticker' mode
+       below); JS only toggles which .ticker-fact has .active every ~8s
+       — see startTicker() in overlay.js. SHOW/HIDE (control.show_ticker)
+       and the auto-rotation are two independent systems on purpose: the
+       operator button only ever toggles .is-hidden on the outer
+       .overlay-ticker; it never touches which fact is .active or the
+       rotation interval. See overlay.css for how each is scoped to a
+       different class selector so they physically can't fight each
+       other (no shared state, no possible race). Live-Game only: Live-
+       Commentators already has this same data as one of its idle-hero
+       center slots (control.idle_content), so the corner version here
+       would just be the same facts shown twice on screen at once. -->
   {% if facts and layout_mode == 'game' %}
   <div class="overlay-ticker {{ '' if control.show_ticker else 'is-hidden' }}">
-    <span class="ovl-hud-bracket ovl-hud-bracket--tr" aria-hidden="true"></span>
-    <span class="ovl-hud-bracket ovl-hud-bracket--bl" aria-hidden="true"></span>
-    <span class="overlay-ticker__edge" aria-hidden="true"></span>
+    <span class="ovl-hud-bracket ovl-hud-bracket--tl" aria-hidden="true"></span>
+    <span class="ovl-hud-bracket ovl-hud-bracket--br" aria-hidden="true"></span>
+    <span class="overlay-ticker__rule overlay-ticker__rule--top" aria-hidden="true"></span>
+    <span class="overlay-ticker__rule overlay-ticker__rule--bottom" aria-hidden="true"></span>
+    <span class="overlay-ticker__corner-signal" aria-hidden="true"></span>
     <span class="overlay-ticker__scan" aria-hidden="true"></span>
     <span class="overlay-ticker__sweep" aria-hidden="true"></span>
     <div class="overlay-ticker__stage">
       {% for fact in facts %}
+      {% set outer_idx = loop.index0 %}
       {% set is_num = fact.value is number %}
-      {# Derived from the value's own Python type (float score vs. int
-         streak count) — not a guess, not a new data field. #}
-      {% set micro = 'СЕРИЯ' if fact.value is integer else 'РЕЙТИНГ' %}
+      {% set is_streak = fact.value is integer %}
+      {# Derived purely from the value's own Python type (float score vs.
+         int streak count) — not a guess, not a new data field. #}
+      {% set micro = 'СЕРИЯ' if is_streak else 'РЕЙТИНГ' %}
+      {# Role-class string already carries the role name
+         ("reveal-card__role--don" -> "don") — reused to pick a mark
+         shape too, instead of inventing a second data source. #}
+      {% if is_streak %}
+        {% set mark_kind = 'streak' %}
+      {% elif fact.role_class %}
+        {% set mark_kind = fact.role_class.rsplit('--', 1)[-1] %}
+      {% else %}
+        {% set mark_kind = 'mvp' %}
+      {% endif %}
       <div class="ticker-fact {{ 'active' if loop.first }}">
         <span class="ticker-fact__signal" aria-hidden="true"></span>
         <div class="ticker-fact__eyebrow">
-          <span class="ticker-fact__dot" aria-hidden="true"></span>
+          <span class="ticker-fact__mark ticker-fact__mark--{{ mark_kind }} {{ fact.role_class }}" aria-hidden="true"></span>
           <span class="ticker-fact__category {{ fact.role_class }}">{{ fact.label }}</span>
-          <span class="ticker-fact__index">{{ "%02d"|format(loop.index) }}/{{ "%02d"|format(loop.length) }}</span>
         </div>
-        <span class="ticker-fact__rule" aria-hidden="true"></span>
         <div class="ticker-fact__player">{{ player_name(fact.rating, equipped_bulk.get(fact.rating.player_id, {})) }}</div>
+        <span class="ticker-fact__tick" aria-hidden="true"></span>
         <div class="ticker-fact__metric">
           <span class="ticker-fact__value" {% if is_num %}data-count-to="{{ fact.value|round(2) }}"{% endif %}>{{ fact.value|round(2) if is_num else fact.value }}</span>
-          <span class="ticker-fact__micro">{{ micro }}</span>
+          <span class="ticker-fact__metric-row" aria-hidden="true">
+            <span class="ticker-fact__metric-tick"></span>
+            <span class="ticker-fact__micro">{{ micro }}</span>
+          </span>
+        </div>
+        {# Position among the OTHER auto-rotating facts — loop.length is
+           the real current count (drops to fewer segments if e.g. no
+           hot streak this tournament), never a fixed number. #}
+        <div class="ticker-fact__segments" aria-hidden="true">
+          {% for i in range(facts|length) %}
+          <span class="ticker-fact__segment {{ 'is-current' if i == outer_idx }}"></span>
+          {% endfor %}
         </div>
       </div>
       {% endfor %}
