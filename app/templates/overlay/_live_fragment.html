@@ -330,7 +330,7 @@
        on having at least one non-empty block — an early tournament with
        no finished games yet would otherwise show an empty scrolling
        strip. -->
-  {% if layout_mode == 'commentators' and marquee_stats and (marquee_stats.top_total or marquee_stats.top_pu_avg or marquee_stats.top_clean or marquee_stats.top_dirty or marquee_stats.top_avg_score) %}
+  {% if layout_mode == 'commentators' and marquee_stats and (marquee_stats.top_total or marquee_stats.top_pu_avg or marquee_stats.top_clean or marquee_stats.top_dirty or marquee_stats.top_avg_score or marquee_stats.top_pu_count or marquee_stats.best_don or marquee_stats.best_sheriff or marquee_stats.best_civilian or marquee_stats.best_mafia) %}
   <div class="overlay-marquee {{ '' if control.show_marquee else 'is-hidden' }}" id="overlay-marquee">
     <div class="overlay-marquee__edge overlay-marquee__edge--l" aria-hidden="true"></div>
     <div class="overlay-marquee__track" id="overlay-marquee-track">
@@ -350,6 +350,11 @@
             ('Меньше всего минусов', marquee_stats.top_clean),
             ('Больше всего минусов', marquee_stats.top_dirty),
             ('Лучшие по среднему баллу', marquee_stats.top_avg_score),
+            ('Больше всего отстрелов', marquee_stats.top_pu_count),
+            ('Лучший Дон', marquee_stats.best_don),
+            ('Лучший Шериф', marquee_stats.best_sheriff),
+            ('Лучший Красный', marquee_stats.best_civilian),
+            ('Лучший Чёрный', marquee_stats.best_mafia),
           ] %}
           {% if entries %}
           <span class="overlay-marquee__block">

@@ -274,7 +274,9 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
 
     marquee_entries = (
         marquee_stats.top_total + marquee_stats.top_pu_avg + marquee_stats.top_clean
-        + marquee_stats.top_dirty + marquee_stats.top_avg_score
+        + marquee_stats.top_dirty + marquee_stats.top_avg_score + marquee_stats.top_pu_count
+        + marquee_stats.best_don + marquee_stats.best_sheriff + marquee_stats.best_civilian
+        + marquee_stats.best_mafia
         if marquee_stats else []
     )
     all_player_ids = (

@@ -175,12 +175,20 @@ class MarqueeStats:
     """Backs the Live-Commentators bottom marquee (see
     RatingService.get_marquee_stats) — five independently-ranked top-3
     lists, tournament-scoped, no games-played floor (the tournament
-    itself is the sample size)."""
+    itself is the sample size) — plus four single-winner role "best of"
+    blocks reusing RatingService.pick_role_superlatives (same criterion/
+    labels already shown in the "Интересные факты" ticker, just also
+    surfaced in the marquee per commentator request)."""
     top_total: list        # top 3 by total_score (== the standings order)
     top_pu_avg: list       # top 3 by avg ПУ bonus, games where is_pu=True only
     top_clean: list        # top 3 "fewest minuses" — least-negative bonus_score sum first
     top_dirty: list        # top 3 "most minuses" — most-negative bonus_score sum first
     top_avg_score: list    # top 3 by avg_score (total_score / games_played)
+    top_pu_count: list     # top 3 "больше всего отстрелов" — times shot night 1 (pu_count)
+    best_don: list         # 0 or 1 entry — "Лучший Дон" (highest bonus_don, > 0)
+    best_sheriff: list     # 0 or 1 entry — "Лучший Шериф" (highest bonus_sheriff, > 0)
+    best_civilian: list    # 0 or 1 entry — "Лучший Красный" (highest bonus_civilian, > 0)
+    best_mafia: list       # 0 or 1 entry — "Лучший Чёрный" (highest bonus_mafia, > 0)
 
 
 # ---------------------------------------------------------------------------
@@ -605,12 +613,39 @@ class RatingService:
             key=lambda e: -e.value,
         )
 
+        # "Топ по отстрелам" — most times shot night 1 (is_pu), same
+        # pu_count already aggregated by get_role_breakdown for the ПУ-
+        # average block above. Filtered to > 0 for the same reason as the
+        # "most minuses" list — a three-way tie at 0 isn't an interesting
+        # "most shot" ranking.
+        pu_count_entries = sorted(
+            (
+                MarqueeEntry(rating=r, value=role_stats[r.player_id].pu_count)
+                for r in ratings
+                if r.player_id in role_stats and role_stats[r.player_id].pu_count > 0
+            ),
+            key=lambda e: -e.value,
+        )
+
+        # Reuses the exact same superlatives already shown in the
+        # "Интересные факты" ticker (see overlay.py's _build_live_context)
+        # — single winner per role, only when bonus_score in that role > 0.
+        superlatives = RatingService.pick_role_superlatives(ratings, role_stats)
+
+        def _single(sup: Optional["RoleSuperlative"]) -> list:
+            return [MarqueeEntry(rating=sup.rating, value=sup.value)] if sup else []
+
         return MarqueeStats(
             top_total=top_total,
             top_pu_avg=pu_entries[:3],
             top_clean=clean_entries[:3],
             top_dirty=dirty_entries[:3],
             top_avg_score=avg_entries[:3],
+            top_pu_count=pu_count_entries[:3],
+            best_don=_single(superlatives.get("don")),
+            best_sheriff=_single(superlatives.get("sheriff")),
+            best_civilian=_single(superlatives.get("civilian")),
+            best_mafia=_single(superlatives.get("mafia")),
         )
 
     # ── Team rating ──────────────────────────────────────────────────────────
