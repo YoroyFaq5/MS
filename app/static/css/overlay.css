@@ -1129,147 +1129,310 @@ html, body {
 .reveal-card__role--don       { color: var(--ovl-crimson, #C4232D); }
 .reveal-card__role--mafia     { color: var(--ovl-signal-light, #FF3B3B); }
 
-/* ═══ SECTION 4: rotating stats ticker — "a small show, every time" ═════
-   The panel itself arrives via a camera-focus pull (3D tilt + blur→sharp,
-   distinct from the card's iris-flip and the standings' HUD-wipe). Each
-   fact change is a miniature split-flap board flip (rotateX with a
-   darkening "flap shadow" pseudo-element) rather than a plain crossfade,
-   finished off with a gold sweep across the value and numeric stats
-   counting up (see overlay.js animateTickerValue). */
+/* ═══ SECTION 4: "ИНТЕРЕСНЫЕ ФАКТЫ" — broadcast graphic module, not a
+   card ══════════════════════════════════════════════════════════════
+   A compact left-aligned HUD instrument: persistent frame (corner
+   brackets reusing .ovl-hud-bracket, a static red edge segment, an idle
+   scanline reusing the exact same keyframes as .overlay-mini-standings'
+   __scan) around a stack of three reveals — CATEGORY (small/technical),
+   PLAYER (the main visual weight), METRIC (value + a micro caption
+   derived from the value's own type, never fabricated). transform/
+   opacity/clip-path only; the only filter:blur used anywhere below is a
+   two-frame mid-transition pulse on the OUTGOING fact, well within the
+   "brief use during transition only" budget.
 
-/* Sized in vw-relative clamp()s, not fixed px — the seat cards below
-   already scale with the canvas via flex (width = strip-width / seat
-   count), so a fixed-px corner panel would drift out of proportion with
-   them on any canvas wider/narrower than the ~1920px this was eyeballed
-   at (e.g. it reads as "too small" on a 2560+ wide canvas, where the
-   cards have grown but this box hasn't). clamp() keeps a sane floor/
-   ceiling so it doesn't go illegibly tiny or absurdly huge at the
-   extremes. */
+   TWO INDEPENDENT SYSTEMS, deliberately never sharing a selector:
+     - SHOW/HIDE: .overlay-ticker.is-hidden — operator button only.
+     - AUTO-ROTATION: .ticker-fact.is-leaving/.is-entering/.active —
+       startTicker() in overlay.js only, runs on its own interval
+       whether the panel is visible or not (so content is never stale
+       the moment it's shown again).
+   The category/player/metric reveal itself is keyed purely off
+   ".overlay-ticker:not(.is-hidden) .ticker-fact.active" — which is what
+   lets ONE set of reveal keyframes correctly replay for BOTH triggers
+   (a fresh SHOW, and every auto-rotation) without the two systems ever
+   touching the same class, per the CSS rule "an element replays its
+   animation whenever the matching rule starts matching again" (already
+   relied on throughout this file — see .overlay-mini-standings/
+   .overlay-full-standings above). */
 .overlay-ticker {
-  position: fixed;
+  --tk-show-dur: .42s;
+  --tk-hide-dur: .24s;
   /* Cleared below .ovl-broadcast-bar (broadcast-brand.css), which now
      also lives in this top strip on Live pages — was 1.1rem, collided
      with the LIVE badge/brand tag when both were on screen at once. */
+  position: fixed;
   top: clamp(4.4rem, 8vh, 6.4rem); right: 1.1rem;
   z-index: 2;
-  width: clamp(235px, 14.8vw, 610px);
-  min-height: clamp(200px, 13.2vw, 540px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* Narrower AND shorter than the old centered card — a dense HUD
+     instrument, not a trophy card with room to breathe. */
+  width: clamp(200px, 13vw, 520px);
+  min-height: clamp(150px, 10.2vw, 410px);
   background: var(--ovl-glass-bg, rgba(15,14,12,.6));
   border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
   clip-path: var(--ovl-panel-clip-sm, none);
-  padding: clamp(1.1rem, 1.27vw, 3.2rem) clamp(.85rem, 1.04vw, 2.75rem);
-  font-size: clamp(1.17rem, 1.1vw, 2.8rem);
+  padding: clamp(.85rem, .95vw, 2.3rem) clamp(.9rem, 1vw, 2.4rem);
+  font-size: clamp(1.05rem, .98vw, 2.5rem);
   backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
   box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
-  opacity: 0;
-  transform: perspective(600px) rotateX(-25deg) scale(.9);
-  filter: blur(6px);
-  animation: ovl-ticker-focus .5s cubic-bezier(.22,.85,.25,1) both;
-}
-@keyframes ovl-ticker-focus {
-  0%   { opacity: 0; filter: blur(9px); transform: perspective(600px) rotateX(-25deg) scale(.9); }
-  100% { opacity: 1; filter: blur(0);   transform: perspective(600px) rotateX(0deg) scale(1); }
+  overflow: hidden;
+  animation: ovl-hud-boot var(--tk-show-dur) cubic-bezier(.65,0,.15,1) both;
 }
 .overlay-ticker.is-hidden {
   pointer-events: none;
-  animation: ovl-ticker-unfocus .3s cubic-bezier(.4,0,1,1) both;
+  animation: ovl-hud-shutdown var(--tk-hide-dur) cubic-bezier(.4,0,1,1) both;
 }
-@keyframes ovl-ticker-unfocus {
-  0%   { opacity: 1; filter: blur(0); transform: perspective(600px) rotateX(0deg) scale(1); }
-  100% { opacity: 0; filter: blur(8px); transform: perspective(600px) rotateX(18deg) scale(.92); }
+/* ovl-hud-boot/ovl-hud-shutdown reused verbatim from
+   .overlay-mini-standings above (plain clip-path+opacity, no custom
+   properties involved) — same "HUD panel boots up" identity, so the two
+   corner panels read as one family of object. */
+
+/* One-shot diagonal red sweep, SHOW only — never loops, never fires on
+   auto-rotation. This plus the brackets snapping on is what makes SHOW
+   read as "a graphic module switching on" instead of a plain fade. */
+.overlay-ticker__sweep {
+  position: absolute; inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 40%, var(--ovl-signal-glow, rgba(227,30,36,.35)) 50%, transparent 60%);
+  opacity: 0;
+  transform: translateX(-140%);
+  animation: ovl-tk-sweep-pass .4s ease-out .08s both;
+}
+@keyframes ovl-tk-sweep-pass {
+  0%   { opacity: 0; transform: translateX(-140%); }
+  30%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(140%); }
+}
+.overlay-ticker.is-hidden .overlay-ticker__sweep { animation: none; opacity: 0; }
+
+/* Static frame accents — a slim active-segment on the left edge (the
+   "red active segment" HUD detail) and a faint idle scanline (reusing
+   .overlay-mini-standings' exact keyframes, zero new ones needed). Both
+   sit BEHIND the content (z-index 1) and cost nothing once settled —
+   no permanent blur/shadow, just opacity/position. */
+.overlay-ticker__edge {
+  position: absolute; left: 0; top: 14%; bottom: 14%; width: 2px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, var(--ovl-signal, #E31E24) 20%, var(--ovl-signal, #E31E24) 80%, transparent);
+  opacity: .6;
+  animation: ovl-tk-edge-breathe 3.6s ease-in-out .5s infinite;
+}
+@keyframes ovl-tk-edge-breathe { 0%, 100% { opacity: .45; } 50% { opacity: .85; } }
+.overlay-ticker__scan {
+  position: absolute; left: 0; right: 0; top: 0; height: 10px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,.7), transparent);
+  animation:
+    ovl-hud-scan-boot .5s cubic-bezier(.65,0,.15,1) both,
+    ovl-hud-scan-idle 6.5s linear .55s infinite;
 }
 
 .overlay-ticker__stage {
   position: relative;
   width: 100%; height: 100%;
-  perspective: 500px;
+  z-index: 2;
 }
 
 .ticker-fact {
   position: absolute; inset: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: .3rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  text-align: left;
   opacity: 0;
   visibility: hidden;
-  backface-visibility: hidden;
-  transform-origin: 50% 100%;
-}
-.ticker-fact::before {
-  content: "";
-  position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,.5), transparent 60%);
-  opacity: 0;
   pointer-events: none;
 }
-.ticker-fact.active { opacity: 1; visibility: visible; transform: rotateX(0deg); }
+.ticker-fact.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* ── ROTATION: outgoing ─────────────────────────────────────────────── */
 .ticker-fact.is-leaving {
   visibility: visible;
-  animation: ovl-flap-out .5s cubic-bezier(.5,0,.75,0) both;
+  /* Starts right as the signal pulse (below) fires, so the collapse
+     reads as its consequence rather than a coincidence. */
+  animation: ovl-tk-collapse .18s cubic-bezier(.5,0,.75,.4) .07s both;
 }
-.ticker-fact.is-leaving::before { animation: ovl-flap-shade .5s ease both; }
+@keyframes ovl-tk-collapse {
+  0%   { opacity: 1; transform: translateY(0) scale(1);      clip-path: inset(0 0 0 0);   filter: blur(0); }
+  55%  { opacity: .5; transform: translateY(-3px) scale(.98); clip-path: inset(0 0 4% 0);  filter: blur(1.5px); }
+  100% { opacity: 0; transform: translateY(-6px) scale(.97); clip-path: inset(0 0 100% 0); filter: blur(0); }
+}
+
+/* ── ROTATION: incoming ─────────────────────────────────────────────── */
 .ticker-fact.is-entering {
   visibility: visible;
-  animation: ovl-flap-in .5s cubic-bezier(.25,1,.4,1) .1s both;
+  animation: ovl-tk-settle .24s cubic-bezier(.2,.8,.2,1) both;
 }
-@keyframes ovl-flap-out {
-  0%   { opacity: 1; transform: rotateX(0deg);   filter: blur(0) brightness(1); }
-  60%  { opacity: 1; transform: rotateX(-80deg); filter: blur(3px) brightness(.6); }
-  100% { opacity: 0; transform: rotateX(-100deg); filter: blur(4px) brightness(.4); }
-}
-@keyframes ovl-flap-shade { 0% { opacity: 0; } 55% { opacity: .7; } 100% { opacity: 0; } }
-@keyframes ovl-flap-in {
-  0%   { opacity: 0; transform: rotateX(90deg); filter: blur(4px) brightness(1.8); }
-  45%  { opacity: 1; filter: blur(1px) brightness(1.3); }
-  100% { opacity: 1; transform: rotateX(0deg);  filter: blur(0) brightness(1); }
+@keyframes ovl-tk-settle {
+  0%   { opacity: 0; transform: translateY(5px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
-.ticker-fact__label {
+/* Signal — a thin bright line flashing across the fact's own top edge:
+   fires on the outgoing fact right before it collapses AND on the
+   incoming fact the instant it arrives, reading as "the module just
+   reconfigured" rather than two unrelated fades. 80ms, never loops. */
+.ticker-fact__signal {
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  z-index: 5;
+  pointer-events: none;
+  background: var(--ovl-signal-light, #FF3B3B);
+  box-shadow: 0 0 8px 1px var(--ovl-signal-glow, rgba(227,30,36,.5));
+  opacity: 0;
+  transform: scaleX(0);
+}
+.ticker-fact.is-leaving .ticker-fact__signal {
+  animation: ovl-tk-signal .09s linear both;
+  transform-origin: 0% 50%;
+}
+.ticker-fact.is-entering .ticker-fact__signal {
+  animation: ovl-tk-signal .09s linear both;
+  transform-origin: 100% 50%;
+}
+@keyframes ovl-tk-signal {
+  0%   { opacity: 0; transform: scaleX(0); }
+  40%  { opacity: 1; transform: scaleX(1); }
+  100% { opacity: 0; transform: scaleX(1); }
+}
+
+/* ── Content reveal — see the section intro comment for why this is
+   keyed off .active (not .is-entering): it's what makes ONE set of
+   keyframes serve both SHOW and every auto-rotation. Staggered
+   category → player → metric, each a horizontal clip-path wipe (the
+   same "being printed" identity THE STANDARD's header uses elsewhere in
+   this file) rather than a plain fade. Closed/base state declared
+   explicitly (not just as a keyframe 0%) so a fact that gets
+   interrupted mid-reveal (.active removed mid-animation) always has a
+   real value to fall back to, ready to replay correctly next time. ── */
+.ticker-fact__eyebrow {
   position: relative;
-  padding-bottom: 2px;
-  color: var(--ovl-chrome-light, #FFFFFF);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: .4em;
+  width: 100%;
+  clip-path: inset(0 100% 0 0);
+}
+.overlay-ticker:not(.is-hidden) .ticker-fact.active .ticker-fact__eyebrow {
+  animation: ovl-tk-wipe .2s cubic-bezier(.65,0,.15,1) both;
+}
+.ticker-fact__dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--ovl-signal, #E31E24);
+  box-shadow: 0 0 5px 1px var(--ovl-signal-glow, rgba(227,30,36,.6));
+}
+.ticker-fact__category {
+  font-family: 'Inter', sans-serif;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-size: .84em;
+  color: var(--ovl-chrome-light, #FFFFFF);
 }
-.ticker-fact__label::after {
-  content: "";
-  position: absolute; left: 25%; right: 25%; bottom: -2px; height: 1px;
-  background: var(--ovl-chrome-light, #FFFFFF);
-  opacity: .35;
-  animation: ovl-label-breathe 4s ease-in-out infinite;
-}
-@keyframes ovl-label-breathe {
-  0%, 100% { left: 25%; right: 25%; opacity: .35; }
-  50%      { left: 10%; right: 10%; opacity: .7; }
+/* Role tint reuses .reveal-card__role--* verbatim (already defined
+   above for the seat cards/reveal panel) — same palette everywhere a
+   role is named on this page. Empty for MVP/win-streak (no role). */
+.ticker-fact__category.reveal-card__role--don     { color: var(--ovl-crimson, #C4232D); }
+.ticker-fact__category.reveal-card__role--sheriff { color: var(--ovl-steel-light, #B7C0CE); }
+.ticker-fact__category.reveal-card__role--civilian{ color: var(--ms-text, #F2F2F2); }
+.ticker-fact__category.reveal-card__role--mafia   { color: var(--ovl-signal-light, #FF3B3B); }
+.ticker-fact__index {
+  margin-left: auto;
+  font-family: 'Inter', sans-serif;
+  font-size: .72em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .04em;
+  color: var(--ms-muted, #8A8A8A);
+  flex: none;
 }
 
-.ticker-fact__value {
+.ticker-fact__rule {
   position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 1px;
+  margin: .5em 0;
+  background: linear-gradient(90deg, var(--ovl-border-accent, rgba(216,216,216,.4)) 0%, transparent 85%);
+  transform: scaleX(0);
+  transform-origin: 0% 50%;
+}
+.overlay-ticker:not(.is-hidden) .ticker-fact.active .ticker-fact__rule {
+  animation: ovl-tk-draw .18s ease-out .07s both;
+}
+
+.ticker-fact__player {
+  position: relative;
+  z-index: 2;
+  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
   font-weight: 700;
-  font-size: clamp(1.63rem, 1.48vw, 3.7rem);
+  text-transform: uppercase;
+  letter-spacing: .01em;
+  font-size: 1.55em;
+  line-height: 1.05;
+  color: var(--ms-text, #F2F2F2);
+  clip-path: inset(0 100% 0 0);
 }
-.ticker-fact.is-entering .ticker-fact__value::after {
-  content: "";
-  position: absolute; inset: -2px -6px;
-  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.8) 48%, transparent 66%);
-  animation: ovl-value-sweep .5s ease-out .45s both;
+.overlay-ticker:not(.is-hidden) .ticker-fact.active .ticker-fact__player {
+  animation: ovl-tk-wipe .22s cubic-bezier(.65,0,.15,1) .08s both;
 }
-@keyframes ovl-value-sweep {
-  0%   { transform: translateX(-120%); opacity: 0; }
-  25%  { opacity: 1; }
-  100% { transform: translateX(120%); opacity: 0; }
+
+.ticker-fact__metric {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: .5em;
+  opacity: 0;
+  transform: translateY(4px);
 }
-.ticker-fact__extra {
-  color: var(--ms-muted, #8A8A8A);
-  font-size: clamp(1.1rem, .99vw, 2.55rem);
+.overlay-ticker:not(.is-hidden) .ticker-fact.active .ticker-fact__metric {
+  animation: ovl-tk-rise .2s ease-out .16s both;
+}
+.ticker-fact__value {
+  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
+  font-weight: 700;
+  font-size: 1.35em;
+  color: var(--ovl-chrome-light, #FFFFFF);
   font-variant-numeric: tabular-nums;
 }
+.ticker-fact__micro {
+  font-family: 'Inter', sans-serif;
+  font-size: .62em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--ms-muted, #8A8A8A);
+}
+
+@keyframes ovl-tk-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes ovl-tk-draw { to { transform: scaleX(1); } }
+@keyframes ovl-tk-rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── HIDE: content collapses first (fast, staggered in reverse —
+   metric/player/category), THEN the frame goes with the panel's own
+   ovl-hud-shutdown clip-path above. Rotation has no equivalent of this
+   — .is-leaving already handles "old content going away" for that
+   case; this rule only ever matches on .is-hidden. ── */
+.overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__metric,
+.overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__player,
+.overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__eyebrow {
+  animation: ovl-tk-away .1s ease-in both;
+}
+.overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__player  { animation-delay: .03s; }
+.overlay-ticker.is-hidden .ticker-fact.active .ticker-fact__eyebrow { animation-delay: .06s; }
+@keyframes ovl-tk-away { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-3px); } }
 
 /* ═══ SECTION 5: mini standings — a HUD, not a card ═══════════════════════
    Corner brackets snap on like a targeting reticle locking on, the panel
@@ -1356,6 +1519,12 @@ html, body {
 }
 .ovl-hud-bracket--tl { top: -1px; left: -1px; border-right: 0; border-bottom: 0; transform-origin: top left; }
 .ovl-hud-bracket--br { bottom: -1px; right: -1px; border-left: 0; border-top: 0; transform-origin: bottom right; }
+/* --tr/--bl: for panels whose own clip-path (--ovl-panel-clip-sm, not
+   the -flip variant) already cuts the top-left/bottom-right corners —
+   see .overlay-ticker — so the brackets belong on the two corners the
+   clip left sharp instead. */
+.ovl-hud-bracket--tr { top: -1px; right: -1px; border-left: 0; border-bottom: 0; transform-origin: top right; }
+.ovl-hud-bracket--bl { bottom: -1px; left: -1px; border-right: 0; border-top: 0; transform-origin: bottom left; }
 @keyframes ovl-hud-bracket-snap {
   0%   { opacity: 0; transform: scale(1.8); }
   60%  { opacity: 1; }
@@ -2614,7 +2783,8 @@ html, body {
   .overlay-idle-hero__logo, .overlay-idle-hero__wordmark, .overlay-idle-hero__tagline,
   .ovl-label, .ovl-info-headline, .ovl-info-rule,
   .ovl-info-feature__name, .ovl-info-feature__value, .ovl-info-subrow,
-  .overlay-ticker, .ticker-fact, .ticker-fact.active, .ticker-fact__label::after,
+  .overlay-ticker, .ticker-fact, .ticker-fact.active,
+  .ticker-fact__eyebrow, .ticker-fact__player, .ticker-fact__rule, .ticker-fact__metric,
   .overlay-mini-standings, .overlay-mini-standings__scan, .ovl-hud-bracket, .overlay-mini-standings tr,
   .overlay-full-standings, .overlay-full-standings__content, .overlay-full-standings__title::after,
   .overlay-full-standings tr,
@@ -2628,6 +2798,16 @@ html, body {
   .results-reveal-panel { transform: translate(-50%, -50%) !important; }
   .ms-seat-card:hover, .ms-seat-card:hover .ms-seat-card__img { transform: none !important; }
   .ovl-embers, .ovl-hud-bracket { opacity: 0 !important; }
+
+  /* "ИНТЕРЕСНЫЕ ФАКТЫ": the cut-corner panel shape is the permanent
+     brand silhouette (same as .overlay-full-standings' taper above),
+     restored after the blanket clip-path:none a few lines up. The
+     one-shot SHOW sweep and idle scanline are pure motion accents with
+     no resting pose worth freezing into — hidden, same call as the
+     idle-hero panel's own ambient layers. The per-fact signal flash is
+     the same kind of one-shot accent. */
+  .overlay-ticker { clip-path: var(--ovl-panel-clip-sm, none) !important; }
+  .overlay-ticker__sweep, .overlay-ticker__scan, .ticker-fact__signal { opacity: 0 !important; }
 
   /* THE STANDARD (results-reveal-panel): the shield-taper silhouette is
      the permanent brand shape, not a motion artifact, so — same

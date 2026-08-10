@@ -11,7 +11,7 @@
 // Also drives the two things CSS keyframes can't express on their own:
 // a tiny DOM-based particle system (card-lock sparks, reveal-card dust
 // convergence, drifting embers — see .ovl-spark in overlay.css) and the
-// ticker's split-flap flip + numeric count-up.
+// ticker's numeric count-up.
 (function () {
   const root = document.getElementById('overlay-root');
   if (!root) return;
@@ -387,8 +387,13 @@
       outgoing.classList.add('is-leaving');
       incoming.classList.add('active', 'is-entering');
       animateTickerValue(incoming);
-      setTimeout(() => outgoing.classList.remove('is-leaving'), 520);
-      setTimeout(() => incoming.classList.remove('is-entering'), 620);
+      // Match the CSS: is-leaving's own signal+collapse finishes at .07s+.18s
+      // = 250ms, is-entering's longest child (metric, .16s delay + .2s
+      // duration = 360ms) — both with a small buffer so the class isn't
+      // pulled out from under a still-running animation. See overlay.css's
+      // "ИНТЕРЕСНЫЕ ФАКТЫ" section for the full timing breakdown.
+      setTimeout(() => outgoing.classList.remove('is-leaving'), 300);
+      setTimeout(() => incoming.classList.remove('is-entering'), 420);
     }, TICKER_MS);
   }
 
