@@ -541,17 +541,25 @@
       <span class="overlay-full-standings__cloth-sheen" aria-hidden="true"></span>
     </div>
     <div class="overlay-full-standings__frame" aria-hidden="true"></div>
-    <div class="overlay-full-standings__title">Турнирная таблица · {{ standings_title }}</div>
-    <table>
-      {% for r in full_ratings %}
-      <tr style="--d:{{ loop.index0 * 40 }}ms">
-        <td class="overlay-full-standings__rank">{{ r.rank }}</td>
-        <td class="overlay-full-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
-        <td class="overlay-full-standings__wins">{{ r.games_won }}W</td>
-        <td class="overlay-full-standings__score">{{ r.total_score|round(2) }}</td>
-      </tr>
-      {% endfor %}
-    </table>
+    {# __content is a hard opacity gate synced to the cloth's own timeline
+       (see overlay.css) — title/rows still have their own wipe/stagger
+       animations underneath, but this wrapper makes it IMPOSSIBLE for
+       either to render before the fabric has arrived or to still be
+       visible after it's gone, regardless of whether the two independent
+       child timings stay perfectly lined up on their own. #}
+    <div class="overlay-full-standings__content">
+      <div class="overlay-full-standings__title">Турнирная таблица · {{ standings_title }}</div>
+      <table>
+        {% for r in full_ratings %}
+        <tr style="--d:{{ loop.index0 * 40 }}ms">
+          <td class="overlay-full-standings__rank">{{ r.rank }}</td>
+          <td class="overlay-full-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
+          <td class="overlay-full-standings__wins">{{ r.games_won }}W</td>
+          <td class="overlay-full-standings__score">{{ r.total_score|round(2) }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
   </div>
   {% endif %}
 

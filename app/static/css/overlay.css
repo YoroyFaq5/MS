@@ -1582,9 +1582,29 @@ html, body {
   animation: banner-sheen-pass .6s ease-out calc(var(--banner-unfurl-dur) + .2s) both;
 }
 
-.overlay-full-standings__title {
+/* Hard opacity gate for all the text (title + table) — belt-and-braces
+   on top of title/tr's own individually-delayed wipe animations below.
+   Ties directly to the cloth's own timeline (--banner-unfurl-dur, the
+   same custom property that drives banner-unfurl on __cloth/__frame)
+   instead of a separately-guessed constant, so it can never drift out
+   of sync if those tunables change later. This is what actually
+   guarantees text can't render before the fabric has arrived, or still
+   be showing after it's gone, regardless of whether the two independent
+   child animations below stay perfectly lined up on their own. */
+.overlay-full-standings__content {
   position: relative;
   z-index: 4;
+  opacity: 0;
+  animation: ovl-content-fade-in .25s ease calc(var(--banner-unfurl-dur) + .16s) both;
+}
+.overlay-full-standings.is-hidden .overlay-full-standings__content {
+  animation: ovl-content-fade-out .15s ease-in 0s both;
+}
+@keyframes ovl-content-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ovl-content-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+.overlay-full-standings__title {
+  position: relative;
   overflow: hidden;
   font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
   font-weight: 700;
@@ -1597,15 +1617,21 @@ html, body {
   margin-bottom: .5rem;
   border-bottom: 1px solid rgba(216,216,216,.3);
   clip-path: inset(0 100% 0 0);
-  /* Delayed until the crossbar/cloth/frame below have essentially
-     finished unfurling (cloth: .16s delay + .7s duration = .86s) — this
-     used to start at .55s, well before the fabric had visually arrived,
-     which read as the table's text appearing on its own with nothing
-     around it yet. */
-  animation: totem-header-wipe .5s cubic-bezier(.65,0,.15,1) .78s both;
+  /* Delayed well past the point the crossbar/cloth/frame below have
+     actually finished unfurling (cloth: .16s delay + .7s duration =
+     .86s) — pushed out further than the fabric's own nominal finish
+     time (was .78s, right at the edge of it) so real-world compositor
+     lag can never let the text arrive before the shape has visually
+     settled, which is what "text floating with nothing around it yet"
+     actually was. */
+  animation: totem-header-wipe .45s cubic-bezier(.65,0,.15,1) .95s both;
 }
 .overlay-full-standings.is-hidden .overlay-full-standings__title {
-  animation: totem-header-unwipe .3s cubic-bezier(.4,0,1,1) 0s both;
+  /* Closes immediately (no delay) and fast — the fabric (banner-furl)
+     also starts retracting at 0s/.35s, so text and cloth disappear
+     together instead of text lingering after the shape is already
+     gone. */
+  animation: totem-header-unwipe .2s cubic-bezier(.4,0,1,1) 0s both;
 }
 .overlay-full-standings__title::after {
   content: "";
@@ -1614,10 +1640,10 @@ html, body {
   background: linear-gradient(180deg, transparent, rgba(255,255,255,.95), transparent);
   box-shadow: 0 0 10px 2px rgba(255,255,255,.75);
   opacity: 0;
-  animation: totem-header-caret .5s cubic-bezier(.65,0,.15,1) .78s both;
+  animation: totem-header-caret .45s cubic-bezier(.65,0,.15,1) .95s both;
 }
 
-.overlay-full-standings table { position: relative; z-index: 4; width: 100%; border-collapse: collapse; font-size: 1em; }
+.overlay-full-standings table { width: 100%; border-collapse: collapse; font-size: 1em; }
 .overlay-full-standings td {
   /* Row padding shrinks with --row-count too — the font-size formula
      alone isn't enough once a big roster's fixed per-row padding starts
@@ -1630,10 +1656,23 @@ html, body {
   animation: ovl-row-wipe-l .35s ease-out both;
   /* Starts once the title has begun (not before the fabric's arrived —
      same reasoning as the title's own delay above). */
-  animation-delay: calc(var(--d, 0ms) + 1s);
+  animation-delay: calc(var(--d, 0ms) + 1.2s);
 }
 .overlay-full-standings tr:nth-child(even) {
   animation-name: ovl-row-wipe-r;
+}
+/* CLOSE — rows had no is-hidden animation at all, so they stayed at
+   full opacity (the open animation's own "both" end state outranks a
+   plain removed class) until the outer panel's delayed visibility flip
+   cut them off — well after the crossbar/cloth/frame had already
+   retracted. Immediate + fast, same reasoning as the title's close
+   above: text should never outlive the fabric it's printed on. */
+.overlay-full-standings.is-hidden tr {
+  animation: ovl-row-fade-out .18s ease-in both;
+}
+@keyframes ovl-row-fade-out {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
 }
 .overlay-full-standings__rank { color: var(--ms-muted, #8A8A8A); width: 1.5rem; }
 .overlay-full-standings__name { font-weight: 600; }
@@ -2577,7 +2616,7 @@ html, body {
   .ovl-info-feature__name, .ovl-info-feature__value, .ovl-info-subrow,
   .overlay-ticker, .ticker-fact, .ticker-fact.active, .ticker-fact__label::after,
   .overlay-mini-standings, .overlay-mini-standings__scan, .ovl-hud-bracket, .overlay-mini-standings tr,
-  .overlay-full-standings, .overlay-full-standings__title::after,
+  .overlay-full-standings, .overlay-full-standings__content, .overlay-full-standings__title::after,
   .overlay-full-standings tr,
   .ovl-spark {
     opacity: 1 !important;
