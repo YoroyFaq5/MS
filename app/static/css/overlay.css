@@ -1378,103 +1378,242 @@ html, body {
 .overlay-mini-standings__name { font-weight: 600; }
 .overlay-mini-standings__score { text-align: right; color: var(--ms-text-dim, #C9C9C9); }
 
-/* ═══ SECTION 6: full standings — "cut to the main analytics screen" ═════
-   A hard scene change: the panel unfolds up out of flat via a 3D rotateX
-   hinge (like a briefcase lid, or a broadcast graphics package swapping
-   scenes) rather than scaling in, rows populate from *alternating* edges
-   (odd from the left, even from the right — a different stagger identity
-   than the mini standings' uniform left wipe), and a barely-there
-   diagonal light sweep drifts across the glass forever, suggesting studio
-   light on a physical surface without ever distracting from the numbers. */
+/* ═══ SECTION 6: full standings — "THE STANDARD, narrow" ═════════════════
+   Was a centered 3D rotateX hinge-flip; redesigned to read as the SAME
+   family of object as the last-game reveal banner below
+   (.results-reveal-panel / "THE STANDARD") — a physical flag unfurling
+   from a crossbar into a shield-taper point — just narrower and anchored
+   left, in the corner the top-5 HUD panel (.overlay-mini-standings) sits
+   in, since the two are mutually exclusive per standings_mode and this
+   is meant to visually REPLACE that panel rather than compete with it
+   for screen space.
 
-/* width used to cap at a fixed 560px past ~660px viewport width — fine
-   at 1920px, but it means the panel stops growing while the (viewport-
-   scaled) seat cards keep getting bigger on wider/higher-res canvases,
-   drifting out of proportion the same way the ticker/mini-standings did
-   (see their comments above). clamp() lets it keep scaling instead of
-   hitting a hard ceiling. */
+   Almost none of the motion below is new: banner-unfurl / banner-furl /
+   banner-sway / banner-bar-extend / banner-bar-retract / banner-finial-
+   pop / banner-finial-away / banner-crest-in / banner-crest-away /
+   banner-fold-glow / banner-sheen-pass / totem-header-wipe / totem-
+   header-caret / totem-header-unwipe are ALL defined once, above, for
+   .results-reveal-panel — every one of them only ever reads its shape/
+   timing through var(--banner-*), so redeclaring those same custom
+   property NAMES here (scoped to this element's own subtree via normal
+   CSS inheritance) reuses every keyframe verbatim with a narrower/
+   shallower/faster result, with zero duplicated @keyframes. Two
+   components, two independent --banner-* scopes — no collision, nothing
+   shared but the animation definitions themselves.
+
+   Unlike the reveal banner, this panel doesn't need the shared
+   .overlay-fragment.reveal-active/.is-hiding ancestor-class trick (that
+   exists there because the SAME DOM node's visibility is toggled by an
+   unrelated auto-popup timer many times without ever being removed from
+   the DOM). This one drives its own open/close directly off its own
+   .is-hidden — same self-contained mount/is-hidden pattern already used
+   by .overlay-mini-standings above. */
 .overlay-full-standings {
+  --banner-taper: 34px;
+  --banner-unfurl-dur: .7s;
+  --banner-unfurl-ease: cubic-bezier(.22, 1.12, .36, 1);
+  --banner-sway-dur: .6s;
+  --banner-clip: polygon(
+    0 0, 100% 0,
+    100% calc(100% - var(--banner-taper)),
+    50% 100%,
+    0 calc(100% - var(--banner-taper))
+  );
+  --banner-clip-closed: polygon(42% 0, 58% 0, 58% 5%, 50% 5%, 42% 5%);
   position: fixed;
-  top: 50%; left: 50%;
+  /* Same corner anchor as .overlay-mini-standings, on purpose — see this
+     section's intro comment. */
+  top: clamp(4.4rem, 8vh, 6.4rem); left: 1.1rem;
   z-index: 14;
-  width: clamp(610px, 49.3vw, 2030px);
-  max-height: 70vh;
-  overflow: hidden auto;
-  background: var(--ovl-glass-bg-strong, rgba(10,9,8,.92));
-  border: 1px solid var(--ovl-border-accent, rgba(216,216,216,.4));
-  clip-path: var(--ovl-panel-clip-lg, none);
-  padding: clamp(1.43rem, 1.4vw, 3.58rem) clamp(1.7rem, 1.76vw, 4.5rem);
-  font-size: clamp(1.37rem, 1.2vw, 3.06rem);
-  backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
-  -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
-  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient), var(--ovl-shadow-glow);
-  opacity: 0;
-  transform-origin: 50% 100%;
-  transform: translate(-50%, -50%) perspective(1200px) rotateX(-90deg);
-  animation: ovl-standings-unfold .65s cubic-bezier(.22,.85,.25,1) both;
-}
-@keyframes ovl-standings-unfold {
-  0%   { opacity: 0; transform: translate(-50%, -50%) perspective(1200px) rotateX(-90deg); }
-  60%  { opacity: 1; transform: translate(-50%, -50%) perspective(1200px) rotateX(12deg); }
-  100% { opacity: 1; transform: translate(-50%, -50%) perspective(1200px) rotateX(0deg); }
+  /* Narrower than the reveal banner's min(1220px, 90vw) — this is a
+     side HUD panel, not a full-screen centered graphic. */
+  width: clamp(360px, 27vw, 980px);
+  max-height: min(70vh, calc(100vh - 9rem));
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1.3rem 1.4rem calc(1rem + var(--banner-taper)) 1.4rem;
+  font-size: clamp(1.1rem, 1.05vw, 2.7rem);
+  opacity: 1;
+  visibility: visible;
+  /* Opening is instant; closing (below) delays the visibility flip until
+     the piece-by-piece close choreography has actually finished, same
+     trick as .results-reveal-panel's own visibility transition. */
+  transition: visibility 0s linear 0s;
 }
 .overlay-full-standings.is-hidden {
-  opacity: 1;
+  visibility: hidden;
   pointer-events: none;
-  animation: ovl-standings-fold .4s cubic-bezier(.4,0,1,1) both;
-}
-@keyframes ovl-standings-fold {
-  0%   { opacity: 1; transform: translate(-50%, -50%) perspective(1200px) rotateX(0deg); }
-  100% { opacity: 0; transform: translate(-50%, -50%) perspective(1200px) rotateX(-70deg); }
+  transition: visibility 0s linear .85s;
 }
 
-.overlay-full-standings__sweep {
-  position: absolute; inset: 0;
-  z-index: 0;
+/* Frame — thin metal/red rim hugging the shield-taper silhouette, same
+   role as .results-reveal-panel__iris-trace. Sits behind the cloth. */
+.overlay-full-standings__frame {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   pointer-events: none;
-  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.05) 48%, rgba(255,255,255,.08) 52%, transparent 70%);
-  mix-blend-mode: soft-light;
-  animation: ovl-glass-drift 22s linear infinite;
+  clip-path: var(--banner-clip-closed);
+  background: linear-gradient(155deg,
+    var(--ovl-chrome-light, #FFFFFF) 0%, var(--ovl-chrome-dark, #9A9A9A) 32%,
+    var(--ovl-signal, #E31E24) 52%, var(--ovl-chrome-dark, #9A9A9A) 74%,
+    var(--ovl-chrome, #D8D8D8) 100%);
+  filter: drop-shadow(0 0 12px var(--ovl-signal-glow, rgba(227,30,36,.24)));
+  animation: banner-unfurl var(--banner-unfurl-dur) var(--banner-unfurl-ease) .12s both;
 }
-@keyframes ovl-glass-drift {
-  0%   { transform: translateX(-30%); }
-  100% { transform: translateX(30%); }
+.overlay-full-standings.is-hidden .overlay-full-standings__frame {
+  animation: banner-furl .35s cubic-bezier(.4,0,1,1) 0s both;
+}
+
+/* The crossbar — extends first, finials/crest settle a beat later, all
+   before the cloth starts unfurling below (same sequence as THE
+   STANDARD, just compressed — this panel is a toggle a caster may flip
+   several times a broadcast, not a one-shot per-game reveal). */
+.overlay-full-standings__crossbar {
+  position: absolute;
+  top: 0; left: 5%; right: 5%;
+  height: 8px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    var(--ovl-chrome-light, #FFFFFF) 0%, var(--ovl-chrome, #D8D8D8) 22%,
+    var(--ovl-signal, #E31E24) 48%, var(--ovl-chrome-dark, #9A9A9A) 76%, #3a3a3a 100%);
+  border-radius: 1px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.5), 0 0 10px 1px var(--ovl-signal-glow, rgba(227,30,36,.2));
+  transform-origin: 50% 50%;
+  animation: banner-bar-extend .4s cubic-bezier(.2,.8,.2,1) 0s both;
+}
+.overlay-full-standings.is-hidden .overlay-full-standings__crossbar {
+  animation: banner-bar-retract .28s cubic-bezier(.4,0,1,1) .5s both;
+}
+
+.overlay-full-standings__finial {
+  position: absolute;
+  top: 50%;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--ovl-chrome-light, #FFFFFF), var(--ovl-chrome-dark, #9A9A9A) 60%, #2c2c2c 100%);
+  box-shadow: 0 0 6px 1px var(--ovl-signal-glow, rgba(227,30,36,.24));
+  animation: banner-finial-pop .4s cubic-bezier(.3,1.6,.4,1) .18s both;
+}
+.overlay-full-standings__finial--l { left: -5px; }
+.overlay-full-standings__finial--r { right: -5px; }
+.overlay-full-standings.is-hidden .overlay-full-standings__finial {
+  animation: banner-finial-away .2s ease .28s both;
+}
+
+.overlay-full-standings__crest {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(.4);
+  width: 22px; height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.6));
+  animation: banner-crest-in .4s cubic-bezier(.3,1.5,.4,1) .28s both;
+}
+.overlay-full-standings__crest-img { width: 100%; height: auto; display: block; }
+.overlay-full-standings.is-hidden .overlay-full-standings__crest {
+  animation: banner-crest-away .2s ease .1s both;
+}
+
+/* The cloth — the fabric the table sits on. Inset a few px inside the
+   frame so the metal edge shows through as a rim, same as THE STANDARD. */
+.overlay-full-standings__cloth {
+  position: absolute;
+  inset: 3px;
+  z-index: 2;
+  pointer-events: none;
+  clip-path: var(--banner-clip-closed);
+  transform-origin: 50% 0%;
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%, var(--ovl-signal-glow, rgba(227,30,36,.28)) 0%, transparent 62%),
+    linear-gradient(178deg, var(--ovl-burgundy-light, #4A121A) 0%, var(--ovl-black, #0A0908) 38%, var(--ovl-ink, #050505) 100%);
+  box-shadow: var(--ovl-shadow-rim), var(--ovl-shadow-ambient);
+  backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  -webkit-backdrop-filter: var(--ovl-glass-blur, blur(16px) saturate(160%));
+  animation:
+    banner-unfurl var(--banner-unfurl-dur) var(--banner-unfurl-ease) .16s both,
+    banner-sway var(--banner-sway-dur) cubic-bezier(.36,.07,.19,.97) calc(var(--banner-unfurl-dur) + .16s) both;
+}
+.overlay-full-standings.is-hidden .overlay-full-standings__cloth {
+  animation: banner-furl .35s cubic-bezier(.4,0,1,1) 0s both;
+}
+
+.overlay-full-standings__cloth-fold {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(100deg, transparent 40%, rgba(255,255,255,.07) 48%, rgba(255,255,255,.02) 52%, transparent 62%);
+}
+.overlay-full-standings__cloth-fold--l { left: 0; animation: banner-fold-glow .55s ease-out .42s both; }
+.overlay-full-standings__cloth-fold--r { right: 0; transform: scaleX(-1); animation: banner-fold-glow .55s ease-out .5s both; }
+
+.overlay-full-standings__cloth-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .05;
+  mix-blend-mode: overlay;
+  background-image: var(--ovl-grain-uri);
+  background-size: 130px 130px;
+}
+
+.overlay-full-standings__cloth-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(75deg, transparent 42%, rgba(255,255,255,.18) 50%, transparent 58%);
+  opacity: 0;
+  transform: translateX(-60%);
+  animation: banner-sheen-pass .6s ease-out calc(var(--banner-unfurl-dur) + .2s) both;
 }
 
 .overlay-full-standings__title {
   position: relative;
-  z-index: 1;
+  z-index: 4;
+  overflow: hidden;
   font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
   font-weight: 700;
-  font-size: clamp(1.7rem, 1.55vw, 3.9rem);
+  font-size: clamp(1.5rem, 1.4vw, 3.4rem);
   color: var(--ovl-chrome-light, #FFFFFF);
   padding-bottom: .5rem;
   margin-bottom: .5rem;
   border-bottom: 1px solid rgba(216,216,216,.3);
+  clip-path: inset(0 100% 0 0);
+  animation: totem-header-wipe .6s cubic-bezier(.65,0,.15,1) .55s both;
+}
+.overlay-full-standings.is-hidden .overlay-full-standings__title {
+  animation: totem-header-unwipe .3s cubic-bezier(.4,0,1,1) 0s both;
 }
 .overlay-full-standings__title::after {
   content: "";
-  position: absolute; left: 0; bottom: -1px; height: 1px; width: 100%;
-  background: linear-gradient(90deg, var(--ovl-chrome-light, #FFFFFF), transparent);
-  transform-origin: left;
-  transform: scaleX(0);
-  animation: ovl-underline-draw .5s cubic-bezier(.4,0,.2,1) .5s both;
+  position: absolute; top: 0; bottom: 0; left: 0;
+  width: 3px;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,.95), transparent);
+  box-shadow: 0 0 10px 2px rgba(255,255,255,.75);
+  opacity: 0;
+  animation: totem-header-caret .6s cubic-bezier(.65,0,.15,1) .55s both;
 }
-@keyframes ovl-underline-draw { to { transform: scaleX(1); } }
 
-.overlay-full-standings table { position: relative; z-index: 1; width: 100%; border-collapse: collapse; font-size: clamp(1.33rem, 1.2vw, 3.06rem); }
-.overlay-full-standings td { padding: .3rem 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+.overlay-full-standings table { position: relative; z-index: 4; width: 100%; border-collapse: collapse; font-size: clamp(1.2rem, 1.15vw, 2.9rem); }
+.overlay-full-standings td { padding: .28rem 0; border-bottom: 1px solid rgba(255,255,255,.05); }
 .overlay-full-standings tr {
   opacity: 0;
-  animation: ovl-row-wipe-l .4s ease-out both;
-  animation-delay: calc(var(--d, 0ms) + .55s);
+  animation: ovl-row-wipe-l .35s ease-out both;
+  animation-delay: calc(var(--d, 0ms) + .85s);
 }
 .overlay-full-standings tr:nth-child(even) {
   animation-name: ovl-row-wipe-r;
 }
-.overlay-full-standings__rank { color: var(--ms-muted, #8A8A8A); width: 2rem; }
+.overlay-full-standings__rank { color: var(--ms-muted, #8A8A8A); width: 1.8rem; }
 .overlay-full-standings__name { font-weight: 600; }
-.overlay-full-standings__games { color: var(--ms-muted, #8A8A8A); text-align: center; width: 4rem; }
+.overlay-full-standings__games { color: var(--ms-muted, #8A8A8A); text-align: center; width: 3.4rem; font-size: .85em; }
 .overlay-full-standings__score { text-align: right; color: var(--ms-text-dim, #C9C9C9); font-weight: 600; }
 
 /* ── Idle hero — only rendered while there's no current game (see
@@ -2381,9 +2520,11 @@ html, body {
    A ::after works on all of them for free: clip-path on the parent
    already clips its own pseudo-elements to the cut-corner shape, so this
    bar trims itself at the notch automatically, whichever corner it's on. */
+/* .overlay-full-standings deliberately NOT in this list — it now draws
+   its own red accent as part of __frame's gradient (the shield-taper rim
+   would otherwise fight a plain rectangular bottom edge here). */
 .overlay-ticker::after,
-.overlay-mini-standings::after,
-.overlay-full-standings::after {
+.overlay-mini-standings::after {
   content: "";
   position: absolute;
   left: 0; right: 0; bottom: 0;
@@ -2412,7 +2553,7 @@ html, body {
   .ovl-info-feature__name, .ovl-info-feature__value, .ovl-info-subrow,
   .overlay-ticker, .ticker-fact, .ticker-fact.active, .ticker-fact__label::after,
   .overlay-mini-standings, .overlay-mini-standings__scan, .ovl-hud-bracket, .overlay-mini-standings tr,
-  .overlay-full-standings, .overlay-full-standings__sweep, .overlay-full-standings__title::after,
+  .overlay-full-standings, .overlay-full-standings__title::after,
   .overlay-full-standings tr,
   .ovl-spark {
     opacity: 1 !important;
@@ -2422,7 +2563,6 @@ html, body {
     clip-path: none !important;
   }
   .results-reveal-panel { transform: translate(-50%, -50%) !important; }
-  .overlay-full-standings { transform: translate(-50%, -50%) !important; }
   .ms-seat-card:hover, .ms-seat-card:hover .ms-seat-card__img { transform: none !important; }
   .ovl-embers, .ovl-hud-bracket { opacity: 0 !important; }
 
@@ -2452,6 +2592,24 @@ html, body {
      invisible, same call as the idle-hero panel's own ambient layers
      just below. */
   .results-reveal-panel__cloth-fold, .results-reveal-panel__cloth-sheen {
+    opacity: 0 !important;
+  }
+
+  /* Left standings flag panel (.overlay-full-standings) — same reasoning
+     as THE STANDARD directly above: the shield-taper cloth/frame shape
+     is the permanent brand silhouette, forced to its fully-open resting
+     shape instead of the blanket clip-path:none. This one has no
+     .reveal-active gate of its own (see its section comment in overlay.css
+     for why), so its .is-hidden override right below is what actually
+     hides it. */
+  .overlay-full-standings__cloth, .overlay-full-standings__frame {
+    clip-path: var(--banner-clip) !important;
+    opacity: 1 !important;
+  }
+  .overlay-full-standings__crossbar { opacity: 1 !important; }
+  .overlay-full-standings__finial { opacity: 1 !important; transform: translateY(-50%) !important; }
+  .overlay-full-standings__crest { opacity: 1 !important; transform: translate(-50%, -50%) !important; }
+  .overlay-full-standings__cloth-fold, .overlay-full-standings__cloth-sheen {
     opacity: 0 !important;
   }
   /* Header/callouts/seats now only ever animate while .reveal-active is
@@ -2497,7 +2655,7 @@ html, body {
   .overlay-ticker.is-hidden, .overlay-mini-standings.is-hidden, .overlay-seat-strip.is-hidden {
     opacity: 0 !important;
   }
-  .overlay-full-standings.is-hidden { opacity: 0 !important; transform: translate(-50%, -50%) !important; }
+  .overlay-full-standings.is-hidden { visibility: hidden !important; pointer-events: none !important; }
   .overlay-fragment.reveal-active .overlay-ticker,
   .overlay-fragment.reveal-active .overlay-mini-standings { opacity: .12 !important; }
   .overlay-fragment.reveal-active .overlay-full-standings { opacity: 0 !important; }
