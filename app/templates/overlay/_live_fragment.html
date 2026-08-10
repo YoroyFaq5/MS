@@ -521,7 +521,12 @@
      instead of centered — see overlay.css for how the shared
      banner-unfurl/-furl/-sway/-bar-extend/etc. keyframes get reused
      verbatim here via re-scoped --banner-* custom properties. #}
-  <div class="overlay-full-standings {{ '' if control.standings_mode == 'full' else 'is-hidden' }}">
+  {# --row-count feeds the font-size formula in overlay.css: more rows
+     need to fit the same fixed max-height, so this shrinks the whole
+     table (instead of overflow-y:auto burying most of a 30+-player
+     roster below the fold on a non-interactive broadcast source nobody
+     can scroll). #}
+  <div class="overlay-full-standings {{ '' if control.standings_mode == 'full' else 'is-hidden' }}" style="--row-count:{{ full_ratings|length }}">
     <div class="overlay-full-standings__crossbar" aria-hidden="true">
       <span class="overlay-full-standings__finial overlay-full-standings__finial--l"></span>
       <span class="overlay-full-standings__crest">
@@ -542,7 +547,7 @@
       <tr style="--d:{{ loop.index0 * 40 }}ms">
         <td class="overlay-full-standings__rank">{{ r.rank }}</td>
         <td class="overlay-full-standings__name">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</td>
-        <td class="overlay-full-standings__games">{{ r.games_played }} игр</td>
+        <td class="overlay-full-standings__wins">{{ r.games_won }}W</td>
         <td class="overlay-full-standings__score">{{ r.total_score|round(2) }}</td>
       </tr>
       {% endfor %}

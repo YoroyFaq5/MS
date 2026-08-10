@@ -1426,13 +1426,21 @@ html, body {
   top: clamp(4.4rem, 8vh, 6.4rem); left: 1.1rem;
   z-index: 14;
   /* Narrower than the reveal banner's min(1220px, 90vw) — this is a
-     side HUD panel, not a full-screen centered graphic. */
-  width: clamp(360px, 27vw, 980px);
+     side HUD panel, not a full-screen centered graphic, and there isn't
+     enough per-row content (rank/name/wins/score) to fill a wide table. */
+  width: clamp(300px, 19vw, 620px);
   max-height: min(70vh, calc(100vh - 9rem));
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 1.3rem 1.4rem calc(1rem + var(--banner-taper)) 1.4rem;
-  font-size: clamp(1.1rem, 1.05vw, 2.7rem);
+  padding: 1.1rem 1.1rem calc(.9rem + var(--banner-taper)) 1.1rem;
+  /* --row-count (set inline by the template, one <tr> per rating row)
+     shrinks the whole table as the roster grows, so a 30+-player
+     tournament still fits the fixed max-height above instead of mostly
+     scrolling off-screen on a non-interactive broadcast source nobody
+     can actually scroll. vw stays the primary scale (resolution-
+     independent across OBS canvas sizes, same as every other panel
+     here) — the row-count term only trims it down from there. */
+  font-size: clamp(.82rem, calc(1.05vw - var(--row-count, 12) * .018vw), 2.3rem);
   opacity: 1;
   visibility: visible;
   /* Opening is instant; closing (below) delays the visibility flip until
@@ -1580,13 +1588,21 @@ html, body {
   overflow: hidden;
   font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
   font-weight: 700;
-  font-size: clamp(1.5rem, 1.4vw, 3.4rem);
+  /* em, not its own rem/vw clamp — ties it to the parent's --row-count-
+     aware font-size (see .overlay-full-standings above) instead of
+     scaling independently of how many rows have to fit. */
+  font-size: 1.5em;
   color: var(--ovl-chrome-light, #FFFFFF);
   padding-bottom: .5rem;
   margin-bottom: .5rem;
   border-bottom: 1px solid rgba(216,216,216,.3);
   clip-path: inset(0 100% 0 0);
-  animation: totem-header-wipe .6s cubic-bezier(.65,0,.15,1) .55s both;
+  /* Delayed until the crossbar/cloth/frame below have essentially
+     finished unfurling (cloth: .16s delay + .7s duration = .86s) — this
+     used to start at .55s, well before the fabric had visually arrived,
+     which read as the table's text appearing on its own with nothing
+     around it yet. */
+  animation: totem-header-wipe .5s cubic-bezier(.65,0,.15,1) .78s both;
 }
 .overlay-full-standings.is-hidden .overlay-full-standings__title {
   animation: totem-header-unwipe .3s cubic-bezier(.4,0,1,1) 0s both;
@@ -1598,22 +1614,30 @@ html, body {
   background: linear-gradient(180deg, transparent, rgba(255,255,255,.95), transparent);
   box-shadow: 0 0 10px 2px rgba(255,255,255,.75);
   opacity: 0;
-  animation: totem-header-caret .6s cubic-bezier(.65,0,.15,1) .55s both;
+  animation: totem-header-caret .5s cubic-bezier(.65,0,.15,1) .78s both;
 }
 
-.overlay-full-standings table { position: relative; z-index: 4; width: 100%; border-collapse: collapse; font-size: clamp(1.2rem, 1.15vw, 2.9rem); }
-.overlay-full-standings td { padding: .28rem 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+.overlay-full-standings table { position: relative; z-index: 4; width: 100%; border-collapse: collapse; font-size: 1em; }
+.overlay-full-standings td {
+  /* Row padding shrinks with --row-count too — the font-size formula
+     alone isn't enough once a big roster's fixed per-row padding starts
+     dominating the available max-height. */
+  padding: max(.05rem, calc(.28rem - var(--row-count, 12) * .005rem)) 0;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
 .overlay-full-standings tr {
   opacity: 0;
   animation: ovl-row-wipe-l .35s ease-out both;
-  animation-delay: calc(var(--d, 0ms) + .85s);
+  /* Starts once the title has begun (not before the fabric's arrived —
+     same reasoning as the title's own delay above). */
+  animation-delay: calc(var(--d, 0ms) + 1s);
 }
 .overlay-full-standings tr:nth-child(even) {
   animation-name: ovl-row-wipe-r;
 }
-.overlay-full-standings__rank { color: var(--ms-muted, #8A8A8A); width: 1.8rem; }
+.overlay-full-standings__rank { color: var(--ms-muted, #8A8A8A); width: 1.5rem; }
 .overlay-full-standings__name { font-weight: 600; }
-.overlay-full-standings__games { color: var(--ms-muted, #8A8A8A); text-align: center; width: 3.4rem; font-size: .85em; }
+.overlay-full-standings__wins { color: var(--ms-muted, #8A8A8A); text-align: center; width: 2.1rem; font-size: .85em; }
 .overlay-full-standings__score { text-align: right; color: var(--ms-text-dim, #C9C9C9); font-weight: 600; }
 
 /* ── Idle hero — only rendered while there's no current game (see
