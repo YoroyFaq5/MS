@@ -407,6 +407,12 @@ def generate_next_round(stage_id: int):
         return redirect(url_for("tournaments.stages", tournament_id=stage.tournament_id))
     result = TournamentService.generate_next_round(stage_id)
     flash(result.message, "success" if result.ok else "danger")
+    if result.ok:
+        from app.routes.games import _notify_next_slot
+        _notify_next_slot(result.data)
+        game_ids = result.data.get("game_ids") or []
+        if len(game_ids) == 1:
+            return redirect(url_for("games.game_detail", game_id=game_ids[0]))
     return redirect(url_for("tournaments.tournament_games", tournament_id=stage.tournament_id))
 
 

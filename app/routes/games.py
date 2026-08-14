@@ -876,59 +876,56 @@ def finish_game(game_id: int):
             {"won": won, "total_score": slot.total_score, "bonus_score": slot.bonus_score},
         )
 
-    # Авторассадка: если это была последняя незавершённая игра своего
-    # раунда данной стадии — сразу же генерируем следующий раунд. Только
-    # для игр, реально созданных через generate_next_round/generate_games
-    # (у них round_number проставлен) — обычные ручные/не турнирные игры
-    # (round_number is None) этот механизм не трогает.
+    # Никакого автосоздания следующего раунда здесь больше нет по явному
+    # решению — админ сам решает, когда его создавать (кнопка "Следующий
+    # раунд"/"Сгенерировать следующий раунд" на странице турнира/серии, см.
+    # tournaments/detail.html и series_tournaments/series_detail.html).
+    # Единственное, что происходит автоматически, — если следующий раунд
+    # УЖЕ существует (например, создан заранее или другим столом того же
+    # раунда) — сразу переходим в его первую незавершённую игру, чтобы не
+    # заставлять искать её вручную.
     series = (
         db.session.query(TournamentSeries).filter_by(stage_id=game.stage_id).first()
         if game.stage_id else None
     )
-    auto_next_game_id = None
+    next_game_id = None
+    round_just_finished = False
 
     if game.stage_id and game.round_number is not None:
-        remaining = (
+        next_game = (
             db.session.query(Game)
             .filter(
                 Game.stage_id == game.stage_id,
-                Game.round_number == game.round_number,
-                Game.is_finished == False,
+                Game.round_number == game.round_number + 1,
             )
-            .count()
+            .order_by(Game.is_finished.asc(), Game.id.asc())
+            .first()
         )
-        if remaining == 0:
-            from app.services.tournament_service import TournamentService
-            # Для серийного турнира раунд продолжается ТОЛЬКО подтверждённым
-            # составом вечера (confirmed_player_ids) — тем же списком, что
-            # админ явно выбирает на странице серии, — а не всеми участниками
-            # турнира сразу, среди которых могут быть игроки с других
-            # вечеров серии, которых сегодня физически нет за столом.
-            next_round_player_ids = series.confirmed_player_ids if series else None
-            next_round_result = TournamentService.generate_next_round(
-                game.stage_id, player_ids=next_round_player_ids
+        if next_game:
+            next_game_id = next_game.id
+        else:
+            remaining = (
+                db.session.query(Game)
+                .filter(
+                    Game.stage_id == game.stage_id,
+                    Game.round_number == game.round_number,
+                    Game.is_finished == False,
+                )
+                .count()
             )
-            if next_round_result.ok:
-                flash(f"Раунд {game.round_number} завершён — {next_round_result.message}", "info")
-                _notify_next_slot(next_round_result.data)
-                game_ids = next_round_result.data.get("game_ids") or []
-                if len(game_ids) == 1:
-                    # Один стол — обычный случай для вечера серийного
-                    # турнира — переходим сразу в форму следующей игры,
-                    # ни одного лишнего клика вместо связки tournament_detail
-                    # → series_tournament_detail → series_detail → раскрыть
-                    # панель → отметить состав → сгенерировать → открыть игру.
-                    auto_next_game_id = game_ids[0]
-            # Отсутствие следующего раунда (например, стадия почти закончена,
-            # участников не хватает) — не ошибка самого finish_game, поэтому
-            # неудачу generate_next_round здесь не показываем как danger.
+            round_just_finished = remaining == 0
 
-    if auto_next_game_id:
-        return redirect(url_for("games.game_detail", game_id=auto_next_game_id))
+    if next_game_id:
+        return redirect(url_for("games.game_detail", game_id=next_game_id))
+
+    if round_just_finished:
+        flash(
+            f"Раунд {game.round_number} завершён — создайте следующий раунд на странице "
+            + ("серии." if series else "турнира."),
+            "info",
+        )
     if series:
-        # Следующий раунд не создался автоматически (не все столы раунда
-        # завершены, или не хватило подтверждённых игроков) — всё равно
-        # ведём сразу на страницу ЭТОГО вечера серии, а не на общую
+        # Ведём сразу на страницу ЭТОГО вечера серии, а не на общую
         # страницу турнира-обёртки, откуда до неё ещё два перехода.
         return redirect(url_for(
             "series_tournaments.series_detail",

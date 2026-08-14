@@ -40,8 +40,18 @@
     <button class="btn btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#rosterPanel">
       <i class="bi bi-people-fill me-1"></i>Состав на вечер
     </button>
+    {% if series.confirmed_player_ids and series.confirmed_player_ids|length >= 10 %}
+    <form method="POST" action="{{ url_for('series_tournaments.generate_series_seating', series_id=series.id) }}" class="d-inline">
+      {% for pid in series.confirmed_player_ids %}
+      <input type="hidden" name="player_ids" value="{{ pid }}">
+      {% endfor %}
+      <button type="submit" class="btn btn-primary" data-confirm="Сгенерировать следующий раунд текущим подтверждённым составом ({{ series.confirmed_player_ids|length }} игроков)?">
+        <i class="bi bi-shuffle me-1"></i>Следующий раунд
+      </button>
+    </form>
+    {% endif %}
     <button class="btn btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#seatingPanel">
-      <i class="bi bi-shuffle me-1"></i>Сгенерировать рассадку
+      <i class="bi bi-sliders me-1"></i>{{ 'Изменить состав и рассадку' if series.confirmed_player_ids else 'Сгенерировать рассадку' }}
     </button>
     {% endif %}
     <form method="POST" action="{{ url_for('series_tournaments.finish_series', series_id=series.id) }}"

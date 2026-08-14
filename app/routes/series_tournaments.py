@@ -225,6 +225,14 @@ def generate_series_seating(series_id: int):
 
     result = TournamentService.generate_next_round(series.stage_id, player_ids=player_ids)
     flash(result.message, "success" if result.ok else "danger")
+    if result.ok:
+        from app.routes.games import _notify_next_slot
+        _notify_next_slot(result.data)
+        game_ids = result.data.get("game_ids") or []
+        if len(game_ids) == 1:
+            # Один стол — обычный случай для вечера серийного турнира —
+            # переходим сразу в форму этой игры вместо страницы серии.
+            return redirect(url_for("games.game_detail", game_id=game_ids[0]))
     return redirect(url_for(
         "series_tournaments.series_detail",
         series_tournament_id=series.series_tournament_id, series_id=series_id,
