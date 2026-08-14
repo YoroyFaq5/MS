@@ -480,11 +480,14 @@ class TournamentService:
 
         Algorithm:
         - WHO plays in a given game: greedy — always pick the GAME_SIZE
-          participants with the fewest games played so far (ties broken by
-          participant order). This is the standard fair-scheduling
+          participants with the fewest games played so far (ties broken
+          randomly, not by participant id, so the same players aren't
+          always preferred/deferred). This is the standard fair-scheduling
           guarantee: after any number of games, max(count) - min(count) <= 1.
-        - WHICH SEAT each of them sits in: unchanged — greedy seat
-          assignment scored by historical seat usage.
+        - WHICH SEAT each of them sits in: greedy seat assignment scored by
+          historical seat usage, with ties broken randomly (previously
+          broken by player id, which made seat numbers drift downward by 1
+          every game for tied players instead of varying).
         - Both counters are seeded from games that already exist in this
           tournament (not just this batch), so fairness holds across
           repeated calls to generate_games on the same tournament, not only
@@ -495,6 +498,7 @@ class TournamentService:
         """
         from app.models import Game, GameSlot, WinSide, Role, TournamentParticipant  # Role.CIVILIAN placeholder
         from collections import Counter, defaultdict
+        import random
 
         t = db.session.get(Tournament, tournament_id)
         if not t:
@@ -548,15 +552,19 @@ class TournamentService:
             # для любого сочетания числа участников/игр (в отличие от
             # прежнего фиксированного окна, которое было честным только в
             # частных случаях).
-            candidates = sorted(pool, key=lambda pid: (games_played_count[pid], pid))
+            shuffled_pool = pool[:]
+            random.shuffle(shuffled_pool)
+            candidates = sorted(shuffled_pool, key=lambda pid: games_played_count[pid])
             players_this_game = candidates[:GAME_SIZE]
 
             # Greedy seat assignment: for each seat pick the player who has
-            # sat there least often (ties broken by total games played)
+            # sat there least often (ties broken randomly, not by player id,
+            # so seat numbers don't drift in a fixed direction across games)
             remaining = list(players_this_game)
             assigned: dict[int, int] = {}  # seat → player_id
 
             for seat in range(1, GAME_SIZE + 1):
+                random.shuffle(remaining)
                 remaining.sort(key=lambda pid: (seat_usage[pid][seat], sum(seat_usage[pid].values())))
                 chosen = remaining.pop(0)
                 assigned[seat] = chosen

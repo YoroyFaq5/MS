@@ -334,7 +334,12 @@ class RatingService:
         return current_ratings, rank_30d_ago
 
     @staticmethod
-    def get_recent_form(player_ids: Sequence[int], limit: int = 8) -> dict:
+    def get_recent_form(
+        player_ids: Sequence[int],
+        limit: int = 8,
+        tournament_id: Optional[int] = None,
+        stage_id: Optional[int] = None,
+    ) -> dict:
         """
         Last `limit` ranked/finished results per player (for a mini
         "form" sparkline) plus their current win/loss streak — one batch
@@ -342,12 +347,18 @@ class RatingService:
         for a small, already-selected set (e.g. a top-N leaderboard row
         set on the homepage), not the whole roster.
 
+        Site-wide by default (matches the homepage's "lifetime form"
+        use). Pass tournament_id/stage_id to scope the streak to one
+        tournament/evening instead (e.g. the overlay's "Весь турнир"/
+        "Только этот вечер" toggle) — mutually exclusive, stage_id wins
+        if both given.
+
         Returns {player_id: PlayerForm}. PlayerForm.results is ordered
         oldest -> newest (so a sparkline reads left-to-right chronologically).
         """
         if not player_ids:
             return {}
-        rows = (
+        query = (
             db.session.query(GameSlot.player_id, GameSlot.role, Game.win_side)
             .join(Game)
             .filter(
@@ -355,9 +366,12 @@ class RatingService:
                 Game.is_finished == True,
                 Game.is_ranked == True,
             )
-            .order_by(Game.played_at.desc())
-            .all()
         )
+        if stage_id is not None:
+            query = query.filter(Game.stage_id == stage_id)
+        elif tournament_id is not None:
+            query = query.filter(Game.tournament_id == tournament_id)
+        rows = query.order_by(Game.played_at.desc()).all()
         by_player: dict[int, list] = {}
         for player_id, role, win_side in rows:
             by_player.setdefault(player_id, []).append((role, win_side))
@@ -570,20 +584,25 @@ class RatingService:
     # ── Marquee (Live-Commentators bottom scrolling strip) ──────────────────
 
     @staticmethod
-    def get_marquee_stats(tournament_id: int) -> "MarqueeStats":
+    def get_marquee_stats(tournament_id: int, stage_id: Optional[int] = None) -> "MarqueeStats":
         """Five top-3 lists for the scrolling stats marquee — tournament-
-        scoped, no games-played floor (per the brief: within one
-        tournament the sample IS the tournament, no separate threshold
-        needed the way a lifetime/all-time stat would want one).
+        scoped (or, if stage_id is given, scoped down to that one evening
+        of a series tournament), no games-played floor (per the brief:
+        within one tournament the sample IS the tournament, no separate
+        threshold needed the way a lifetime/all-time stat would want one).
 
-        Reuses get_tournament_rating (already ranked by total_score) +
-        get_role_breakdown's per-player sums (pu_bonus_sum/pu_count for
-        the ПУ average, negative_bonus_sum for the two "minuses" lists) —
-        no new queries, just different sort keys/filters over data both
-        already fetch.
+        Reuses get_tournament_rating/get_stage_rating (already ranked by
+        total_score) + get_role_breakdown's per-player sums (pu_bonus_sum/
+        pu_count for the ПУ average, negative_bonus_sum for the two
+        "minuses" lists) — no new queries, just different sort keys/
+        filters over data both already fetch.
         """
-        ratings = [r for r in RatingService.get_tournament_rating(tournament_id) if r.games_played > 0]
-        role_stats = RatingService.get_role_breakdown(tournament_id=tournament_id)
+        if stage_id is not None:
+            ratings = [r for r in RatingService.get_stage_rating(stage_id) if r.games_played > 0]
+            role_stats = RatingService.get_role_breakdown(stage_id=stage_id)
+        else:
+            ratings = [r for r in RatingService.get_tournament_rating(tournament_id) if r.games_played > 0]
+            role_stats = RatingService.get_role_breakdown(tournament_id=tournament_id)
 
         top_total = [MarqueeEntry(rating=r, value=r.total_score) for r in ratings[:3]]
 
@@ -810,7 +829,10 @@ class RatingService:
         дистанции по стадиям, сознательно не реализовано).
 
         Правило (п.8.6.1-8.6.4): игрок, убитый в 1-ю ночь на роли мирного
-        или шерифа ("красная" команда = городская сторона), получает Ci
+        или шерифа ("красная" команда = городская сторона), учитывается в
+        расчёте Ci только если ведущий отметил в этом слоте хотя бы одного
+        реально названного "чёрного" (pu_mafia_count >= 1) — иначе отстрел
+        не засчитывается как результативный. Такой игрок получает Ci
         основных баллов, если его команда проиграла (п.8.6.3), либо 0.5*Ci,
         если команда выиграла, но он успел в лучшем ходе назвать хотя бы
         одного реального "чёрного" (мафию) — п.8.6.4.
@@ -839,7 +861,9 @@ class RatingService:
             games_played = len(slots)
             qualifying = [
                 s for s in slots
-                if s.is_pu and s.role in (Role.CIVILIAN, Role.SHERIFF)
+                if s.is_pu
+                and s.role in (Role.CIVILIAN, Role.SHERIFF)
+                and (s.pu_mafia_count or 0) >= 1
             ]
             ci = RatingService._compensation_coefficient(len(qualifying), games_played)
 

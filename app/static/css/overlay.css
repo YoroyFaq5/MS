@@ -799,7 +799,13 @@ html, body {
   opacity: 0;
 }
 .overlay-fragment.reveal-active .results-reveal-panel__cloth {
-  opacity: 1;
+  /* Slightly translucent rather than a fully opaque sheet — the reveal
+     banner used to fully block whatever's underneath; a bit of see-
+     through keeps it from feeling like a solid card dropped on the
+     scene. Only the cloth's own opacity moves — header/callouts/seat
+     rows are separate siblings printed on top, so text stays fully
+     legible. */
+  opacity: .88;
   animation:
     banner-unfurl var(--banner-unfurl-dur) var(--banner-unfurl-ease) .3s both,
     banner-sway var(--banner-sway-dur) cubic-bezier(.36,.07,.19,.97) calc(var(--banner-unfurl-dur) + .3s) both;

@@ -170,15 +170,33 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
     current_game_number = game_number_by_id.get(current_game.id) if current_game else None
     last_game_number = game_number_by_id.get(last_game.id) if last_game else None
 
-    # This tournament-wide rating is always computed regardless of series
-    # scope: it backs the seat-strip's per-player "score so far" stat and
-    # the ticker's superlatives/hot-streak facts (both already effectively
-    # whole-series-wide for a series tournament, since Game.tournament_id
-    # is shared across all its evenings — no scope toggle needed there).
-    player_ratings = RatingService.get_tournament_rating(tournament_id)  # already ranked/sorted
+    control = OverlayControlService.get_control(tournament_id)
+    series_tournament, current_series = _resolve_series_context(tournament_id, current_game, last_game)
+
+    # Which "distance" backs ALL optional tournament-wide content (seat-
+    # strip "score so far", ticker superlatives/hot-streak, bottom marquee)
+    # — not just the top-5/full standings panels. For a plain (non-series)
+    # tournament there's only one meaningful distance, the tournament
+    # itself. For a series tournament, standings_scope picks between "this
+    # evening only" (scope_stage_id set) and "whole series" (scope_stage_id
+    # None, i.e. the whole Tournament — same as a plain tournament).
+    scope_stage_id = (
+        current_series.stage_id
+        if series_tournament and control.standings_scope == "evening" and current_series
+        else None
+    )
+
+    if scope_stage_id:
+        player_ratings = RatingService.get_stage_rating(scope_stage_id)  # already ranked/sorted
+    else:
+        player_ratings = RatingService.get_tournament_rating(tournament_id)  # already ranked/sorted
     ratings_by_pid = {r.player_id: r for r in player_ratings}
 
-    role_breakdown = RatingService.get_role_breakdown(tournament_id=tournament_id)
+    role_breakdown = (
+        RatingService.get_role_breakdown(stage_id=scope_stage_id)
+        if scope_stage_id
+        else RatingService.get_role_breakdown(tournament_id=tournament_id)
+    )
     for r in player_ratings:
         r.role_stats = role_breakdown.get(r.player_id) or RoleTournamentStats()
     superlatives = RatingService.pick_role_superlatives(player_ratings, role_breakdown)
@@ -187,15 +205,14 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
         pid for (pid,) in
         db.session.query(TournamentParticipant.player_id).filter_by(tournament_id=tournament_id).all()
     ]
-    recent_form = RatingService.get_recent_form(participant_ids)
+    recent_form = RatingService.get_recent_form(
+        participant_ids, stage_id=scope_stage_id, tournament_id=tournament_id
+    )
     hot_streak_rating, hot_streak_count = None, 0
     for pid, form in recent_form.items():
         if form.streak_won and form.streak_count > hot_streak_count:
             hot_streak_count = form.streak_count
             hot_streak_rating = ratings_by_pid.get(pid)
-
-    control = OverlayControlService.get_control(tournament_id)
-    series_tournament, current_series = _resolve_series_context(tournament_id, current_game, last_game)
 
     # Admin can pin ANY finished game (not just the auto "most recent") to
     # show in the idle-hero's last_game slot — see
@@ -222,7 +239,8 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
     # layout, the seat strip already owns it). Skipped entirely on the
     # other layout so that page doesn't pay for the extra aggregation.
     marquee_stats = (
-        RatingService.get_marquee_stats(tournament_id) if layout_mode == "commentators" else None
+        RatingService.get_marquee_stats(tournament_id, stage_id=scope_stage_id)
+        if layout_mode == "commentators" else None
     )
 
     # ── Privacy gate ─────────────────────────────────────────────────────
