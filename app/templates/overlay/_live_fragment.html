@@ -300,19 +300,23 @@
         </div>
         {% endif %}
 
-        <!-- Twitch chat — the only idle-hero slot with NO server-rendered
-             content: a live external feed, not tournament data, so it's
-             just an empty mount point overlay-chat.js attaches a WebSocket
-             renderer to (see that file for the connect/parse/render/
-             reconnect logic). Always present in the DOM like the other
-             four slots — .is-active only controls visibility, never
-             whether the socket is open, so switching AWAY from chat and
-             back doesn't drop/reconnect the connection or lose scrollback. -->
+        <!-- Aggregated chat (StreamVI) — the only idle-hero slot with NO
+             server-rendered content: a live external widget, not
+             tournament data, so this is just an empty mount point
+             overlay-chat.js attaches its <iframe> to (see that file for
+             why the iframe itself is created once in JS and MOVED into
+             this container on every poll, rather than being written here
+             by Jinja — an <iframe> written straight into this template
+             would get destroyed and reloaded from scratch on every full
+             fragment replace, which is exactly the "chat keeps clearing"
+             behavior this design avoids). Always present in the DOM like
+             the other four slots — .is-active only controls visibility,
+             never whether the widget is mounted, so switching AWAY from
+             chat and back doesn't reload it or lose scrollback. -->
         <div class="overlay-idle-hero__slot overlay-idle-hero__slot--chat {{ 'is-active' if effective_idle_content == 'chat' else '' }}" data-idle-slot="chat">
-          <div class="ovl-label">Чат Twitch</div>
+          <div class="ovl-label">Чат</div>
           <div class="ovl-info-rule"></div>
-          <div class="ovl-chat-log" id="ovl-chat-log" aria-hidden="true"></div>
-          <div class="ovl-chat-status" id="ovl-chat-status" aria-hidden="true"></div>
+          <div class="ovl-chat-frame" id="ovl-chat-frame" aria-hidden="true"></div>
         </div>
       </div>
     </div>

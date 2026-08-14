@@ -2691,78 +2691,21 @@ html, body {
   animation: ovl-shield-piece-in .3s cubic-bezier(.34,1.56,.64,1) 110ms both;
 }
 
-/* ═══ SECTION: Twitch chat slot (idle-hero, Live-Commentators) ══════════
+/* ═══ SECTION: aggregated chat slot (idle-hero, Live-Commentators) ══════
    The only idle-hero slot with no server-rendered content — overlay-
-   chat.js owns everything inside .ovl-chat-log, this is just layout. */
+   chat.js mounts a persistent StreamVI <iframe> into .ovl-chat-frame,
+   this is just layout for it. */
 .overlay-idle-hero__slot--chat {
   display: flex;
   flex-direction: column;
 }
-.ovl-chat-log {
+.ovl-chat-frame {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: .55rem;
-  padding-top: .3rem;
+  border-radius: 6px;
 }
-.ovl-chat-msg {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: .45rem;
-  font-family: 'Inter', sans-serif;
-  font-size: 1.05rem;
-  line-height: 1.35;
-  opacity: 0;
-  animation: ovl-chat-msg-in .35s ease both;
-}
-@keyframes ovl-chat-msg-in {
-  0%   { opacity: 0; transform: translateY(6px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-.ovl-chat-msg__name {
-  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
-  font-weight: 700;
-  color: var(--ovl-signal-light, #FF3B3B);
-  flex: none;
-}
-.ovl-chat-msg__text {
-  color: var(--ms-text, #F2F2F2);
-  overflow-wrap: anywhere;
-}
-/* Quiet by default — a dot + label only appears while something needs
-   attention (connecting / lost connection), matching the rest of the
-   brand's "red = event" language rather than a permanent status line
-   cluttering a panel that's meant to read as pure chat. */
-.ovl-chat-status {
-  flex: none;
-  min-height: 0;
-  margin-top: .5rem;
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  font-family: 'Inter', sans-serif;
-  font-size: .78rem;
-  font-weight: 600;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--ms-muted, #8A8A8A);
-  opacity: 0;
-  transition: opacity .25s ease;
-}
-.ovl-chat-status.is-visible { opacity: 1; }
-.ovl-chat-status::before {
-  content: "";
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  flex: none;
-  background: var(--ovl-signal, #E31E24);
-}
-.ovl-chat-status.is-connecting::before { animation: ovl-live-pulse-slow 1.4s ease-in-out infinite; }
 
 /* ═══ SECTION: bottom stats marquee (Live-Commentators only) ═══════════
    A REAL horizontally-scrolling strip — CSS transform loop, content
@@ -3053,6 +2996,4 @@ html, body {
      own explicit override here, same "opacity scoped to .is-hidden"
      pattern as the ticker/standings/seat-strip above. */
   .overlay-marquee.is-hidden { opacity: 0 !important; transform: none !important; }
-  .ovl-chat-msg { opacity: 1 !important; transform: none !important; }
-  .ovl-chat-status.is-connecting::before { animation: none !important; }
 }

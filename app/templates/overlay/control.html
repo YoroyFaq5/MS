@@ -198,7 +198,7 @@
           того, идёт ли сейчас игра.
         </p>
         <div class="d-flex flex-column gap-2">
-          {% for mode, label in [('logo', 'Лого турнира'), ('standings', 'Турнирная таблица'), ('last_game', 'Прошлая игра'), ('ticker', 'Интересные факты'), ('chat', 'Чат Twitch')] %}
+          {% for mode, label in [('logo', 'Лого турнира'), ('standings', 'Турнирная таблица'), ('last_game', 'Прошлая игра'), ('ticker', 'Интересные факты'), ('chat', 'Чат')] %}
           <form method="POST" action="{{ url_for('overlay.overlay_set_idle_content', tournament_id=tournament.id) }}">
             <input type="hidden" name="mode" value="{{ mode }}">
             <button type="submit" class="btn w-100 {{ 'btn-success' if control.idle_content == mode else 'btn-outline-secondary' }}">

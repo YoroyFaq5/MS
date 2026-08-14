@@ -346,6 +346,56 @@
     });
   }
 
+  // ── Standings auto-scroll ────────────────────────────────────────────────
+  // The full-standings panels (.overlay-full-standings on Live-Game,
+  // the idle-hero "standings" slot's .ovl-info-list on Live-Commentators)
+  // are fixed-height, non-interactive broadcast surfaces — nobody watching
+  // a stream can scroll them, so a roster that doesn't fit used to just
+  // silently truncate past the fold. Slowly ping-pongs scrollTop between
+  // top and bottom instead so every row eventually shows. Re-run after
+  // every full DOM replace (new elements each time — any earlier loop
+  // notices its element is no longer in the document and stops itself, no
+  // explicit teardown needed) and left inert under prefers-reduced-motion.
+  const AUTOSCROLL_PX_PER_SEC = 26;
+  const AUTOSCROLL_HOLD_MS = 2200;
+
+  function easeInOutSine(t) { return 0.5 - 0.5 * Math.cos(Math.PI * t); }
+
+  function autoScrollPanel(el) {
+    const distance = el.scrollHeight - el.clientHeight;
+    if (distance <= 4) { el.scrollTop = 0; return; } // fits already, nothing to do
+    if (REDUCED_MOTION) { el.scrollTop = 0; return; }
+
+    const travelMs = Math.max(3000, (distance / AUTOSCROLL_PX_PER_SEC) * 1000);
+    let phase = 'hold-top';
+    let phaseStart = performance.now();
+
+    function step(now) {
+      if (!el.isConnected) return; // replaced by a newer poll — let this loop die
+      const elapsed = now - phaseStart;
+      if (phase === 'hold-top') {
+        if (elapsed >= AUTOSCROLL_HOLD_MS) { phase = 'down'; phaseStart = now; }
+      } else if (phase === 'down') {
+        const t = Math.min(1, elapsed / travelMs);
+        el.scrollTop = easeInOutSine(t) * distance;
+        if (t >= 1) { phase = 'hold-bottom'; phaseStart = now; }
+      } else if (phase === 'hold-bottom') {
+        if (elapsed >= AUTOSCROLL_HOLD_MS) { phase = 'up'; phaseStart = now; }
+      } else { // 'up'
+        const t = Math.min(1, elapsed / travelMs);
+        el.scrollTop = (1 - easeInOutSine(t)) * distance;
+        if (t >= 1) { phase = 'hold-top'; phaseStart = now; }
+      }
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function autoScrollStandings() {
+    root.querySelectorAll('.overlay-full-standings, [data-idle-slot="standings"] .ovl-info-list')
+      .forEach(autoScrollPanel);
+  }
+
   // ── Ticker: split-flap flip + numeric count-up ──────────────────────────
   function animateTickerValue(factEl) {
     const el = factEl.querySelector('[data-count-to]');
@@ -509,6 +559,7 @@
       startTicker();
       fitSeatNames();
       spawnCardEntranceBursts();
+      autoScrollStandings();
       if (window.MSBroadcastScenes) window.MSBroadcastScenes.init();
       if (window.MSOverlayMarquee) window.MSOverlayMarquee.init();
       if (window.MSOverlayChat) window.MSOverlayChat.init();
@@ -553,6 +604,7 @@
   startTicker();
   fitSeatNames();
   spawnCardEntranceBursts();
+  autoScrollStandings();
   scheduleInfoPulse();
   if (window.MSBroadcastScenes) window.MSBroadcastScenes.init();
   if (window.MSOverlayMarquee) window.MSOverlayMarquee.init();
