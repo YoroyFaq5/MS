@@ -36,6 +36,21 @@
     {% if series.status.value == 'active' and current_user.is_authenticated and current_user.is_admin %}
     <a href="{{ url_for('games.new_game', tournament_id=tournament.id, stage_id=series.stage_id) }}"
        class="btn btn-danger"><i class="bi bi-plus-lg me-1"></i>Добавить игру</a>
+    {% if tournament.type.value == 'team' %}
+    {% if tournament.teams|length >= 10 %}
+    <form method="POST" action="{{ url_for('series_tournaments.generate_series_seating', series_id=series.id) }}" class="d-inline">
+      {% for team in tournament.teams %}
+      <input type="hidden" name="team_ids" value="{{ team.id }}">
+      {% endfor %}
+      <button type="submit" class="btn btn-primary" data-confirm="Сгенерировать следующий раунд — играют все {{ tournament.teams|length }} команд?">
+        <i class="bi bi-shuffle me-1"></i>Следующий раунд
+      </button>
+    </form>
+    <button class="btn btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#seatingPanel">
+      <i class="bi bi-sliders me-1"></i>Не все команды сегодня
+    </button>
+    {% endif %}
+    {% else %}
     {% if tournament_players|length >= 10 %}
     <button class="btn btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#rosterPanel">
       <i class="bi bi-people-fill me-1"></i>Состав на вечер
@@ -54,6 +69,7 @@
       <i class="bi bi-sliders me-1"></i>{{ 'Изменить состав и рассадку' if series.confirmed_player_ids else 'Сгенерировать рассадку' }}
     </button>
     {% endif %}
+    {% endif %}
     <form method="POST" action="{{ url_for('series_tournaments.finish_series', series_id=series.id) }}"
           data-confirm="Завершить серию?">
       <button class="btn btn-outline-secondary"><i class="bi bi-flag-fill me-1"></i>Завершить</button>
@@ -66,7 +82,8 @@
   </div>
 </div>
 
-{% if series.status.value == 'active' and current_user.is_authenticated and current_user.is_admin and tournament_players|length >= 10 %}
+{% set enough_to_seat = (tournament.teams|length >= 10) if tournament.type.value == 'team' else (tournament_players|length >= 10) %}
+{% if series.status.value == 'active' and current_user.is_authenticated and current_user.is_admin and enough_to_seat %}
 <div class="collapse mb-4" id="rosterPanel">
   <div class="card border-success">
     <div class="card-header fw-semibold text-success">
@@ -126,6 +143,38 @@ document.addEventListener('DOMContentLoaded', updateRosterCount);
       <i class="bi bi-shuffle me-1"></i>Рассадка на сегодняшний вечер
     </div>
     <div class="card-body">
+      {% if tournament.type.value == 'team' %}
+      <p class="text-muted small mb-3">
+        Отметьте, какие команды играют сегодня — за каждой отмеченной командой закрепляется
+        одно место за столом, тиммейты никогда не сидят вместе. Кто именно из состава команды
+        сядет — выбирается по умолчанию (кто сыграл меньше в этом турнире), поменять на другого
+        игрока или замену можно потом прямо в карточке игры.
+      </p>
+      <form method="POST" action="{{ url_for('series_tournaments.generate_series_seating', series_id=series.id) }}">
+        <div class="d-flex gap-2 mb-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAllSeatingChecks(true)">Выбрать всех</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAllSeatingChecks(false)">Снять всех</button>
+          <span class="text-muted small align-self-center ms-auto" id="seatingCount"></span>
+        </div>
+        <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-1 mb-3" style="max-height:260px; overflow-y:auto">
+          {% for team in tournament.teams %}
+          <div class="col">
+            <div class="form-check">
+              <input class="form-check-input seating-check" type="checkbox" name="team_ids"
+                     value="{{ team.id }}" id="seat-t-{{ team.id }}" checked
+                     onchange="updateSeatingCount()">
+              <label class="form-check-label small" for="seat-t-{{ team.id }}">
+                {{ team.name }}
+              </label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-shuffle me-1"></i>Сгенерировать рассадку
+        </button>
+      </form>
+      {% else %}
       <p class="text-muted small mb-3">
         Отметьте, кто из участников турнира пришёл сегодня — рассадка (столы + места)
         построится только для отмеченных, минимизируя повторные пары и места, как обычно.
@@ -155,6 +204,7 @@ document.addEventListener('DOMContentLoaded', updateRosterCount);
           <i class="bi bi-shuffle me-1"></i>Сгенерировать рассадку
         </button>
       </form>
+      {% endif %}
     </div>
   </div>
 </div>

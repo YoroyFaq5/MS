@@ -568,8 +568,20 @@ class GameSlot(db.Model):
     # ALTER TABLE миграцию (migrate_elo_history.py) для существующих БД.
     elo_after = Column(Float, nullable=True)
 
+    # ── Командный зачёт с заменами ("играет ЗА команду", не обязательно
+    # её штатный член) — добавлено через ALTER TABLE миграцию
+    # (migrate_credit_team_id.py) для существующих БД. NULL для всех
+    # обычных индивидуальных игр и для командных турниров, никогда не
+    # тронутых generate_next_team_round — RatingService.get_team_rating
+    # в этом случае считает по-старому, через TeamPlayer. См. docstring
+    # миграции для полного контекста замены.
+    credit_team_id = Column(
+        Integer, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True
+    )
+
     game = relationship("Game", back_populates="slots")
     player = relationship("Player", back_populates="game_slots")
+    credit_team = relationship("Team", foreign_keys=[credit_team_id])
 
     @validates("quality_score")
     def clamp_quality(self, key, value):

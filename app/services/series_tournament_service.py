@@ -91,6 +91,7 @@ class SeriesTournamentService:
     @staticmethod
     def create_series_tournament(
         name: str, description: str = "", is_ranked: bool = True,
+        t_type: TournamentType = TournamentType.INDIVIDUAL,
     ) -> SeriesResult:
         """
         has_stages=False на этапе создания — иначе TournamentService
@@ -98,9 +99,17 @@ class SeriesTournamentService:
         (элиминационная механика, к сериям отношения не имеющая).
         Включаем has_stages постфактум, напрямую — это не запускает
         автосоздание этапов (оно происходит только внутри create_tournament).
+
+        t_type=TEAM — флагманский формат клуба: N команд, каждый вечер
+        играют все, но за столом по одному представителю от команды
+        (см. TournamentService.generate_next_team_round). Команды
+        заводятся уже ПОСЛЕ создания турнира, на его обычной странице
+        (tournaments/detail.html), тем же путём, что и для обычного
+        командного турнира — здесь ничего специфичного для команд не
+        создаётся, только снят прежний хардкод INDIVIDUAL.
         """
         result = TournamentService.create_tournament(
-            name=name, t_type=TournamentType.INDIVIDUAL,
+            name=name, t_type=t_type,
             is_ranked=is_ranked, has_stages=False, description=description,
         )
         if not result.ok:

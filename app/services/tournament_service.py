@@ -993,6 +993,202 @@ class TournamentService:
             },
         )
 
+    @staticmethod
+    def generate_next_team_round(
+        stage_id: int, team_ids: Optional[list[int]] = None,
+    ) -> ServiceResult:
+        """
+        Team-aware вариант generate_next_round — атомарная единица
+        рассадки НЕ игрок, а команда. Каждой играющей команде достаётся
+        ровно одно место за столом: тиммейты физически не могут
+        оказаться за одним столом, это гарантировано самой конструкцией
+        (один представитель на команду за раунд), а не постфактум-
+        проверкой, как в generate_games/generate_next_round.
+
+        Кто именно из ростера команды садится в её место — простой
+        дефолт (в этом турнире сыграл меньше остальных членов команды),
+        администратор решает вручную и полностью свободен поменять его
+        на кого угодно (включая постороннего игрока клуба "на замену")
+        через обычную перестановку места на странице игры — это НЕ
+        меняет, за какую команду идёт результат (credit_team_id ставится
+        один раз здесь и переживает любую последующую смену player_id).
+
+        team_ids (опционально) — сузить круг играющих команд до
+        конкретного подмножества (например, кто реально может выставить
+        представителя в этот вечер серии), как player_ids у
+        generate_next_round для отдельных игроков.
+        """
+        from app.models import GameSlot, Role
+        from collections import Counter, defaultdict
+        from sqlalchemy import func
+
+        stage = db.session.get(TournamentStage, stage_id)
+        if not stage:
+            return ServiceResult.fail("Этап не найден.")
+        tournament = stage.tournament
+        if tournament.type != TournamentType.TEAM:
+            return ServiceResult.fail("Этот турнир не командный.")
+        if stage.status != "active":
+            return ServiceResult.fail(f"Этап «{stage.name}» не активен.")
+
+        all_teams = {team.id: team for team in tournament.teams}
+        if team_ids is not None:
+            chosen = list(dict.fromkeys(team_ids))
+            invalid = [tid for tid in chosen if tid not in all_teams]
+            if invalid:
+                return ServiceResult.fail(
+                    "Среди выбранных есть команды, не принадлежащие этому турниру."
+                )
+            eligible_team_ids = chosen
+        else:
+            eligible_team_ids = list(all_teams.keys())
+
+        # Ростер каждой команды — нужен и для отсева пустых команд (некого
+        # посадить), и для выбора дефолтного представителя ниже.
+        roster: dict[int, list[int]] = defaultdict(list)
+        for team_id, player_id in (
+            db.session.query(TeamPlayer.team_id, TeamPlayer.player_id)
+            .filter(TeamPlayer.team_id.in_(eligible_team_ids))
+            .all()
+        ):
+            roster[team_id].append(player_id)
+
+        empty_teams = [tid for tid in eligible_team_ids if not roster.get(tid)]
+        eligible_team_ids = [tid for tid in eligible_team_ids if roster.get(tid)]
+
+        if len(eligible_team_ids) < 10:
+            return ServiceResult.fail(
+                f"Недостаточно команд с составом для раунда: "
+                f"{len(eligible_team_ids)} (нужно ≥10)."
+            )
+
+        current_round = (
+            db.session.query(func.max(Game.round_number))
+            .filter(Game.stage_id == stage_id, Game.round_number.isnot(None))
+            .scalar()
+        ) or 0
+        next_round = current_round + 1
+
+        # История считается по credit_team_id — то есть только по играм,
+        # уже прошедшим через этот же team-aware механизм (см. docstring
+        # миграции credit_team_id). Для свежего командного серийного
+        # турнира это ровно вся его история.
+        existing_slots = (
+            db.session.query(GameSlot.credit_team_id, GameSlot.seat_number, GameSlot.game_id)
+            .join(Game)
+            .filter(Game.tournament_id == tournament.id, GameSlot.credit_team_id.isnot(None))
+            .all()
+        )
+        seat_usage: dict[int, Counter] = defaultdict(Counter)
+        team_games_played: dict[int, int] = defaultdict(int)
+        slots_by_game: dict[int, list[int]] = defaultdict(list)
+        for team_id, seat_number, game_id in existing_slots:
+            seat_usage[team_id][seat_number] += 1
+            team_games_played[team_id] += 1
+            slots_by_game[game_id].append(team_id)
+
+        pairing_count: Counter = Counter()
+        for teams_in_game in slots_by_game.values():
+            for i in range(len(teams_in_game)):
+                for j in range(i + 1, len(teams_in_game)):
+                    pairing_count[frozenset((teams_in_game[i], teams_in_game[j]))] += 1
+
+        # Если команд не кратно 10 — отдыхают те, что уже сыграли больше
+        # всех (честная ротация, как и для отдельных игроков).
+        remainder = len(eligible_team_ids) % 10
+        resting_team_ids: list[int] = []
+        if remainder:
+            resting_team_ids = sorted(
+                eligible_team_ids, key=lambda tid: (-team_games_played[tid], tid)
+            )[:remainder]
+        playing_team_ids = [tid for tid in eligible_team_ids if tid not in resting_team_ids]
+
+        n_tables = len(playing_team_ids) // 10
+        if n_tables == 0:
+            return ServiceResult.fail("Недостаточно играющих команд для стола после ротации отдыха.")
+
+        tables = (
+            [list(playing_team_ids)] if n_tables == 1
+            else TournamentService._group_into_tables(playing_team_ids, n_tables, pairing_count)
+        )
+
+        # Личные игры каждого члена команды в этом турнире — для выбора
+        # дефолтного представителя (сыграл меньше остальных в ростере).
+        member_ids = [pid for members in roster.values() for pid in members]
+        player_games_played: dict[int, int] = defaultdict(int)
+        if member_ids:
+            for (pid, cnt) in (
+                db.session.query(GameSlot.player_id, func.count(GameSlot.id))
+                .join(Game)
+                .filter(Game.tournament_id == tournament.id, GameSlot.player_id.in_(member_ids))
+                .group_by(GameSlot.player_id)
+                .all()
+            ):
+                player_games_played[pid] = cnt
+
+        created_games = []
+        assignments = []
+        for table_idx, table_teams in enumerate(tables, start=1):
+            remaining = list(table_teams)
+            seat_assignment: dict[int, int] = {}  # seat -> team_id
+            for seat in range(1, 11):
+                remaining.sort(key=lambda tid: (seat_usage[tid][seat], sum(seat_usage[tid].values())))
+                chosen = remaining.pop(0)
+                seat_assignment[seat] = chosen
+                seat_usage[chosen][seat] += 1
+
+            game = Game(
+                win_side=WinSide.NONE,
+                is_finished=False,
+                is_ranked=tournament.is_ranked,
+                tournament_id=tournament.id,
+                stage_id=stage_id,
+                round_number=next_round,
+                notes=f"Раунд {next_round}, стол {table_idx}",
+            )
+            db.session.add(game)
+            db.session.flush()
+
+            for seat_num, team_id in seat_assignment.items():
+                representative = min(
+                    roster[team_id], key=lambda pid: (player_games_played[pid], pid)
+                )
+                player_games_played[representative] += 1
+                db.session.add(GameSlot(
+                    game_id=game.id, player_id=representative,
+                    seat_number=seat_num, role=Role.CIVILIAN,
+                    base_score=0.0, bonus_score=0.0,
+                    credit_team_id=team_id,
+                ))
+                assignments.append({
+                    "player_id": representative, "game_id": game.id,
+                    "table_number": table_idx, "seat_number": seat_num,
+                    "round_number": next_round,
+                })
+            created_games.append(game.id)
+
+        db.session.commit()
+        message = (
+            f"Раунд {next_round} создан: {len(created_games)} стол(ов)"
+            + (f", отдыхают {len(resting_team_ids)} команд" if resting_team_ids else "") + "."
+        )
+        if empty_teams:
+            names = ", ".join(all_teams[tid].name for tid in empty_teams)
+            message += f" Пропущены команды без состава: {names}."
+        logger.info(
+            f"Командный раунд {next_round} стадии {stage_id}: создано {len(created_games)} игр, "
+            f"отдыхают {len(resting_team_ids)} команд."
+        )
+        return ServiceResult.success(
+            message,
+            data={
+                "round_number": next_round,
+                "game_ids": created_games,
+                "resting_team_ids": resting_team_ids,
+                "assignments": assignments,
+            },
+        )
+
     # ── Summary / context builders ────────────────────────────────────────────
 
     @staticmethod

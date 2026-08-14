@@ -148,6 +148,18 @@
                     {% endif %}
                 </a>
               {% endif %}
+              {% if slot.credit_team_id and slot.credit_team %}
+              <div class="small mt-1">
+                <span class="badge bg-body-secondary text-body border" title="Результат этого места идёт в зачёт команды">
+                  <i class="bi bi-people-fill me-1"></i>{{ slot.credit_team.name }}
+                </span>
+                {% if slot.player and slot.player.id not in slot.credit_team.members|map(attribute='player_id')|list %}
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle" title="Играет не как штатный член команды">
+                  замена
+                </span>
+                {% endif %}
+              </div>
+              {% endif %}
             </td>
             <td class="text-center">
               {% if not role_editable_now %}
@@ -235,6 +247,13 @@
                     <span class="ms-1" title="Первый убиенный">💀</span>
                   {% endif %}
               </a>
+              {% if slot.credit_team_id and slot.credit_team %}
+              <div class="small mt-1">
+                <span class="badge bg-body-secondary text-body border" title="Результат этого места идёт в зачёт команды">
+                  <i class="bi bi-people-fill me-1"></i>{{ slot.credit_team.name }}
+                </span>
+              </div>
+              {% endif %}
             </td>
             <td class="text-center">
               {% if game.is_finished or not roles_editable %}

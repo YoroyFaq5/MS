@@ -672,8 +672,18 @@ class RatingService:
     @staticmethod
     def get_team_rating(tournament_id: int) -> List[TeamRating]:
         """
-        Team rating = sum of all member scores within tournament games.
-        Each game slot contributes to its player's team.
+        Team rating = sum of scores credited to the team.
+
+        Primary source: GameSlot.credit_team_id, set by
+        TournamentService.generate_next_team_round — correctly attributes
+        a stand-in's result to the team they played FOR, even though a
+        stand-in isn't a TeamPlayer of that team (see migrate_credit_team_id.py
+        for the full "represents a team, not necessarily its member"
+        rationale). Falls back to the original member-roster sum (via
+        TeamPlayer) for any team with no credit_team_id-tagged slots at
+        all — a plain team tournament never touched by the team-slot
+        generator, where "team member's own games" is still exactly what
+        should be summed.
         """
         from app.models import Team, TeamPlayer
 
@@ -691,22 +701,37 @@ class RatingService:
                 color=team.color,
                 member_count=len(team.members),
             )
-            # Aggregate individual scores of all team members in this tournament
-            member_player_ids = [m.player_id for m in team.members]
-            if not member_player_ids:
-                ratings.append(tr)
-                continue
 
-            slots = (
+            credited_slots = (
                 db.session.query(GameSlot)
                 .join(Game)
                 .filter(
-                    GameSlot.player_id.in_(member_player_ids),
+                    GameSlot.credit_team_id == team.id,
                     Game.is_finished == True,
                     Game.tournament_id == tournament_id,
                 )
                 .all()
             )
+
+            if credited_slots:
+                slots = credited_slots
+            else:
+                # Aggregate individual scores of all team members in this tournament
+                member_player_ids = [m.player_id for m in team.members]
+                if not member_player_ids:
+                    ratings.append(tr)
+                    continue
+
+                slots = (
+                    db.session.query(GameSlot)
+                    .join(Game)
+                    .filter(
+                        GameSlot.player_id.in_(member_player_ids),
+                        Game.is_finished == True,
+                        Game.tournament_id == tournament_id,
+                    )
+                    .all()
+                )
             for slot in slots:
                 tr.games_played += 1
                 tr.total_score += slot.total_score

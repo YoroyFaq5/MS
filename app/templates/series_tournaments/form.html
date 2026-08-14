@@ -25,6 +25,20 @@
           </div>
 
           <div class="mb-4">
+            <label class="form-label fw-medium">Тип турнира</label>
+            <div class="d-flex gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="type" value="individual" id="seriesTypeIndividual" checked>
+                <label class="form-check-label" for="seriesTypeIndividual">👤 Индивидуальный — личный рейтинг игроков</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="type" value="team" id="seriesTypeTeam">
+                <label class="form-check-label" for="seriesTypeTeam">👥 Командный — команды заводятся после создания турнира</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-4">
             <div class="form-check form-switch">
               <input class="form-check-input" type="checkbox" name="is_ranked"
                      id="isRanked" checked value="1">

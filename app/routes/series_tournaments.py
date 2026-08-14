@@ -10,7 +10,7 @@ TournamentService. Там, где действие уже существует �
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 
 from app import db
-from app.models import Player, TournamentSeries
+from app.models import Player, TournamentSeries, TournamentType, Team
 from app.services import SeriesTournamentService, TournamentService, RatingService
 from app.services.rating_service import RoleTournamentStats
 from app.services.shop_service import ShopService
@@ -40,10 +40,16 @@ def list_series_tournaments():
 @admin_required
 def new_series_tournament():
     if request.method == "POST":
+        try:
+            t_type = TournamentType(request.form.get("type", "individual"))
+        except ValueError:
+            t_type = TournamentType.INDIVIDUAL
+
         result = SeriesTournamentService.create_series_tournament(
             name=request.form.get("name", ""),
             description=request.form.get("description", ""),
             is_ranked=bool(request.form.get("is_ranked")),
+            t_type=t_type,
         )
         if result.ok:
             flash(result.message, "success")
@@ -215,15 +221,27 @@ def generate_series_seating(series_id: int):
             series_tournament_id=series.series_tournament_id, series_id=series_id,
         ))
 
-    player_ids = request.form.getlist("player_ids", type=int)
-    if len(player_ids) < 10:
-        flash(f"Нужно выбрать минимум 10 игроков. Выбрано: {len(player_ids)}.", "danger")
-        return redirect(url_for(
-            "series_tournaments.series_detail",
-            series_tournament_id=series.series_tournament_id, series_id=series_id,
-        ))
+    is_team = series.series_tournament.tournament.type == TournamentType.TEAM
 
-    result = TournamentService.generate_next_round(series.stage_id, player_ids=player_ids)
+    if is_team:
+        team_ids = request.form.getlist("team_ids", type=int)
+        if len(team_ids) < 10:
+            flash(f"Нужно выбрать минимум 10 команд. Выбрано: {len(team_ids)}.", "danger")
+            return redirect(url_for(
+                "series_tournaments.series_detail",
+                series_tournament_id=series.series_tournament_id, series_id=series_id,
+            ))
+        result = TournamentService.generate_next_team_round(series.stage_id, team_ids=team_ids)
+    else:
+        player_ids = request.form.getlist("player_ids", type=int)
+        if len(player_ids) < 10:
+            flash(f"Нужно выбрать минимум 10 игроков. Выбрано: {len(player_ids)}.", "danger")
+            return redirect(url_for(
+                "series_tournaments.series_detail",
+                series_tournament_id=series.series_tournament_id, series_id=series_id,
+            ))
+        result = TournamentService.generate_next_round(series.stage_id, player_ids=player_ids)
+
     flash(result.message, "success" if result.ok else "danger")
     if result.ok:
         from app.routes.games import _notify_next_slot
