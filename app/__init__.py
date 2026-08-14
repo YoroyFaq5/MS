@@ -67,6 +67,7 @@ def create_app(config_name: str = "default") -> Flask:
     from .routes.mafiaspace import mafiaspace_bp
     from .routes.admin_imports import admin_imports_bp
     from .routes.overlay import overlay_bp
+    from .routes.bar import bar_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(players_bp, url_prefix="/players")
@@ -90,6 +91,7 @@ def create_app(config_name: str = "default") -> Flask:
     app.register_blueprint(mafiaspace_bp, url_prefix="/api")
     app.register_blueprint(admin_imports_bp, url_prefix="/admin/imports")
     app.register_blueprint(overlay_bp, url_prefix="/overlay")
+    app.register_blueprint(bar_bp, url_prefix="/bar")
 
     # Migration API — только для одноразового переноса данных из старой
     # версии приложения. Регистрируется исключительно при явном

@@ -1176,6 +1176,87 @@ class InventoryItem(db.Model):
 
 
 # ---------------------------------------------------------------------------
+# BarRedemption  (real-world bar/shop purchases, coins charged in person)
+# ---------------------------------------------------------------------------
+
+class BarRedemption(db.Model):
+    """
+    Records a player spending coins on a PHYSICAL item (or a free-form
+    amount) at the club's bar, charged in person by an admin via
+    BarService.redeem() — see app/services/bar_service.py for the QR-token
+    flow this backs. Same "immutable ledger, never UPDATE, only INSERT
+    (+ optional soft revoke)" shape as GG above: a mistaken charge is
+    voided (compensating refund via EconomyService.add_coins + the
+    voided_* fields below), never deleted or edited in place — the whole
+    point is a trail an owner can audit per admin/shift, not just per
+    player.
+
+    item_id is nullable (a free-form amount, e.g. "полкило чипсов", has no
+    ShopItem row) and ondelete="SET NULL" rather than CASCADE — deleting a
+    catalog item must never erase redemption history, which is why the
+    item's name is ALSO snapshotted into item_name_snapshot at charge time.
+    """
+    __tablename__ = "bar_redemptions"
+    __allow_unmapped__ = True
+
+    id        = Column(Integer, primary_key=True)
+    player_id = Column(Integer, ForeignKey("players.id", ondelete="CASCADE"), nullable=False)
+    admin_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    item_id             = Column(Integer, ForeignKey("shop_items.id", ondelete="SET NULL"), nullable=True)
+    item_name_snapshot  = Column(String(120), nullable=True)
+    amount              = Column(Float, nullable=False)  # coins charged, always positive
+    note                = Column(String(255), nullable=True)  # required (service-level) when item_id is None
+
+    # Set via the `coin_transaction` relationship below (not the raw id) in
+    # BarService.redeem() — SQLAlchemy's unit-of-work resolves the FK value
+    # itself once both rows flush, in the correct insert order, no manual
+    # flush() needed in between.
+    coin_transaction_id = Column(Integer, ForeignKey("coin_transactions.id"), nullable=False)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    voided_at              = Column(DateTime(timezone=True), nullable=True)
+    voided_by_admin_id     = Column(Integer, ForeignKey("users.id"), nullable=True)
+    void_coin_transaction_id = Column(Integer, ForeignKey("coin_transactions.id"), nullable=True)
+
+    player = relationship("Player", foreign_keys=[player_id])
+    admin  = relationship("User", foreign_keys=[admin_id])
+    voided_by = relationship("User", foreign_keys=[voided_by_admin_id])
+    item   = relationship("ShopItem", foreign_keys=[item_id])
+    coin_transaction      = relationship("CoinTransaction", foreign_keys=[coin_transaction_id])
+    void_coin_transaction = relationship("CoinTransaction", foreign_keys=[void_coin_transaction_id])
+
+    @validates("amount")
+    def round_amount(self, key, value):
+        return round(float(value), 2)
+
+    @property
+    def is_voided(self) -> bool:
+        return self.voided_at is not None
+
+    def to_dict(self) -> dict:
+        return {
+            "id":                  self.id,
+            "player_id":           self.player_id,
+            "admin_id":            self.admin_id,
+            "admin_name":          self.admin.username if self.admin else None,
+            "item_id":             self.item_id,
+            "item_name_snapshot":  self.item_name_snapshot,
+            "amount":              self.amount,
+            "note":                self.note,
+            "created_at":          self.created_at.isoformat(),
+            "is_voided":           self.is_voided,
+            "voided_at":           self.voided_at.isoformat() if self.voided_at else None,
+            "voided_by_admin_id":  self.voided_by_admin_id,
+        }
+
+
+# ---------------------------------------------------------------------------
 # Achievement  (admin-editable presentation, linked to a rule via `code`)
 # ---------------------------------------------------------------------------
 

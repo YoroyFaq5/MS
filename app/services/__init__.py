@@ -18,6 +18,7 @@ from .series_tournament_service import SeriesTournamentService, SeriesResult, Se
 from .migration_service import MigrationService, BatchResult, ItemResult
 from .orchestrator import PostGameOrchestrator, PostTournamentOrchestrator
 from .overlay_control_service import OverlayControlService
+from .bar_service import BarService, BarResult
 
 __all__ = [
     "RatingService", "calculate_base_score",
@@ -40,4 +41,5 @@ __all__ = [
     "MigrationService", "BatchResult", "ItemResult",
     "PostGameOrchestrator", "PostTournamentOrchestrator",
     "OverlayControlService",
+    "BarService", "BarResult",
 ]

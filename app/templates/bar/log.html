@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Бар — журнал списаний{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold">📋 Журнал списаний в баре</h2>
+    <p class="text-muted small mb-0">Последние {{ redemptions|length }} операций — для сверки смены</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if not redemptions %}
+    <p class="text-muted small p-3 mb-0">Списаний пока не было.</p>
+    {% else %}
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th class="ps-4">Когда</th>
+            <th>Игрок</th>
+            <th>Товар / комментарий</th>
+            <th>Сотрудник</th>
+            <th class="text-end">Сумма</th>
+            <th class="text-center">Статус</th>
+            <th class="text-end pe-4">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in redemptions %}
+          <tr class="{{ 'text-muted text-decoration-line-through' if r.is_voided else '' }}">
+            <td class="ps-4 small">{{ r.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            <td>
+              {% if r.player %}
+              <a href="{{ url_for('profile.view_profile', player_id=r.player_id) }}">{{ r.player.display_name }}</a>
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ r.item_name_snapshot or r.note or '—' }}</td>
+            <td class="small">{{ r.admin.username if r.admin else '—' }}</td>
+            <td class="text-end fw-semibold">{{ r.amount | int }}</td>
+            <td class="text-center">
+              {% if r.is_voided %}
+              <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle"
+                    title="{{ 'Отменил ' ~ (r.voided_by.username if r.voided_by else '?') }}">Отменено</span>
+              {% else %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle">Активно</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              {% if not r.is_voided %}
+              <form method="POST" action="{{ url_for('bar.void_redemption', redemption_id=r.id) }}" class="d-inline-flex gap-1">
+                <input type="hidden" name="next" value="{{ url_for('bar.log') }}">
+                <input type="text" name="reason" class="form-control form-control-sm" placeholder="Причина" style="width:140px;" required>
+                <button type="submit" class="btn btn-sm btn-outline-secondary"
+                        onclick="return confirm('Отменить это списание и вернуть монеты игроку?')">
+                  Отменить
+                </button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

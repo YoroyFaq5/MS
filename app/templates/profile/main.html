@@ -301,6 +301,26 @@
   </div>
 </div>
 
+{% if is_own %}
+<div class="row g-3 mb-3">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-4 d-flex flex-wrap align-items-center gap-4">
+        <img id="bar-qr-img" src="{{ url_for('bar.qr_image') }}" alt="QR для бара"
+             width="160" height="160" style="border-radius:8px;background:#fff;padding:8px;flex-shrink:0;">
+        <div>
+          <div class="fw-semibold mb-1"><i class="bi bi-cup-straw text-danger"></i> QR для бара</div>
+          <div class="text-muted small" style="max-width:440px;">
+            Покажите этот код сотруднику бара, чтобы оплатить покупку монетами.
+            Код действует ограниченное время и сам обновляется, пока страница открыта.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="row g-3">
   <div class="col-md-4">
     <a href="{{ url_for('profile.statistics', player_id=player_id) }}" class="text-decoration-none text-reset">
@@ -420,6 +440,19 @@
       removeBtn.disabled = false;
     }
   });
+})();
+</script>
+<script>
+(() => {
+  // Server-side token is valid 5 minutes (see BarService.TOKEN_MAX_AGE_
+  // SECONDS) — refresh a bit before that so a code shown while queueing
+  // at the bar never goes stale mid-wait.
+  const qrImg = document.getElementById('bar-qr-img');
+  if (!qrImg) return;
+  const baseSrc = qrImg.getAttribute('src');
+  setInterval(() => {
+    qrImg.src = baseSrc + (baseSrc.includes('?') ? '&' : '?') + 't=' + Date.now();
+  }, 4 * 60 * 1000);
 })();
 </script>
 {% endblock %}
