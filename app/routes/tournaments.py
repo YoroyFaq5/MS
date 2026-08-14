@@ -489,6 +489,10 @@ def final_view(tournament_id: int):
     final_ratings = RatingService.get_stage_rating(final_stage.id) if can_view_standings else []
     final_games = sorted(final_stage.games, key=lambda g: g.played_at, reverse=True)
     final_participants = TournamentService.get_final_stage_participants(tournament_id)
+    team_ratings = (
+        RatingService.get_team_rating(tournament_id)
+        if can_view_standings and t.type == TournamentType.TEAM else []
+    )
 
     player_ids = {r.player_id for r in final_ratings}
     player_ids.update(fp.player_id for fp in final_participants)
@@ -501,6 +505,7 @@ def final_view(tournament_id: int):
         final_ratings=final_ratings,
         final_games=final_games,
         final_participants=final_participants,
+        team_ratings=team_ratings,
         equipped_bulk=equipped_bulk,
         can_view_standings=can_view_standings,
     )
@@ -514,6 +519,27 @@ def add_team(tournament_id: int):
     name = request.form.get("name", "")
     color = request.form.get("color") or None
     result = TournamentService.create_team(tournament_id, name, color)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("tournaments.tournament_detail", tournament_id=tournament_id))
+
+
+@tournaments_bp.route("/teams/<int:team_id>/rename", methods=["POST"])
+@admin_required
+def rename_team(team_id: int):
+    team = db.session.get(Team, team_id) or abort(404)
+    name = request.form.get("name", "")
+    color = request.form.get("color") or None
+    result = TournamentService.rename_team(team_id, name, color)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("tournaments.tournament_detail", tournament_id=team.tournament_id))
+
+
+@tournaments_bp.route("/teams/<int:team_id>/delete", methods=["POST"])
+@admin_required
+def delete_team(team_id: int):
+    team = db.session.get(Team, team_id) or abort(404)
+    tournament_id = team.tournament_id
+    result = TournamentService.delete_team(team_id)
     flash(result.message, "success" if result.ok else "danger")
     return redirect(url_for("tournaments.tournament_detail", tournament_id=tournament_id))
 

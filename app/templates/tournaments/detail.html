@@ -240,8 +240,33 @@
             <div class="rounded-circle" style="width:12px;height:12px;background:{{ team.color }};flex-shrink:0"></div>
             {% endif %}
             <span class="fw-semibold">{{ team.name }}</span>
-            <span class="badge bg-body-secondary text-muted border ms-auto">{{ team.members|length }} чел.</span>
+            <span class="badge bg-body-secondary text-muted border">{{ team.members|length }} чел.</span>
+            {% if tournament.status != 'finished' and current_user.is_authenticated and current_user.is_admin %}
+            <div class="d-flex gap-1 ms-auto">
+              <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem"
+                      data-bs-toggle="collapse" data-bs-target="#renameTeam-{{ team.id }}" title="Переименовать">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <form method="POST" action="{{ url_for('tournaments.delete_team', team_id=team.id) }}" class="d-inline m-0 p-0">
+                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:.7rem"
+                        title="Удалить команду"
+                        data-confirm="Удалить команду «{{ team.name }}»? Состав и очки команды пропадут из зачёта."
+                        data-confirm-tone="danger">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+            {% endif %}
           </div>
+          {% if tournament.status != 'finished' and current_user.is_authenticated and current_user.is_admin %}
+          <div class="collapse mb-2" id="renameTeam-{{ team.id }}">
+            <form method="POST" action="{{ url_for('tournaments.rename_team', team_id=team.id) }}" class="d-flex gap-2">
+              <input type="text" name="name" class="form-control form-control-sm" value="{{ team.name }}" required>
+              <input type="color" name="color" class="form-control form-control-sm form-control-color" value="{{ team.color or '#e03535' }}" style="width:46px">
+              <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">Сохранить</button>
+            </form>
+          </div>
+          {% endif %}
           <!-- Members list -->
           <div class="d-flex flex-wrap gap-1 mb-2">
             {% for m in team.members %}

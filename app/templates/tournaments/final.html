@@ -35,6 +35,43 @@
   </div>
 </div>
 
+{% if team_ratings %}
+<!-- Командный зачёт (тот же блок, что на leaderboard.html) -->
+<div class="card mb-4">
+  <div class="card-header fw-semibold">🤝 Командный зачёт</div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for tr in team_ratings %}
+      <div class="col-md-4">
+        <div class="card text-center p-3">
+          {% if tr.rank == 1 %}
+          <div class="fs-2 mb-1">🥇</div>
+          {% elif tr.rank == 2 %}
+          <div class="fs-2 mb-1">🥈</div>
+          {% elif tr.rank == 3 %}
+          <div class="fs-2 mb-1">🥉</div>
+          {% else %}
+          <div class="fw-bold text-muted mb-1">#{{ tr.rank }}</div>
+          {% endif %}
+          {% if tr.color %}
+          <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+            <div class="rounded-circle" style="width:12px;height:12px;background:{{ tr.color }}"></div>
+            <span class="fw-bold">{{ tr.team_name }}</span>
+          </div>
+          {% else %}
+          <div class="fw-bold mb-1">{{ tr.team_name }}</div>
+          {% endif %}
+          <div class="text-muted small">{{ tr.member_count }} игроков · {{ tr.games_played }} игр</div>
+          <div class="fs-4 fw-bold text-success mt-1">{{ tr.total_score|round(2) }}</div>
+          <div class="text-muted small">{{ tr.win_rate }}% побед</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- Final rating podium -->
 {% if not can_view_standings %}
 <div class="card mb-4">

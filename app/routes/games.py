@@ -21,6 +21,38 @@ def _active_players():
     return db.session.query(Player).filter_by(is_active=True).order_by(Player.name).all()
 
 
+def _team_conflicts(tournament_id: int | None, player_ids: list[int]) -> list[str]:
+    """Human-readable "Команда «X»: A, B" entries for any team whose 2+
+    members are all present in player_ids — teammates aren't allowed to
+    share a table in a TEAM tournament. No-op (empty list) for a
+    non-tournament game or a tournament with no teams at all — cheap to
+    call unconditionally from every path that seats/reseats players
+    (manual creation, auto-generation, mid-game reassignment) instead of
+    only the one form that happened to check first."""
+    if not tournament_id or not player_ids:
+        return []
+    rows = (
+        db.session.query(TeamPlayer.team_id, TeamPlayer.player_id)
+        .join(Team)
+        .filter(Team.tournament_id == tournament_id, TeamPlayer.player_id.in_(player_ids))
+        .all()
+    )
+    if not rows:
+        return []
+    players = {
+        p.id: p for p in
+        db.session.query(Player).filter(Player.id.in_([pid for _, pid in rows])).all()
+    }
+    team_hits: dict[int, list[str]] = {}
+    for team_id, player_id in rows:
+        player = players.get(player_id)
+        team_hits.setdefault(team_id, []).append(player.display_name if player else str(player_id))
+    return [
+        f"Команда «{db.session.get(Team, tid).name}»: {', '.join(names)}"
+        for tid, names in team_hits.items() if len(names) > 1
+    ]
+
+
 def _active_tournaments():
     return (
         db.session.query(Tournament)
@@ -157,6 +189,10 @@ def _apply_player_reassignments(game: Game, form) -> str | None:
     final_ids = [changes.get(s, s.player_id) for s in game.slots]
     if len(set(final_ids)) != len(final_ids):
         return "Один и тот же игрок не может занимать два места."
+
+    conflicts = _team_conflicts(game.tournament_id, final_ids)
+    if conflicts:
+        return "Конфликт состава — " + "; ".join(conflicts) + " не могут играть вместе."
 
     used_ids = set(final_ids) | {s.player_id for s in game.slots}
     temp_ids = [
@@ -653,23 +689,7 @@ def new_game():
                     pass
 
         if tournament_id and t and t.type.value == "team":
-            team_hits: dict[int, list[str]] = {}
-            for pid in selected_ids_pre:
-                tp = (
-                    db.session.query(TeamPlayer)
-                    .join(Team)
-                    .filter(Team.tournament_id == tournament_id, TeamPlayer.player_id == pid)
-                    .first()
-                )
-                if tp:
-                    player = db.session.get(Player, pid)
-                    team_hits.setdefault(tp.team_id, []).append(
-                        player.display_name if player else str(pid)
-                    )
-            conflicts = [
-                f"Команда «{db.session.get(Team, tid).name}»: {', '.join(names)}"
-                for tid, names in team_hits.items() if len(names) > 1
-            ]
+            conflicts = _team_conflicts(tournament_id, selected_ids_pre)
             if conflicts:
                 for c in conflicts:
                     flash(f"Конфликт состава — {c} не могут играть вместе.", "danger")

@@ -206,6 +206,19 @@ class TournamentService:
         if not p:
             return ServiceResult.fail("Участник не найден.")
 
+        # Убрать из команды, если он в ней состоит — иначе TeamPlayer
+        # переживает удаление участника, и "удалённый" игрок продолжает
+        # числиться в составе команды и его очки продолжают засчитываться
+        # в командный рейтинг (get_team_rating суммирует по TeamPlayer).
+        tp = (
+            db.session.query(TeamPlayer)
+            .join(Team)
+            .filter(Team.tournament_id == tournament_id, TeamPlayer.player_id == player_id)
+            .first()
+        )
+        if tp:
+            db.session.delete(tp)
+
         db.session.delete(p)
         db.session.commit()
         return ServiceResult.success("Участник удалён.")
@@ -276,6 +289,52 @@ class TournamentService:
         db.session.add(tp)
         db.session.commit()
         return ServiceResult.success(f"«{player.display_name}» добавлен в команду «{team.name}».", data=tp)
+
+    @staticmethod
+    def rename_team(team_id: int, name: str, color: Optional[str] = None) -> ServiceResult:
+        team = db.session.get(Team, team_id)
+        if not team:
+            return ServiceResult.fail("Команда не найдена.")
+        if not name.strip():
+            return ServiceResult.fail("Название команды обязательно.")
+
+        exists = (
+            db.session.query(Team)
+            .filter(Team.tournament_id == team.tournament_id, Team.name == name.strip(), Team.id != team_id)
+            .first()
+        )
+        if exists:
+            return ServiceResult.fail(f"Команда «{name}» уже существует.")
+
+        team.name = name.strip()
+        team.color = color
+        db.session.commit()
+        return ServiceResult.success(f"Команда переименована в «{team.name}».", data=team)
+
+    @staticmethod
+    def delete_team(team_id: int) -> ServiceResult:
+        """Полностью удаляет команду вместе с составом. Игроки остаются
+        участниками турнира (TournamentParticipant не трогаем) — просто
+        перестают быть в какой-либо команде, как и после ручного
+        remove_team_player по одному."""
+        team = db.session.get(Team, team_id)
+        if not team:
+            return ServiceResult.fail("Команда не найдена.")
+
+        member_ids = [tp.player_id for tp in team.members]
+        (
+            db.session.query(TournamentParticipant)
+            .filter(
+                TournamentParticipant.tournament_id == team.tournament_id,
+                TournamentParticipant.player_id.in_(member_ids),
+            )
+            .update({TournamentParticipant.team_id: None}, synchronize_session=False)
+        )
+
+        name = team.name
+        db.session.delete(team)  # cascade="all, delete-orphan" на Team.members удаляет TeamPlayer
+        db.session.commit()
+        return ServiceResult.success(f"Команда «{name}» удалена.")
 
     # ── Stages & Cutoff ───────────────────────────────────────────────────────
 
@@ -526,6 +585,18 @@ class TournamentService:
         GAME_SIZE = 10
         pool = participant_ids[:]
 
+        # Командные турниры: тиммейты не должны садиться за один стол.
+        # teammate_of пуст (и вся защита ниже — no-op) для обычных
+        # индивидуальных турниров.
+        teammate_of: dict[int, int] = {}
+        if t.type == TournamentType.TEAM:
+            from app.models import Team, TeamPlayer
+            for team_id, player_id in (
+                db.session.query(TeamPlayer.team_id, TeamPlayer.player_id)
+                .join(Team).filter(Team.tournament_id == tournament_id).all()
+            ):
+                teammate_of[player_id] = team_id
+
         # seat_usage[player_id][seat_number] → count of times used
         # games_played_count[player_id] → total games in this tournament
         # Seeded from games already in the tournament (manually created or
@@ -544,6 +615,7 @@ class TournamentService:
             games_played_count[slot.player_id] += 1
 
         created_ids = []
+        unresolved_team_conflicts = 0
 
         for game_idx in range(n_games):
             # Кто играет в этой игре: жадно берём GAME_SIZE участников с
@@ -555,7 +627,37 @@ class TournamentService:
             shuffled_pool = pool[:]
             random.shuffle(shuffled_pool)
             candidates = sorted(shuffled_pool, key=lambda pid: games_played_count[pid])
-            players_this_game = candidates[:GAME_SIZE]
+
+            if teammate_of:
+                # То же жадное правило "меньше всех сыграл", но пропускаем
+                # кандидата, если его команда уже представлена за этим
+                # столом — тиммейты никогда не садятся вместе, пока среди
+                # оставшихся кандидатов есть из кого выбрать.
+                players_this_game: list[int] = []
+                used_teams: set[int] = set()
+                leftover: list[int] = []
+                for pid in candidates:
+                    team_id = teammate_of.get(pid)
+                    if team_id is not None and team_id in used_teams:
+                        leftover.append(pid)
+                        continue
+                    players_this_game.append(pid)
+                    if team_id is not None:
+                        used_teams.add(team_id)
+                    if len(players_this_game) == GAME_SIZE:
+                        break
+                if len(players_this_game) < GAME_SIZE:
+                    # Физически не хватило "бесконфликтных" кандидатов
+                    # (например, команд меньше GAME_SIZE) — дозаполняем
+                    # оставшимися, чтобы не срывать генерацию, но считаем
+                    # это как известный неизбежный конфликт для отчёта.
+                    for pid in leftover:
+                        if len(players_this_game) == GAME_SIZE:
+                            break
+                        players_this_game.append(pid)
+                    unresolved_team_conflicts += 1
+            else:
+                players_this_game = candidates[:GAME_SIZE]
 
             # Greedy seat assignment: for each seat pick the player who has
             # sat there least often (ties broken randomly, not by player id,
@@ -594,8 +696,14 @@ class TournamentService:
             created_ids.append(game.id)
 
         db.session.commit()
+        message = f"Создано {n_games} игр для турнира «{t.name}»."
+        if unresolved_team_conflicts:
+            message += (
+                f" Внимание: в {unresolved_team_conflicts} игр(ах) не удалось развести "
+                "тиммейтов по разным столам — участников/команд не хватило. Проверьте состав вручную."
+            )
         return ServiceResult.success(
-            f"Создано {n_games} игр для турнира «{t.name}».",
+            message,
             data={"game_ids": created_ids, "count": len(created_ids)},
         )
 
@@ -644,6 +752,38 @@ class TournamentService:
             else:
                 tables[ta][ia], tables[tb][ib] = tables[tb][ib], tables[ta][ia]
         return tables
+
+    @staticmethod
+    def _resolve_single_table_team_conflicts(
+        playing_ids: list[int], resting_ids: list[int], teammate_of: dict[int, int],
+    ) -> tuple[list[int], list[int]]:
+        """Best-effort swap: for a single-table round, if 2+ teammates both
+        ended up in playing_ids, swap the "extra" one out for a resting
+        player whose team isn't already at the table. Leaves the pair in
+        place (unresolved — caller reports this) if no such resting player
+        exists, e.g. too few teams overall."""
+        playing_ids = list(playing_ids)
+        resting_ids = list(resting_ids)
+        seen_teams: set[int] = set()
+        for idx, pid in enumerate(playing_ids):
+            team_id = teammate_of.get(pid)
+            if team_id is None or team_id not in seen_teams:
+                if team_id is not None:
+                    seen_teams.add(team_id)
+                continue
+            # pid is a second (or later) member of an already-seated team
+            replacement_idx = next(
+                (i for i, rid in enumerate(resting_ids)
+                 if teammate_of.get(rid) is None or teammate_of.get(rid) not in seen_teams),
+                None,
+            )
+            if replacement_idx is None:
+                continue
+            resting_ids[replacement_idx], playing_ids[idx] = pid, resting_ids[replacement_idx]
+            new_team = teammate_of.get(playing_ids[idx])
+            if new_team is not None:
+                seen_teams.add(new_team)
+        return playing_ids, resting_ids
 
     @staticmethod
     def generate_next_round(
@@ -723,6 +863,20 @@ class TournamentService:
                 for j in range(i + 1, len(players_in_game)):
                     pairing_count[frozenset((players_in_game[i], players_in_game[j]))] += 1
 
+        # Командные турниры: тиммейты не должны садиться за один стол —
+        # то же правило, что уже соблюдает ручная форма создания игры
+        # (games.py::_team_conflicts), но там оно только проверяет и
+        # отклоняет форму, а не встроено в саму авторассадку. teammate_of
+        # пуст для обычных индивидуальных турниров (весь блок ниже — no-op).
+        teammate_of: dict[int, int] = {}
+        if tournament.type == TournamentType.TEAM:
+            from app.models import Team, TeamPlayer
+            for team_id, player_id in (
+                db.session.query(TeamPlayer.team_id, TeamPlayer.player_id)
+                .join(Team).filter(Team.tournament_id == tournament.id).all()
+            ):
+                teammate_of[player_id] = team_id
+
         # Кто отдыхает этот раунд, если участников не кратно 10 — отдыхают
         # те, кто уже сыграл БОЛЬШЕ всех (честная ротация, зеркально
         # generate_games, который отдаёт приоритет играющим МЕНЬШЕ всех).
@@ -738,10 +892,46 @@ class TournamentService:
         if n_tables == 0:
             return ServiceResult.fail("Недостаточно играющих для стола после ротации отдыха.")
 
+        if n_tables == 1 and teammate_of:
+            # Единственный стол — _group_into_tables не вызывается вообще
+            # (нечего группировать), так что конфликт можно снять только
+            # обменом с отдыхающими: если 2+ тиммейта оба играют, меняем
+            # "лишнего" на отдыхающего из другой команды, если такой есть.
+            playing_ids, resting_ids = TournamentService._resolve_single_table_team_conflicts(
+                playing_ids, resting_ids, teammate_of
+            )
+        elif n_tables > 1 and teammate_of:
+            # Несколько столов — пусть локальный поиск _group_into_tables
+            # сам разведёт тиммейтов по разным столам, если это физически
+            # возможно: делаем повтор пары тиммейтов "бесконечно дорогим".
+            TEAM_CONFLICT_PENALTY = 1_000_000
+            by_team: dict[int, list[int]] = defaultdict(list)
+            for pid in playing_ids:
+                tid = teammate_of.get(pid)
+                if tid is not None:
+                    by_team[tid].append(pid)
+            for members in by_team.values():
+                for i in range(len(members)):
+                    for j in range(i + 1, len(members)):
+                        pairing_count[frozenset((members[i], members[j]))] += TEAM_CONFLICT_PENALTY
+
         tables = (
             [list(playing_ids)] if n_tables == 1
             else TournamentService._group_into_tables(playing_ids, n_tables, pairing_count)
         )
+
+        unresolved_team_conflicts = 0
+        if teammate_of:
+            for table in tables:
+                seen_teams: set[int] = set()
+                for pid in table:
+                    tid = teammate_of.get(pid)
+                    if tid is None:
+                        continue
+                    if tid in seen_teams:
+                        unresolved_team_conflicts += 1
+                        break
+                    seen_teams.add(tid)
 
         created_games = []
         assignments = []  # для будущего уведомления бота (см. MS-TelegramBot)
@@ -784,9 +974,17 @@ class TournamentService:
             f"Раунд {next_round} стадии {stage_id}: создано {len(created_games)} игр, "
             f"отдыхают {len(resting_ids)} игроков."
         )
-        return ServiceResult.success(
+        message = (
             f"Раунд {next_round} создан: {len(created_games)} стол(ов)"
-            + (f", отдыхают {len(resting_ids)} игроков" if resting_ids else "") + ".",
+            + (f", отдыхают {len(resting_ids)} игроков" if resting_ids else "") + "."
+        )
+        if unresolved_team_conflicts:
+            message += (
+                f" Внимание: в {unresolved_team_conflicts} стол(ах) не удалось развести "
+                "тиммейтов — команд/замен не хватило. Проверьте состав вручную."
+            )
+        return ServiceResult.success(
+            message,
             data={
                 "round_number": next_round,
                 "game_ids": created_games,
