@@ -16,6 +16,25 @@ from app import db
 # Enums
 # ---------------------------------------------------------------------------
 
+def _enum_values(enum_cls):
+    """values_callable for Column(Enum(...)) — makes SQLAlchemy read/write
+    each member's lowercase .value (e.g. "killed") instead of its default
+    uppercase .name (e.g. "KILLED"). Needed specifically for the enum
+    columns migrate_live_game_control.py added via hand-written
+    `ALTER TABLE ... ENUM('killed','voted')`-style DDL using lowercase
+    values — SQLAlchemy's un-configured default assumes the DB stores
+    .name, so without this every read of those columns raised
+    `LookupError: 'killed' is not among the defined enum values`
+    (MySQL's native ENUM matches inserts case-insensitively but always
+    returns the value in the case the column was DEFINED with, i.e.
+    lowercase here). The original, hand-crafted-by-db.create_all() enum
+    columns (role, win_side, ...) already store uppercase names and must
+    NOT get this — only apply it to columns backed by one of those
+    migration scripts.
+    """
+    return [e.value for e in enum_cls]
+
+
 class Role(PyEnum):
     CIVILIAN = "civilian"
     MAFIA = "mafia"
@@ -511,7 +530,9 @@ class Game(db.Model):
     # через ALTER TABLE миграцию (migrate_live_game_control.py) для
     # существующих БД. Смысл имеет только для is_finished=False; после
     # завершения игры остаётся как снимок последней отмеченной фазы.
-    live_phase = Column(Enum(LivePhase, name="live_phase_enum"), nullable=True)
+    live_phase = Column(
+        Enum(LivePhase, name="live_phase_enum", values_callable=_enum_values), nullable=True
+    )
     live_turn  = Column(Integer, nullable=True)
 
     slots = relationship(
@@ -581,13 +602,21 @@ class GameSlot(db.Model):
     # синхроне (is_eliminated=True ровно когда elimination_type не NULL),
     # чтобы существующие потребители одного is_eliminated (chart_data_
     # service.py, profile/statistics.html) не требовали правок.
-    elimination_type = Column(Enum(EliminationType, name="elimination_type_enum"), nullable=True)
+    elimination_type = Column(
+        Enum(EliminationType, name="elimination_type_enum", values_callable=_enum_values),
+        nullable=True,
+    )
     # live_role — НЕ то же самое, что role: role участвует в финальной форме
     # (finish_game) и его валидация полагается на "все civilian = роли ещё
     # не расставлены" (см. app/routes/games.py); live_role — отдельное поле
     # для необязательного раскрытия роли по ходу игры на трансляции, никак
     # не влияет на финальный подсчёт.
-    live_role = Column(Enum(Role, name="role_enum"), nullable=True)
+    # NOTE: values_callable here — unlike `role` above — because live_role's
+    # underlying column came from migrate_live_game_control.py's lowercase
+    # native ENUM, not db.create_all()'s uppercase one; see _enum_values.
+    live_role = Column(
+        Enum(Role, name="live_role_enum", values_callable=_enum_values), nullable=True
+    )
 
     # ── PU (Первый Убиенный) ────────────────────────────────────────────────
     # is_pu: этот игрок был убит первым в ночь (без промаха).
@@ -752,8 +781,13 @@ class GameEvent(db.Model):
     game_id = Column(Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
     slot_id = Column(Integer, ForeignKey("game_slots.id", ondelete="CASCADE"), nullable=True)
 
-    event_type = Column(Enum(GameEventType, name="game_event_type_enum"), nullable=False)
-    phase       = Column(Enum(LivePhase, name="live_phase_enum"), nullable=True)
+    event_type = Column(
+        Enum(GameEventType, name="game_event_type_enum", values_callable=_enum_values),
+        nullable=False,
+    )
+    phase       = Column(
+        Enum(LivePhase, name="live_phase_enum", values_callable=_enum_values), nullable=True
+    )
     turn_number = Column(Integer, nullable=True)
 
     admin_id = Column(Integer, ForeignKey("users.id"), nullable=True)
