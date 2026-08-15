@@ -35,6 +35,9 @@
           {% else %}⚔️{% endif %}
         </span>
         <span class="stage-pill__name">{{ stage.name }}</span>
+        {% if stage.score_multiplier and stage.score_multiplier != 1 %}
+        <span class="stage-pill__badge" title="Очки за игры этого этапа умножаются на {{ stage.score_multiplier }}">×{{ stage.score_multiplier|round(2) }}</span>
+        {% endif %}
         <span class="stage-pill__badge">
           {% if stage.status == 'active' %}LIVE
           {% elif stage.status == 'finished' %}DONE
@@ -51,6 +54,7 @@
 
 <!-- Each stage detail -->
 {% for stage in stages %}
+{% set next_stage = stages[loop.index0 + 1] if not loop.last else none %}
 <div class="card mb-4 {% if stage.status == 'active' %}border-warning{% endif %}">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div class="d-flex align-items-center gap-3 flex-wrap">
@@ -64,6 +68,11 @@
         {% else %}bg-warning text-dark{% endif %}">
         {{ stage.status|upper }}
       </span>
+      {% if stage.score_multiplier and stage.score_multiplier != 1 %}
+      <span class="badge bg-danger-subtle text-danger" title="Очки за игры этого этапа умножаются на {{ stage.score_multiplier }}">
+        <i class="bi bi-lightning-charge-fill"></i> ×{{ stage.score_multiplier|round(2) }}
+      </span>
+      {% endif %}
       <span class="text-muted small">{{ stage.games|length }} игр</span>
     </div>
     {% if current_user.is_authenticated and current_user.is_admin %}
@@ -73,7 +82,16 @@
       <i class="bi bi-box-arrow-up-right me-1"></i>Управлять в серийном турнире
     </a>
     {% else %}
-    <div class="d-flex gap-2 flex-wrap">
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <form method="POST" action="{{ url_for('tournaments.edit_stage', stage_id=stage.id) }}"
+            class="d-flex align-items-center gap-1">
+        <input type="number" name="score_multiplier" value="{{ stage.score_multiplier }}"
+               step="0.1" min="0.1" class="form-control form-control-sm" style="width:70px"
+               title="Коэффициент очков за игры этого этапа (1 = без изменений)">
+        <button class="btn btn-sm btn-outline-secondary" title="Сохранить коэффициент">
+          <i class="bi bi-check-lg"></i>
+        </button>
+      </form>
       {% if stage.status == 'pending' and tournament.status == 'active' %}
       <form method="POST" action="{{ url_for('tournaments.activate_stage', stage_id=stage.id) }}">
         <button class="btn btn-sm btn-success">▶ Активировать</button>
@@ -84,10 +102,10 @@
               data-confirm="Сгенерировать следующий раунд рассадки для этапа «{{ stage.name }}»?">
           <button class="btn btn-sm btn-outline-primary">🎲 Следующий раунд</button>
         </form>
-        {% if stage.type != 'final' %}
+        {% if next_stage %}
         <form method="POST" action="{{ url_for('tournaments.run_cutoff', stage_id=stage.id) }}"
-              data-confirm="Запустить cutoff? Топ-{{ tournament.cutoff_size }} игроков пройдут в финал.">
-          <button class="btn btn-sm btn-warning text-dark">✂ Cutoff → Финал</button>
+              data-confirm="Запустить cutoff? Топ-{{ tournament.cutoff_size }} игроков пройдут в этап «{{ next_stage.name }}»{% if next_stage.score_multiplier and next_stage.score_multiplier != 1 %} (очки там ×{{ next_stage.score_multiplier|round(2) }}){% endif %}.">
+          <button class="btn btn-sm btn-warning text-dark">✂ Cutoff → {{ next_stage.name }}</button>
         </form>
         {% endif %}
         <form method="POST" action="{{ url_for('tournaments.finish_stage', stage_id=stage.id) }}"
@@ -124,7 +142,7 @@
         </thead>
         <tbody>
           {% for r in s_ratings %}
-          <tr class="{% if loop.index <= tournament.cutoff_size and stage.type != 'final' %}cutoff-zone{% endif %}">
+          <tr class="{% if loop.index <= tournament.cutoff_size and next_stage %}cutoff-zone{% endif %}">
             <td class="ps-4">
               {% if r.rank == 1 %}🥇
               {% elif r.rank == 2 %}🥈
@@ -141,10 +159,10 @@
         </tbody>
       </table>
     </div>
-    {% if stage.type != 'final' and s_ratings|length > tournament.cutoff_size %}
+    {% if next_stage and s_ratings|length > tournament.cutoff_size %}
     <div class="px-4 py-2 text-muted small border-top">
       <i class="bi bi-scissors me-1 text-warning"></i>
-      Cutoff line — первые {{ tournament.cutoff_size }} игроков проходят в финал
+      Cutoff line — первые {{ tournament.cutoff_size }} игроков проходят в этап «{{ next_stage.name }}»
     </div>
     {% endif %}
     {% else %}
@@ -161,10 +179,10 @@
   <div class="card-body">
     <form method="POST" action="{{ url_for('tournaments.add_stage', tournament_id=tournament.id) }}"
           class="row g-3">
-      <div class="col-md-5">
+      <div class="col-md-4">
         <input type="text" name="name" class="form-control" placeholder="Название этапа" required>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <select name="stage_type" class="form-select">
           <option value="main">⚔️ Основной</option>
           <option value="group">📊 Групповой</option>
@@ -172,9 +190,14 @@
         </select>
       </div>
       <div class="col-md-3">
+        <input type="number" name="score_multiplier" class="form-control" value="1" step="0.1" min="0.1"
+               title="Коэффициент очков за игры этого этапа (1 = без изменений, не для каждого турнира нужен)">
+      </div>
+      <div class="col-md-2">
         <button type="submit" class="btn btn-danger w-100">Добавить</button>
       </div>
     </form>
+    <p class="text-muted small mb-0 mt-2">Коэффициент нужен не всегда — оставьте 1, если на этом этапе очки не должны меняться.</p>
   </div>
 </div>
 {% endif %}

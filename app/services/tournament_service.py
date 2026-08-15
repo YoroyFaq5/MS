@@ -344,6 +344,7 @@ class TournamentService:
         name: str,
         stage_type: StageType = StageType.MAIN,
         order: Optional[int] = None,
+        score_multiplier: float = 1.0,
     ) -> ServiceResult:
         t = db.session.get(Tournament, tournament_id)
         if not t:
@@ -352,6 +353,8 @@ class TournamentService:
             return ServiceResult.fail("У этого турнира нет этапов (has_stages=False).")
         if t.status == "finished":
             return ServiceResult.fail("Нельзя добавлять этапы в завершённый турнир.")
+        if score_multiplier <= 0:
+            return ServiceResult.fail("Коэффициент очков должен быть положительным числом.")
 
         if order is None:
             max_order = max((s.order for s in t.stages), default=0)
@@ -363,10 +366,42 @@ class TournamentService:
             order=order,
             type=stage_type,
             status="pending",
+            score_multiplier=score_multiplier,
         )
         db.session.add(stage)
         db.session.commit()
         return ServiceResult.success(f"Этап «{name}» добавлен.", data=stage)
+
+    @staticmethod
+    def update_stage(
+        stage_id: int,
+        name: Optional[str] = None,
+        score_multiplier: Optional[float] = None,
+    ) -> ServiceResult:
+        """Rename a stage and/or change its score multiplier.
+
+        Changing the multiplier reweights ALL games already played in this
+        stage too (multiplier is applied at read-time, nothing is stored
+        per-GameSlot) — that's intentional, it's how an admin fixes a wrong
+        value, but it does mean it retroactively shifts standings.
+        """
+        stage = db.session.get(TournamentStage, stage_id)
+        if not stage:
+            return ServiceResult.fail("Этап не найден.")
+
+        if name is not None:
+            name = name.strip()
+            if not name:
+                return ServiceResult.fail("Название этапа не может быть пустым.")
+            stage.name = name
+
+        if score_multiplier is not None:
+            if score_multiplier <= 0:
+                return ServiceResult.fail("Коэффициент очков должен быть положительным числом.")
+            stage.score_multiplier = score_multiplier
+
+        db.session.commit()
+        return ServiceResult.success(f"Этап «{stage.name}» обновлён.", data=stage)
 
     @staticmethod
     def activate_stage(stage_id: int) -> ServiceResult:
@@ -410,7 +445,10 @@ class TournamentService:
         1. Compute stage rating for the given stage.
         2. Take top-N (tournament.cutoff_size) players.
         3. Mark their TournamentParticipant.advanced_to_final = True.
-        4. Find the FINAL stage and activate it.
+        4. Activate the next stage by `order` (whatever its type/multiplier —
+           lets a tournament chain group -> semi -> final, each with its own
+           score_multiplier, instead of jumping straight to a FINAL-typed
+           stage).
         5. Return the list of advancing players.
 
         Idempotent: safe to call multiple times.
@@ -420,8 +458,14 @@ class TournamentService:
             return ServiceResult.fail("Этап не найден.")
 
         tournament = stage.tournament
-        if stage.type == StageType.FINAL:
-            return ServiceResult.fail("Нельзя применить cutoff к финальному этапу.")
+        sorted_stages = sorted(tournament.stages, key=lambda x: x.order)
+        next_stage = next(
+            (s for s in sorted_stages if s.order > stage.order), None
+        )
+        if next_stage is None:
+            return ServiceResult.fail(
+                "Нельзя применить cutoff: следующего этапа нет. Сначала добавьте его."
+            )
 
         # Get rating for this stage
         stage_ratings = RatingService.get_stage_rating(stage_id)
@@ -436,25 +480,20 @@ class TournamentService:
         for part in tournament.participants:
             part.advanced_to_final = part.player_id in advancing_player_ids
 
-        # Find final stage
-        final_stage = next(
-            (s for s in sorted(tournament.stages, key=lambda x: x.order)
-             if s.type == StageType.FINAL),
-            None,
-        )
-        if final_stage and final_stage.status == "pending":
-            final_stage.status = "active"
+        if next_stage.status == "pending":
+            next_stage.status = "active"
 
         db.session.commit()
         logger.info(
             f"Cutoff applied for stage {stage_id}: "
-            f"{len(advancing_player_ids)} players advance."
+            f"{len(advancing_player_ids)} players advance to stage {next_stage.id}."
         )
         return ServiceResult.success(
-            f"Cutoff выполнен. В финал проходят {len(advancing_player_ids)} игроков.",
+            f"Cutoff выполнен. В этап «{next_stage.name}» проходят "
+            f"{len(advancing_player_ids)} игроков.",
             data={
                 "advancing": [r.to_dict() for r in advancing_ratings],
-                "final_stage": final_stage.to_dict() if final_stage else None,
+                "next_stage": next_stage.to_dict(),
             },
         )
 

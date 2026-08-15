@@ -195,8 +195,20 @@ class MarqueeStats:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _slots_to_player_rating(player: Player, slots: Sequence[GameSlot]) -> PlayerRating:
-    """Aggregate a list of GameSlots into a PlayerRating DTO."""
+def _slots_to_player_rating(
+    player: Player,
+    slots: Sequence[GameSlot],
+    stage_multipliers: Optional[dict[int, float]] = None,
+) -> PlayerRating:
+    """Aggregate a list of GameSlots into a PlayerRating DTO.
+
+    stage_multipliers (optional): {stage_id: score_multiplier} — when given,
+    each slot's contribution to total_score is scaled by its game's stage
+    multiplier (TournamentStage.score_multiplier, default 1.0). Used by the
+    tournament/stage-scoped rating methods only; the global site-wide rating
+    never passes this, so it stays unaffected by any tournament's stage
+    multipliers.
+    """
     pr = PlayerRating(
         player_id=player.id,
         player_name=player.name,
@@ -205,7 +217,10 @@ def _slots_to_player_rating(player: Player, slots: Sequence[GameSlot]) -> Player
     )
     for slot in slots:
         pr.games_played += 1
-        pr.total_score += slot.total_score
+        multiplier = 1.0
+        if stage_multipliers is not None:
+            multiplier = stage_multipliers.get(slot.game.stage_id, 1.0)
+        pr.total_score += slot.total_score * multiplier
         if slot.role == Role.MAFIA:
             pr.mafia_games += 1
         elif slot.role == Role.DON:
@@ -420,7 +435,18 @@ class RatingService:
         """
         Rating across ALL stages/games of a tournament.
         Only finished games inside this tournament are aggregated.
+
+        Each stage's games are weighted by that stage's score_multiplier
+        (default 1.0 — most tournaments never touch it) before summing.
         """
+        from app.models import TournamentStage
+        stage_multipliers = {
+            s.id: s.score_multiplier
+            for s in db.session.query(TournamentStage)
+            .filter_by(tournament_id=tournament_id)
+            .all()
+        }
+
         players_in_tourney = (
             db.session.query(Player)
             .join(Player.tournament_participations)
@@ -448,18 +474,22 @@ class RatingService:
                 )
                 ratings.append(pr)
                 continue
-            ratings.append(_slots_to_player_rating(player, slots))
+            ratings.append(_slots_to_player_rating(player, slots, stage_multipliers))
         return _rank(ratings)
 
     # ── Stage scoped ─────────────────────────────────────────────────────────
 
     @staticmethod
     def get_stage_rating(stage_id: int) -> List[PlayerRating]:
-        """Rating scoped to a single tournament stage."""
+        """Rating scoped to a single tournament stage (weighted by that
+        stage's own score_multiplier, so it lines up with what this stage
+        contributes to the overall tournament total)."""
         from app.models import TournamentParticipant, TournamentStage
         stage = db.session.get(TournamentStage, stage_id)
         if not stage:
             return []
+
+        stage_multipliers = {stage.id: stage.score_multiplier}
 
         players_in_tourney = (
             db.session.query(Player)
@@ -481,7 +511,7 @@ class RatingService:
             )
             if not slots:
                 continue
-            ratings.append(_slots_to_player_rating(player, slots))
+            ratings.append(_slots_to_player_rating(player, slots, stage_multipliers))
         return _rank(ratings)
 
     # ── Role/ПУ/Ci breakdown + superlatives ─────────────────────────────────
@@ -685,7 +715,14 @@ class RatingService:
         generator, where "team member's own games" is still exactly what
         should be summed.
         """
-        from app.models import Team, TeamPlayer
+        from app.models import Team, TeamPlayer, TournamentStage
+
+        stage_multipliers = {
+            s.id: s.score_multiplier
+            for s in db.session.query(TournamentStage)
+            .filter_by(tournament_id=tournament_id)
+            .all()
+        }
 
         teams = (
             db.session.query(Team)
@@ -734,7 +771,7 @@ class RatingService:
                 )
             for slot in slots:
                 tr.games_played += 1
-                tr.total_score += slot.total_score
+                tr.total_score += slot.total_score * stage_multipliers.get(slot.game.stage_id, 1.0)
                 game = slot.game
                 won = (
                     (slot.is_mafia_side and game.win_side == WinSide.MAFIA)

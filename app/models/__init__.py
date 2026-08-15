@@ -306,6 +306,15 @@ class TournamentStage(db.Model):
     status = Column(String(20), default="pending", nullable=False)
     # pending → active → finished
 
+    # Очки за игры этого этапа умножаются на это значение при подсчёте
+    # турнирных/этапных таблиц (RatingService.get_tournament_rating/
+    # get_stage_rating/get_team_rating) — например, финал "весит" x1.5.
+    # 1.0 = без изменений (большинство этапов/турниров эту механику не
+    # используют вовсе). НЕ применяется к общему сайтовому рейтингу
+    # (compute_all_ratings) — тот считается по сырым GameSlot.total_score,
+    # чтобы коэффициент турнирного этапа не влиял на лайфтайм-ELO игрока.
+    score_multiplier = Column(Float, default=1.0, nullable=False, server_default="1")
+
     tournament = relationship("Tournament", back_populates="stages")
     games = relationship("Game", back_populates="stage", foreign_keys="Game.stage_id")
 
@@ -324,6 +333,7 @@ class TournamentStage(db.Model):
             "order": self.order,
             "type": self.type.value,
             "status": self.status,
+            "score_multiplier": self.score_multiplier,
             "games_count": len(self.games),
         }
 

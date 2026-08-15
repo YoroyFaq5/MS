@@ -353,10 +353,25 @@ def add_stage(tournament_id: int):
         stage_type = StageType(stage_type_str)
     except ValueError:
         stage_type = StageType.MAIN
+    score_multiplier = request.form.get("score_multiplier", default=1.0, type=float) or 1.0
 
-    result = TournamentService.add_stage(tournament_id, name, stage_type)
+    result = TournamentService.add_stage(tournament_id, name, stage_type, score_multiplier=score_multiplier)
     flash(result.message, "success" if result.ok else "danger")
     return redirect(url_for("tournaments.stages", tournament_id=tournament_id))
+
+
+@tournaments_bp.route("/stages/<int:stage_id>/edit", methods=["POST"])
+@admin_required
+def edit_stage(stage_id: int):
+    stage = _get_stage_or_404(stage_id)
+    if _get_series_tournament_id(stage.tournament_id):
+        flash(_SERIES_ACTION_BLOCKED_MSG, "danger")
+        return redirect(url_for("tournaments.stages", tournament_id=stage.tournament_id))
+    name = request.form.get("name", "").strip() or None
+    score_multiplier = request.form.get("score_multiplier", type=float)
+    result = TournamentService.update_stage(stage_id, name=name, score_multiplier=score_multiplier)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("tournaments.stages", tournament_id=stage.tournament_id))
 
 
 @tournaments_bp.route("/stages/<int:stage_id>/activate", methods=["POST"])
