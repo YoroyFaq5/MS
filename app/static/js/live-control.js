@@ -36,12 +36,14 @@
     seatsEl.innerHTML = slots.map((s) => {
       const stateClass = s.elimination_type === 'killed' ? 'is-killed'
         : s.elimination_type === 'voted' ? 'is-voted' : '';
-      const statusLabel = s.elimination_type === 'killed' ? '☠ Убит'
-        : s.elimination_type === 'voted' ? '🗳 Выгнан' : 'Жив';
+      // One status dot instead of a dedicated text line — see the CSS
+      // comment on .lc-seat__dot for why (compact-dock redesign).
+      const dotTitle = s.elimination_type === 'killed' ? 'Убит ночью'
+        : s.elimination_type === 'voted' ? 'Заголосован' : 'Жив';
       const actions = s.is_eliminated
-        ? `<button type="button" class="dock-btn" data-action="revive" data-slot="${s.slot_id}">↩ Вернуть</button>`
-        : `<button type="button" class="dock-btn dock-btn--danger" data-action="kill" data-slot="${s.slot_id}">☠ Убит</button>
-           <button type="button" class="dock-btn dock-btn--warn" data-action="vote" data-slot="${s.slot_id}">🗳 Выгнан</button>`;
+        ? `<button type="button" class="lc-icon-btn" data-action="revive" data-slot="${s.slot_id}" title="Вернуть в игру">↩</button>`
+        : `<button type="button" class="lc-icon-btn lc-icon-btn--danger" data-action="kill" data-slot="${s.slot_id}" title="Убит ночью">☠</button>
+           <button type="button" class="lc-icon-btn lc-icon-btn--warn" data-action="vote" data-slot="${s.slot_id}" title="Заголосован">🗳</button>`;
       const roleOptions = ['', 'civilian', 'mafia', 'don', 'sheriff'].map((r) => {
         const label = r === '' ? 'Роль…' : ROLE_LABELS[r];
         const selected = (s.live_role || '') === r ? 'selected' : '';
@@ -52,12 +54,12 @@
           <div class="lc-seat__top">
             <span class="lc-seat__num">${s.seat_number}</span>
             <span class="lc-seat__name" title="${s.player_name}">${s.player_name}</span>
+            <span class="lc-seat__dot" title="${dotTitle}"></span>
           </div>
-          <div class="lc-seat__status">${statusLabel}</div>
           <div class="lc-seat__actions">${actions}</div>
           <div class="lc-seat__role-row">
             <select data-role-select data-slot="${s.slot_id}">${roleOptions}</select>
-            <button type="button" class="dock-btn" data-action="reveal-role" data-slot="${s.slot_id}">Раскрыть</button>
+            <button type="button" class="lc-icon-btn" data-action="reveal-role" data-slot="${s.slot_id}" title="Раскрыть роль">👁</button>
           </div>
         </div>`;
     }).join('');

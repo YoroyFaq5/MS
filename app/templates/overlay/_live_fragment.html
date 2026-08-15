@@ -120,7 +120,10 @@
   <div class="overlay-seat-strip {{ '' if control.show_seats else 'is-hidden' }}">
     <div class="overlay-seat-strip__ignite" aria-hidden="true"></div>
     {% for slot in current_slots %}
-    {% set dead_class = 'dead dead--killed' if slot.elimination_type and slot.elimination_type.value == 'killed' else ('dead dead--voted' if slot.elimination_type and slot.elimination_type.value == 'voted' else ('dead' if slot.is_eliminated else '')) %}
+    {% set is_killed = slot.elimination_type and slot.elimination_type.value == 'killed' %}
+    {% set is_voted = slot.elimination_type and slot.elimination_type.value == 'voted' %}
+    {% set dead_class = 'dead dead--killed' if is_killed else ('dead dead--voted' if is_voted else ('dead' if slot.is_eliminated else '')) %}
+    {% set status_text = '† Убит ночью' if is_killed else ('Заголосован' if is_voted else '') %}
     <div class="ms-seat-card {{ dead_class }}" data-slot-id="{{ slot.id }}" style="--d:{{ loop.index0 * 70 }}ms; --seed:{{ loop.index0 }}">
       <div class="ms-seat-card__glow" aria-hidden="true"></div>
       <div class="ms-seat-card__inner">
@@ -128,6 +131,13 @@
         {{ seat_card_media(slot.player, equipped_bulk.get(slot.player_id, {})) }}
         <div class="ms-seat-card__grain" aria-hidden="true"></div>
         <div class="ms-seat-card__frame" aria-hidden="true"></div>
+        {# Killed/voted cinematic sequence's transient flash + the big
+           "verdict" stamp (voted only) — both always rendered so
+           overlay.js's patch only ever toggles a class/[hidden], never
+           creates or destroys nodes. See overlay.css's "Eliminated state"
+           section for the full choreography. #}
+        <div class="ms-seat-card__impact" data-impact aria-hidden="true"></div>
+        <div class="ms-seat-card__stamp" data-stamp {{ '' if is_voted else 'hidden' }} aria-hidden="true">Заголосован</div>
         {# Раскрытие роли по ходу игры — опционально, только когда ведущий
            явно нажал "Раскрыть" на live-пульте (live_role), никогда не
            показывается сама по себе автоматически. #}
@@ -136,6 +146,7 @@
         </span>
         <div class="ms-seat-card__plate">
           <div class="ms-seat-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}</div>
+          <div class="ms-seat-card__status-tag" data-status-tag {{ '' if status_text else 'hidden' }}>{{ status_text }}</div>
         </div>
       </div>
     </div>

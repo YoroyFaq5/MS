@@ -69,6 +69,19 @@ html, body {
      roles read as four distinct colors, not "red vs three whites". */
   --ovl-steel: #8B95A6;
   --ovl-steel-light: #B7C0CE;
+  /* Vote-elimination accent — the "verdict of the table" cause of death,
+     kept distinct from --ovl-signal (used for the night-kill cause) so a
+     viewer can tell the two apart at a glance. Tokenized here since it now
+     feeds four places (diagonal mark, impact flash, stamp, status tag)
+     instead of being inlined per-use. */
+  --ovl-amber: #F5A623;
+  --ovl-amber-light: #FFC35C;
+  --ovl-amber-glow: rgba(245,166,35,.4);
+  /* Shared resting look for an eliminated seat card's photo — referenced
+     by both the plain (always-on, reduced-motion-safe) .dead rule and the
+     one-shot dying sequence's final keyframe, so the transient flourish
+     hands off to the static rule with zero visual pop at the boundary. */
+  --ms-dead-filter: grayscale(.82) brightness(.6) saturate(.22) contrast(1.05);
   --ms-text: #F2F2F2;
   --ms-text-dim: #C9C9C9;
   --ms-surface: #0F0F0F;
@@ -499,48 +512,247 @@ html, body {
   -webkit-box-orient: vertical;
 }
 
-/* Eliminated player — a quick "power-down" flicker (steps(), not smooth
-   easing, for an electronic rather than photographic feel) instead of a
-   static desaturated state appearing instantly, then the diagonal "out"
-   mark wipes on rather than just being present. Nameplate/seat chip are
-   never touched — the name stays perfectly legible. */
+/* ═══ Eliminated state — two distinct broadcast-grade death sequences ═════
+   Two life-cycle layers, deliberately kept separate:
+
+   1. PERSISTENT ("dead"/"dead--killed"/"dead--voted") — plain, un-animated
+      rules. This is the resting look, always correct on its own (survives
+      prefers-reduced-motion, a fresh page load on an already-dead slot,
+      and reload mid-broadcast) because it never depends on an animation
+      having run. Card geometry, plate and slotchip are never touched —
+      only photo/media-layer treatment + (voted only) a tiny permanent
+      downward settle, so the strip still reads as one continuous row.
+
+   2. TRANSIENT ("is-dying" + "dying--killed"/"dying--voted") — the one-shot
+      cinematic flourish, added by overlay.js's patchLiveSeatCards() only on
+      the alive→dead edge (never replayed on subsequent polls while a card
+      stays dead) and removed again after a fixed duration it keeps in sync
+      via DEATH_ANIM_MS/VOTE_ANIM_MS. Deliberately placed only on elements
+      with NO pre-existing `animation` of their own (.ms-seat-card root,
+      .ms-seat-card__impact, .ms-seat-card__stamp) — .ms-seat-card__inner's
+      one-shot mount animation (ms-card-materialize, above) holds its
+      forward-filled end state for as long as it's still the element's
+      active animation, and CSS animation effects override plain-rule
+      cascade for the properties they touch regardless of selector
+      specificity, so a second animation competing for the same element/
+      property would either fight it or silently lose. Keeping the two
+      choreographies on disjoint elements sidesteps that entirely. */
+
 .ms-seat-card.dead .ms-seat-card__img,
 .ms-seat-card.dead .ms-seat-card__placeholder {
-  animation: ms-card-powerdown .5s steps(5) both;
+  filter: var(--ms-dead-filter);
 }
-@keyframes ms-card-powerdown {
-  0%   { filter: grayscale(0) brightness(1) saturate(1);   opacity: 1; }
-  20%  { filter: grayscale(.6) brightness(1.4) saturate(.5); opacity: .4; }
-  40%  { filter: grayscale(.2) brightness(.6) saturate(.8); opacity: 1; }
-  60%  { filter: grayscale(.8) brightness(1.1) saturate(.3); opacity: .5; }
-  100% { filter: grayscale(1) brightness(.5) saturate(.2);  opacity: .8; }
+/* Re-states the full shorthand (not just transition-delay/-duration) on
+   purpose — .ms-seat-card__img/__placeholder's base rule also transitions
+   `transform`/`opacity` for hover/entrance, and delay/duration alone
+   (without transition-property) would apply to that whole list, not just
+   filter. */
+.ms-seat-card.dead .ms-seat-card__img {
+  transition: transform .6s cubic-bezier(.22,1,.36,1), filter .7s ease .4s;
 }
+.ms-seat-card.dead .ms-seat-card__placeholder {
+  transition: filter .55s ease .4s, opacity .3s ease;
+}
+/* Cools/darkens only the photo layer (mix-blend multiply, low opacity) —
+   plate/name/chip sit in later DOM layers untouched, so they stay exactly
+   as legible as on a live card. Always rendered (base opacity 0) rather
+   than conjured only under .dead, purely so it has a transition to
+   animate FROM/TO in both directions instead of popping in/out. */
+.ms-seat-card__media::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(8,10,14,.15) 40%, rgba(8,10,14,.44) 100%);
+  mix-blend-mode: multiply;
+  opacity: 0;
+  transition: opacity .6s ease .35s;
+}
+.ms-seat-card.dead .ms-seat-card__media::before { opacity: 1; }
+
+/* The diagonal "out" mark — same reveal for both causes, only the accent
+   color (--slash-glow) and clip-path direction differ. A snappy reveal
+   (not a slow wipe) with a short trailing glow that decays away, instead
+   of just appearing. */
 .ms-seat-card.dead .ms-seat-card__media::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
+  --slash-glow: rgba(227,30,36,.85);
   clip-path: inset(0 100% 0 0);
   background:
     linear-gradient(115deg, transparent calc(50% - 1.5px),
       rgba(196,42,42,.9) calc(50% - 1.5px), rgba(196,42,42,.9) calc(50% + 1.5px),
       transparent calc(50% + 1.5px)),
     linear-gradient(180deg, transparent 50%, rgba(227,30,36,.4) 100%);
-  animation: ms-slash-wipe .4s ease-out .15s both;
+  animation: ms-slash-wipe .22s cubic-bezier(.65,0,.35,1) .24s both;
 }
-@keyframes ms-slash-wipe { to { clip-path: inset(0 0 0 0); } }
+@keyframes ms-slash-wipe {
+  0%   { clip-path: inset(0 100% 0 0); filter: drop-shadow(0 0 12px var(--slash-glow)); }
+  65%  { clip-path: inset(0 -6% 0 0);  filter: drop-shadow(0 0 9px var(--slash-glow)); }
+  100% { clip-path: inset(0 0 0 0);    filter: drop-shadow(0 0 0 transparent); }
+}
 
 /* Two different causes of the same "out" mark, from the live-control
    panel (see LiveGameControlService) — killed (night) stays the default
-   red already set above, voted-out (day) gets the dock's amber instead,
+   red already set above, voted-out (day) gets the amber accent instead,
    so a viewer can tell them apart at a glance without reading anything. */
 .ms-seat-card.dead--voted .ms-seat-card__media::after {
+  --slash-glow: var(--ovl-amber-light, #FFC35C);
   background:
     linear-gradient(115deg, transparent calc(50% - 1.5px),
-      rgba(245,166,35,.9) calc(50% - 1.5px), rgba(245,166,35,.9) calc(50% + 1.5px),
+      var(--ovl-amber, #F5A623) calc(50% - 1.5px), var(--ovl-amber, #F5A623) calc(50% + 1.5px),
       transparent calc(50% + 1.5px)),
-    linear-gradient(180deg, transparent 50%, rgba(245,166,35,.4) 100%);
+    linear-gradient(180deg, transparent 50%, var(--ovl-amber-glow, rgba(245,166,35,.4)) 100%);
+}
+
+/* Voted (only) settles a few px lower at rest — "the card got heavier" —
+   using the card's own existing transform transition, so it eases in on
+   death and eases back out cleanly on revive with no extra bookkeeping. */
+.ms-seat-card.dead--voted { transform: translateY(3px); }
+
+/* ── Transient impulse layer — killed: freeze + micro-shake + border flash;
+   voted: brighten anticipation + settle. Lives entirely on .ms-seat-card's
+   own transform/box-shadow (see the section comment above for why not
+   __inner) so it can never fight the card's mount animation. Bounded,
+   finite keyframes (no `infinite`) — even if a bug ever stopped JS from
+   removing these classes, the animation still ends and holds, it can
+   never hang mid-motion. */
+.ms-seat-card.is-dying.dying--killed {
+  animation: ms-dying-killed-shake .3s steps(1, jump-end) both;
+}
+@keyframes ms-dying-killed-shake {
+  0%, 9%      { transform: translate(0, 0); }
+  22%         { transform: translate(-3px, 1px); }
+  35%         { transform: translate(3px, -1px); }
+  48%         { transform: translate(-2px, 1px); }
+  61%         { transform: translate(2px, 0); }
+  74%, 100%   { transform: translate(0, 0); }
+}
+.ms-seat-card.is-dying.dying--voted {
+  animation: ms-dying-voted-settle .5s cubic-bezier(.34,1.15,.4,1) both;
+}
+@keyframes ms-dying-voted-settle {
+  0%   { transform: translateY(0); }
+  45%  { transform: translateY(1px); }
+  72%  { transform: translateY(5px); }
+  100% { transform: translateY(3px); }
+}
+
+/* One reusable decorative layer for both the killed border-flash impulse
+   and the voted brighten-then-verdict flash — always in the DOM
+   (data-impact, see template) but inert/invisible outside .is-dying, so
+   overlay.js never has to create/destroy it. */
+.ms-seat-card__impact {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  clip-path: var(--ms-card-clip);
+  opacity: 0;
+}
+.ms-seat-card.is-dying.dying--killed .ms-seat-card__impact {
+  animation: ms-impact-killed .5s cubic-bezier(.2,.8,.2,1) .22s both;
+}
+@keyframes ms-impact-killed {
+  0%   { opacity: 0; box-shadow: inset 0 0 0 2px var(--ovl-signal-light, #FF3B3B), 0 0 0 2px var(--ovl-signal-light, #FF3B3B), 0 0 30px 6px var(--ovl-signal-glow, rgba(227,30,36,.28)); }
+  25%  { opacity: 1; }
+  55%  { opacity: .3; }
+  100% { opacity: 0; }
+}
+.ms-seat-card.is-dying.dying--voted .ms-seat-card__impact {
+  animation: ms-impact-voted .55s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes ms-impact-voted {
+  0%   { opacity: 0; box-shadow: inset 0 0 0 2px rgba(255,255,255,.9), 0 0 0 2px rgba(255,255,255,.9), 0 0 26px 8px rgba(255,255,255,.32); }
+  18%  { opacity: 1; }
+  45%  { opacity: 0; box-shadow: inset 0 0 0 2px var(--ovl-amber, #F5A623), 0 0 0 2px var(--ovl-amber, #F5A623), 0 0 26px 8px var(--ovl-amber-glow, rgba(245,166,35,.4)); }
+  100% { opacity: 0; }
+}
+
+/* "VERDICT" stamp — voted only. Modern take on a rubber-stamp impression:
+   filled condensed type + a thin double ring (box-shadow, not a border
+   asset) instead of a chunky meme-stamp rectangle, impact-in with a short
+   overshoot then settle. Always rendered (data-stamp, see template) so
+   the patch only toggles the [hidden] attribute — see role-badge above
+   for the same reasoning. */
+.ms-seat-card__stamp {
+  position: absolute;
+  left: 50%; top: 44%;
+  z-index: 2;
+  transform: translate(-50%, -50%) rotate(-8deg) scale(1);
+  transform-origin: center;
+  max-width: 92%;
+  padding: .3rem .7rem;
+  border-radius: 2px;
+  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
+  font-size: clamp(.66rem, 1.5vw, 1.05rem);
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+  color: rgba(255,255,255,.94);
+  text-shadow: 0 0 0 var(--ovl-signal, #E31E24), 0 2px 0 rgba(140,15,20,.55), 0 0 20px rgba(227,30,36,.4);
+  -webkit-text-stroke: .5px rgba(227,30,36,.85);
+  box-shadow: inset 0 0 0 1px rgba(227,30,36,.5), 0 0 0 4px rgba(227,30,36,.15);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .35s ease;
+}
+.ms-seat-card__stamp[hidden] { display: none; }
+.ms-seat-card.dead--voted .ms-seat-card__stamp:not([hidden]) { opacity: .94; }
+.ms-seat-card.is-dying.dying--voted .ms-seat-card__stamp:not([hidden]) {
+  animation: ms-stamp-impact .5s cubic-bezier(.34,1.56,.64,1) .12s both;
+}
+@keyframes ms-stamp-impact {
+  0%   { opacity: 0; transform: translate(-50%,-50%) rotate(-8deg) scale(1.5); filter: blur(6px); }
+  55%  { opacity: 1; transform: translate(-50%,-50%) rotate(-8deg) scale(.97); filter: blur(0); }
+  78%  { transform: translate(-50%,-50%) rotate(-8deg) scale(1.03); }
+  100% { opacity: .94; transform: translate(-50%,-50%) rotate(-8deg) scale(1); }
+}
+
+/* Small broadcast-caption status line, inside the nameplate — deliberately
+   NOT a plain label: thin marker rule, tracked small-caps type, subtle
+   glow, and it reveals itself via a clip-path wipe (a transition, not a
+   throwaway keyframe, so reduced-motion's blanket transition:none simply
+   makes it snap straight to its end state instead of needing its own
+   override). Always rendered (data-status-tag, see template). */
+.ms-seat-card__status-tag {
+  position: relative;
+  margin-top: .3rem;
+  padding-top: .3rem;
+  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
+  font-size: .6rem;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ovl-signal-light, #FF3B3B);
+  text-shadow: 0 0 10px rgba(227,30,36,.5);
+  opacity: 0;
+  clip-path: inset(0 100% 0 0);
+  transition: opacity .45s ease .55s, clip-path .45s cubic-bezier(.65,0,.35,1) .55s;
+}
+.ms-seat-card__status-tag[hidden] { display: none; }
+.ms-seat-card__status-tag::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 1.3rem;
+  height: 1px;
+  background: currentColor;
+  opacity: .75;
+}
+.ms-seat-card.dead .ms-seat-card__status-tag:not([hidden]) {
+  opacity: 1;
+  clip-path: inset(0 0 0 0);
+}
+.ms-seat-card.dead--voted .ms-seat-card__status-tag {
+  color: var(--ovl-amber-light, #FFC35C);
+  text-shadow: 0 0 10px var(--ovl-amber-glow, rgba(245,166,35,.4));
 }
 
 /* Optional live role reveal (ведущий explicitly hits "Раскрыть" on the
@@ -548,7 +760,11 @@ html, body {
    "shield tag" family, colored the same way .reveal-card__role--* already
    colors roles everywhere else post-game. Server renders it (possibly
    empty/[hidden]) so overlay.js's point-patch only ever has to toggle
-   [hidden] + textContent, never create/destroy the node. */
+   [hidden] + textContent, never create/destroy the node. The suspenseful
+   "proves itself" moment lives in .is-revealing (added by overlay.js only
+   on the hidden→shown edge) — a clip-path wipe + a brief glow pulse in
+   the role's own color via currentColor, so one keyframe serves all four
+   roles without four copies. */
 .ms-seat-card__role-badge {
   position: absolute;
   top: .5rem; right: .5rem;
@@ -568,6 +784,14 @@ html, body {
 .ms-seat-card__role-badge--sheriff  { color: var(--ovl-steel-light, #B7C0CE); }
 .ms-seat-card__role-badge--don      { color: var(--ovl-crimson, #C4232D); }
 .ms-seat-card__role-badge--mafia    { color: var(--ovl-signal-light, #FF3B3B); }
+.ms-seat-card__role-badge.is-revealing {
+  animation: ms-role-reveal .55s cubic-bezier(.2,.85,.25,1) both;
+}
+@keyframes ms-role-reveal {
+  0%   { clip-path: inset(0 100% 0 0); opacity: 0; transform: scale(.92); box-shadow: inset 0 0 0 1px transparent, 0 0 0 transparent; }
+  55%  { clip-path: inset(0 -12% 0 0); opacity: 1; transform: scale(1.04); box-shadow: inset 0 0 0 1px currentColor, 0 0 16px currentColor; }
+  100% { clip-path: inset(0 0 0 0); opacity: 1; transform: scale(1); box-shadow: inset 0 0 0 1px rgba(255,255,255,.15), 0 0 0 transparent; }
+}
 
 /* ═══ SECTION 3: last-game results reveal — THE STANDARD ═════════════════
    A physical banner, not a flash+bounce: crossbar extends → finials/crest
@@ -2923,6 +3147,20 @@ html, body {
   .results-reveal-panel { transform: translate(-50%, -50%) !important; }
   .ms-seat-card:hover, .ms-seat-card:hover .ms-seat-card__img { transform: none !important; }
   .ovl-embers, .ovl-hud-bracket { opacity: 0 !important; }
+
+  /* The blanket .ms-seat-card__img/__placeholder reset above (bare
+     selector, matches alive AND dead cards alike) would otherwise force
+     filter:none on a dead card too, showing it in full color under
+     reduced motion — a viewer with this setting on should still be able
+     to see who's dead. Same specificity/!important as that rule, placed
+     after it, so source order alone decides the winner for this specific
+     element. Everything else new (status-tag, stamp, media::before wash,
+     dead--voted's settle) already rests correctly without an override —
+     see their own rules' comments above. */
+  .ms-seat-card.dead .ms-seat-card__img,
+  .ms-seat-card.dead .ms-seat-card__placeholder {
+    filter: var(--ms-dead-filter) !important;
+  }
 
   /* "ИНТЕРЕСНЫЕ ФАКТЫ": no permanent clip-path to restore anymore (v2
      dropped the corner-cut panel shape in favor of the rule/bracket/

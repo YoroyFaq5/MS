@@ -10,49 +10,101 @@
   <style>
     /* Дополнения к общим .dock-* токенам/классам (obs-control.css) —
        разметки, специфичной только для этой страницы (сетка карточек
-       игроков + лента протокола), в общем файле пульта нет смысла. */
+       игроков + лента протокола), в общем файле пульта нет смысла.
+
+       Компактная раскладка: карточка игрока — три плотные строки (имя+
+       статус-точка / иконки-действия / роль), не текстовые кнопки с
+       переносом — чтобы в типичной ширине OBS-дока (~260-320px) помещалось
+       2-3 колонки вместо 1, и весь список игроков был виден без скролла
+       даже при 10+ участниках. */
     .lc-seats {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: .6rem;
+      grid-template-columns: repeat(auto-fill, minmax(122px, 1fr));
+      gap: .4rem;
     }
     .lc-seat {
       background: var(--dock-surface);
       border: 1px solid var(--dock-border);
-      border-radius: 10px;
-      padding: .6rem;
+      border-radius: 8px;
+      padding: .4rem;
       display: flex;
       flex-direction: column;
-      gap: .4rem;
+      gap: .3rem;
     }
     .lc-seat.is-killed { border-color: rgba(227,30,36,.5); }
     .lc-seat.is-voted { border-color: rgba(245,166,35,.5); }
-    .lc-seat__top { display: flex; align-items: center; gap: .4rem; }
+    .lc-seat__top { display: flex; align-items: center; gap: .3rem; }
     .lc-seat__num {
-      width: 20px; height: 20px; border-radius: 50%;
+      width: 17px; height: 17px; border-radius: 50%;
       background: var(--dock-surface-raised); border: 1px solid var(--dock-border);
       display: flex; align-items: center; justify-content: center;
-      font-size: .7rem; color: var(--dock-text-dim); flex: none;
+      font-size: .64rem; color: var(--dock-text-dim); flex: none;
     }
-    .lc-seat__name { font-weight: 600; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .lc-seat__status { font-size: .68rem; color: var(--dock-text-faint); text-transform: uppercase; letter-spacing: .04em; }
-    .lc-seat.is-killed .lc-seat__status { color: var(--dock-red-light); }
-    .lc-seat.is-voted .lc-seat__status { color: var(--dock-amber); }
-    .lc-seat__actions { display: flex; gap: .3rem; flex-wrap: wrap; }
-    .lc-seat__actions .dock-btn { padding: .35rem .5rem; font-size: .7rem; }
-    .lc-seat__role-row { display: flex; gap: .3rem; margin-top: .1rem; }
-    .lc-seat__role-row select { flex: 1 1 auto; min-width: 0; }
+    .lc-seat__name {
+      flex: 1 1 auto; min-width: 0;
+      font-weight: 600; font-size: .76rem;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    /* Replaces the old dedicated uppercase status LINE — a single dot
+       carries alive/killed/voted at a glance without its own row, saving
+       a full line of vertical space per card; the exact cause is still one
+       hover/title tap away, and the card's own border tint (is-killed/
+       is-voted above) reinforces it without reading anything. */
+    .lc-seat__dot {
+      width: 7px; height: 7px; border-radius: 50%; flex: none;
+      background: var(--dock-green);
+    }
+    .lc-seat.is-killed .lc-seat__dot { background: var(--dock-red-light); }
+    .lc-seat.is-voted .lc-seat__dot { background: var(--dock-amber); }
+    .lc-seat__actions { display: flex; gap: .25rem; }
+    .lc-icon-btn {
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 30px;
+      padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--dock-surface-raised);
+      border: 1px solid var(--dock-border);
+      color: var(--dock-text);
+      font-size: .9rem;
+      line-height: 1;
+      cursor: pointer;
+      user-select: none;
+      transition: background .12s ease, border-color .12s ease, transform .05s ease;
+    }
+    .lc-icon-btn:hover { background: #26262c; border-color: #3a3a40; }
+    .lc-icon-btn:active { transform: scale(.94); }
+    .lc-icon-btn--danger { border-color: rgba(227,30,36,.4); color: var(--dock-red-light); }
+    .lc-icon-btn--danger:hover { background: rgba(227,30,36,.14); border-color: var(--dock-red); }
+    .lc-icon-btn--warn { border-color: rgba(245,166,35,.5); color: var(--dock-amber); }
+    .lc-icon-btn--warn:hover { background: rgba(245,166,35,.14); }
+    .lc-seat__role-row { display: flex; gap: .25rem; }
+    .lc-seat__role-row select {
+      flex: 1 1 auto; min-width: 0;
+      min-height: 30px;
+      padding: 0 .25rem;
+      font-size: .68rem;
+      background: var(--dock-surface-raised);
+      border: 1px solid var(--dock-border);
+      color: var(--dock-text);
+      font-family: inherit;
+    }
+    .lc-seat__role-row .lc-icon-btn { flex: 0 0 30px; font-size: .78rem; }
     .lc-phase-row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
-    .lc-phase-row input { width: 64px; }
+    .lc-phase-row input { width: 56px; }
     .lc-phase-state { font-weight: 700; margin-left: auto; }
-    .lc-protocol { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: .35rem; }
+    .lc-protocol { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: .3rem; }
     .lc-protocol__row {
       display: flex; align-items: center; gap: .5rem;
-      font-size: .76rem; color: var(--dock-text-dim);
-      padding: .3rem .4rem; border-radius: 6px; background: var(--dock-surface);
+      font-size: .74rem; color: var(--dock-text-dim);
+      padding: .28rem .4rem; border-radius: 6px; background: var(--dock-surface);
     }
     .lc-protocol__row.is-revoked { opacity: .4; text-decoration: line-through; }
     .lc-protocol__row button { margin-left: auto; flex: none; }
+    /* Section padding trimmed page-wide too — the default 1rem side
+       padding from obs-control.css's shared .dock-section eats a lot of a
+       ~260px dock's width across three stacked sections. */
+    .dock-section { padding: .6rem .7rem; }
   </style>
 </head>
 <body>

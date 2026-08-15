@@ -527,24 +527,114 @@
     // 'auto' — leave whatever the lastFinishedId-driven trigger already set.
   }
 
+  // Seat-card death/role-reveal state machine — alive -> dying -> dead
+  // (plus which of the two causes: dying--killed/dying--voted), driving
+  // the cinematic sequence in overlay.css's "Eliminated state" section.
+  // "dying" is a strictly transient, timed window: patchLiveSeatCards adds
+  // it only on the alive->dead edge and this map's timers remove it again
+  // after the CSS choreography's own duration, so the one-shot flourish
+  // never replays on later polls while a card just stays dead (classList
+  // stays a no-op mutation for those), and a revive always lands on a
+  // clean slate even if it happens mid-flourish.
+  const DEATH_ANIM_MS = 950; // killed — keep in step with overlay.css's is-dying.dying--killed timings
+  const VOTE_ANIM_MS  = 950; // voted  — keep in step with overlay.css's is-dying.dying--voted timings
+  const ROLE_REVEAL_MS = 550; // keep in step with overlay.css's ms-role-reveal
+  const liveCardTimers = new Map(); // slotId -> { dying: handle|null, role: handle|null }
+
+  function clearLiveCardTimer(slotId, key) {
+    const timers = liveCardTimers.get(slotId);
+    if (timers && timers[key]) {
+      clearTimeout(timers[key]);
+      timers[key] = null;
+    }
+  }
+  function setLiveCardTimer(slotId, key, fn, ms) {
+    clearLiveCardTimer(slotId, key);
+    const timers = liveCardTimers.get(slotId) || {};
+    timers[key] = setTimeout(fn, ms);
+    liveCardTimers.set(slotId, timers);
+  }
+  // Called whenever the seat strip is torn down wholesale (sigChanged full
+  // replace) — the DOM nodes those handles would touch are gone, and a
+  // slot id can legitimately point at a different player/card next game.
+  function resetLiveCardTimers() {
+    liveCardTimers.forEach((timers) => {
+      if (timers.dying) clearTimeout(timers.dying);
+      if (timers.role) clearTimeout(timers.role);
+    });
+    liveCardTimers.clear();
+  }
+
   // Patches only the .ms-seat-card elements whose live status actually
   // changed (killed/voted/revived, role revealed) — see
   // _build_live_state_sig's docstring for why this is deliberately not
   // folded into the main sig-triggered full replace above.
   function patchLiveSeatCards(newRoot) {
     newRoot.querySelectorAll('.ms-seat-card[data-slot-id]').forEach((newCard) => {
-      const liveCard = root.querySelector(`.ms-seat-card[data-slot-id="${newCard.dataset.slotId}"]`);
+      const slotId = newCard.dataset.slotId;
+      const liveCard = root.querySelector(`.ms-seat-card[data-slot-id="${slotId}"]`);
       if (!liveCard) return;
-      liveCard.classList.toggle('dead', newCard.classList.contains('dead'));
-      liveCard.classList.toggle('dead--killed', newCard.classList.contains('dead--killed'));
-      liveCard.classList.toggle('dead--voted', newCard.classList.contains('dead--voted'));
+
+      const wasDead = liveCard.classList.contains('dead');
+      const isDead = newCard.classList.contains('dead');
+      const isKilled = newCard.classList.contains('dead--killed');
+      const isVoted = newCard.classList.contains('dead--voted');
+
+      if (!wasDead && isDead) {
+        // alive -> dead: play the one-shot cinematic sequence, then settle.
+        liveCard.classList.add('dead');
+        if (isKilled) liveCard.classList.add('dead--killed');
+        if (isVoted) liveCard.classList.add('dead--voted');
+        if (!REDUCED_MOTION) {
+          liveCard.classList.add('is-dying', isKilled ? 'dying--killed' : 'dying--voted');
+          setLiveCardTimer(slotId, 'dying', () => {
+            liveCard.classList.remove('is-dying', 'dying--killed', 'dying--voted');
+          }, isKilled ? DEATH_ANIM_MS : VOTE_ANIM_MS);
+        }
+      } else if (wasDead && !isDead) {
+        // dead -> alive (revive): clear any in-flight flourish/timer first
+        // so nothing is left mid-animation, then drop every dead-related
+        // class in one go — the plain CSS transitions (see overlay.css)
+        // ease it back to normal on their own, no JS-timed class needed.
+        clearLiveCardTimer(slotId, 'dying');
+        liveCard.classList.remove('is-dying', 'dying--killed', 'dying--voted', 'dead', 'dead--killed', 'dead--voted');
+      } else {
+        // No alive/dead edge this cycle — keep flags in sync without
+        // mutating anything that's already correct (classList.toggle is a
+        // no-op on an unchanged value, so a running/settled animation is
+        // never restarted or interrupted).
+        liveCard.classList.toggle('dead', isDead);
+        liveCard.classList.toggle('dead--killed', isKilled);
+        liveCard.classList.toggle('dead--voted', isVoted);
+      }
+
+      const newStamp = newCard.querySelector('[data-stamp]');
+      const liveStamp = liveCard.querySelector('[data-stamp]');
+      if (newStamp && liveStamp) liveStamp.hidden = newStamp.hasAttribute('hidden');
+
+      const newTag = newCard.querySelector('[data-status-tag]');
+      const liveTag = liveCard.querySelector('[data-status-tag]');
+      if (newTag && liveTag) {
+        liveTag.hidden = newTag.hasAttribute('hidden');
+        liveTag.textContent = newTag.textContent;
+      }
 
       const newBadge = newCard.querySelector('[data-role-badge]');
       const liveBadge = liveCard.querySelector('[data-role-badge]');
       if (newBadge && liveBadge) {
+        const wasRevealed = !liveBadge.hidden;
+        const willReveal = !newBadge.hasAttribute('hidden');
         liveBadge.hidden = newBadge.hasAttribute('hidden');
         liveBadge.textContent = newBadge.textContent;
-        liveBadge.className = newBadge.className;
+        liveBadge.className = newBadge.className; // carries the --{role} color modifier
+        if (!wasRevealed && willReveal && !REDUCED_MOTION) {
+          liveBadge.classList.add('is-revealing');
+          setLiveCardTimer(slotId, 'role', () => {
+            liveBadge.classList.remove('is-revealing');
+          }, ROLE_REVEAL_MS);
+        } else {
+          clearLiveCardTimer(slotId, 'role');
+        }
       }
     });
   }
@@ -571,6 +661,7 @@
     const sigChanged = newSig !== currentSig;
 
     if (sigChanged) {
+      resetLiveCardTimers();
       root.innerHTML = '';
       root.appendChild(newRoot);
       currentSig = newSig;
