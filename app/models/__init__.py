@@ -29,6 +29,22 @@ class WinSide(PyEnum):
     NONE = "none"
 
 
+class EliminationType(PyEnum):
+    """Как именно игрок выбыл по ходу ЕЩЁ НЕ завершённой игры — отмечается
+    live с overlay-пульта (см. LiveGameControlService), не путать с
+    финальным подведением итогов в finish_game. Два разных визуала на
+    трансляции (см. .ms-seat-card.dead--killed/--voted в overlay.css)."""
+    KILLED = "killed"
+    VOTED = "voted"
+
+
+class LivePhase(PyEnum):
+    """Текущая фаза ЕЩЁ НЕ завершённой игры, для контекста протокола
+    (GameEvent.phase/turn_number) — переключается вручную с overlay-пульта."""
+    NIGHT = "night"
+    DAY = "day"
+
+
 class TournamentType(PyEnum):
     INDIVIDUAL = "individual"
     TEAM = "team"
@@ -480,6 +496,14 @@ class Game(db.Model):
         Integer, ForeignKey("seasons.id", ondelete="SET NULL"), nullable=True
     )
 
+    # ── Live-протокол (overlay-пульт, см. LiveGameControlService) ───────────
+    # NULL, пока ведущий ни разу не переключил фазу с пульта — добавлено
+    # через ALTER TABLE миграцию (migrate_live_game_control.py) для
+    # существующих БД. Смысл имеет только для is_finished=False; после
+    # завершения игры остаётся как снимок последней отмеченной фазы.
+    live_phase = Column(Enum(LivePhase, name="live_phase_enum"), nullable=True)
+    live_turn  = Column(Integer, nullable=True)
+
     slots = relationship(
         "GameSlot", back_populates="game", cascade="all, delete-orphan", lazy="joined"
     )
@@ -539,6 +563,21 @@ class GameSlot(db.Model):
     bonus_score = Column(Float, default=0.0, nullable=False)
     is_eliminated = Column(Boolean, default=False, nullable=False)
     was_best_move = Column(Boolean, default=False, nullable=False)
+
+    # ── Live-протокол (overlay-пульт, см. LiveGameControlService) ───────────
+    # Добавлено через ALTER TABLE миграцию (migrate_live_game_control.py)
+    # для существующих БД. elimination_type уточняет уже существовавшее (но
+    # ранее нигде не проставлявшееся) is_eliminated — держим оба поля в
+    # синхроне (is_eliminated=True ровно когда elimination_type не NULL),
+    # чтобы существующие потребители одного is_eliminated (chart_data_
+    # service.py, profile/statistics.html) не требовали правок.
+    elimination_type = Column(Enum(EliminationType, name="elimination_type_enum"), nullable=True)
+    # live_role — НЕ то же самое, что role: role участвует в финальной форме
+    # (finish_game) и его валидация полагается на "все civilian = роли ещё
+    # не расставлены" (см. app/routes/games.py); live_role — отдельное поле
+    # для необязательного раскрытия роли по ходу игры на трансляции, никак
+    # не влияет на финальный подсчёт.
+    live_role = Column(Enum(Role, name="role_enum"), nullable=True)
 
     # ── PU (Первый Убиенный) ────────────────────────────────────────────────
     # is_pu: этот игрок был убит первым в ночь (без промаха).
@@ -670,6 +709,75 @@ class GameSlot(db.Model):
 # User  (auth — imported last to avoid circular refs)
 # ---------------------------------------------------------------------------
 from app.models.user import User  # noqa: E402,F401
+
+
+# ---------------------------------------------------------------------------
+# GameEvent  (live-протокол игры — overlay-пульт, см. LiveGameControlService)
+# ---------------------------------------------------------------------------
+
+class GameEventType(PyEnum):
+    KILLED         = "killed"
+    VOTED          = "voted"
+    REVIVED        = "revived"          # отмена ошибочного killed/voted
+    ROLE_REVEALED  = "role_revealed"
+    PHASE_CHANGED  = "phase_changed"
+
+
+class GameEvent(db.Model):
+    """
+    Хронологический протокол live-событий ЕЩЁ НЕ завершённой игры,
+    отмечаемых ведущим с overlay-пульта (LiveGameControlService) —
+    "Ночь N: игрок X убит", "День N: игрок Y выгнан" и т.д. Тот же
+    принцип, что у GG/BarRedemption выше: неизменяемый леджер, только
+    INSERT — ошибочный клик не удаляется и не переписывается, а гасится
+    через revoked_at/revoked_by_admin_id, так что сама история "что и
+    когда записали" не может быть тихо стёрта. Задел на будущую
+    статистику (типичный ход первого убийства и т.п.) — phase/turn_number
+    снимаются с Game.live_phase/live_turn на момент события.
+    """
+    __tablename__ = "game_events"
+    __allow_unmapped__ = True
+
+    id      = Column(Integer, primary_key=True)
+    game_id = Column(Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    slot_id = Column(Integer, ForeignKey("game_slots.id", ondelete="CASCADE"), nullable=True)
+
+    event_type = Column(Enum(GameEventType, name="game_event_type_enum"), nullable=False)
+    phase       = Column(Enum(LivePhase, name="live_phase_enum"), nullable=True)
+    turn_number = Column(Integer, nullable=True)
+
+    admin_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    revoked_at          = Column(DateTime(timezone=True), nullable=True)
+    revoked_by_admin_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    game  = relationship("Game", foreign_keys=[game_id])
+    slot  = relationship("GameSlot", foreign_keys=[slot_id])
+    admin = relationship("User", foreign_keys=[admin_id])
+    revoked_by = relationship("User", foreign_keys=[revoked_by_admin_id])
+
+    @property
+    def is_revoked(self) -> bool:
+        return self.revoked_at is not None
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "game_id": self.game_id,
+            "slot_id": self.slot_id,
+            "player_name": self.slot.player.display_name if self.slot and self.slot.player else None,
+            "event_type": self.event_type.value,
+            "phase": self.phase.value if self.phase else None,
+            "turn_number": self.turn_number,
+            "admin_name": self.admin.username if self.admin else None,
+            "created_at": self.created_at.isoformat(),
+            "is_revoked": self.is_revoked,
+        }
 
 
 # ---------------------------------------------------------------------------
