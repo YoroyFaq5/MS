@@ -32,6 +32,7 @@
   let currentSig = root.firstElementChild ? root.firstElementChild.dataset.sig : null;
   let lastFinishedId = root.firstElementChild ? root.firstElementChild.dataset.lastFinishedId : '';
   let currentCtl = root.firstElementChild ? parseCtl(root.firstElementChild.dataset.ctl) : null;
+  let currentLiveSig = root.firstElementChild ? root.firstElementChild.dataset.liveSig : null;
   let currentTimerStartedAt = currentCtl ? currentCtl.timerStartedAt : null;
   let revealTimeoutHandle = null;
   let revealCloseTimeoutHandle = null;
@@ -526,6 +527,28 @@
     // 'auto' — leave whatever the lastFinishedId-driven trigger already set.
   }
 
+  // Patches only the .ms-seat-card elements whose live status actually
+  // changed (killed/voted/revived, role revealed) — see
+  // _build_live_state_sig's docstring for why this is deliberately not
+  // folded into the main sig-triggered full replace above.
+  function patchLiveSeatCards(newRoot) {
+    newRoot.querySelectorAll('.ms-seat-card[data-slot-id]').forEach((newCard) => {
+      const liveCard = root.querySelector(`.ms-seat-card[data-slot-id="${newCard.dataset.slotId}"]`);
+      if (!liveCard) return;
+      liveCard.classList.toggle('dead', newCard.classList.contains('dead'));
+      liveCard.classList.toggle('dead--killed', newCard.classList.contains('dead--killed'));
+      liveCard.classList.toggle('dead--voted', newCard.classList.contains('dead--voted'));
+
+      const newBadge = newCard.querySelector('[data-role-badge]');
+      const liveBadge = liveCard.querySelector('[data-role-badge]');
+      if (newBadge && liveBadge) {
+        liveBadge.hidden = newBadge.hasAttribute('hidden');
+        liveBadge.textContent = newBadge.textContent;
+        liveBadge.className = newBadge.className;
+      }
+    });
+  }
+
   async function poll() {
     let resp;
     try {
@@ -544,8 +567,10 @@
     const newSig = newRoot.dataset.sig;
     const newLastFinishedId = newRoot.dataset.lastFinishedId || '';
     const newCtl = parseCtl(newRoot.dataset.ctl);
+    const newLiveSig = newRoot.dataset.liveSig;
+    const sigChanged = newSig !== currentSig;
 
-    if (newSig !== currentSig) {
+    if (sigChanged) {
       root.innerHTML = '';
       root.appendChild(newRoot);
       currentSig = newSig;
@@ -578,6 +603,17 @@
       const liveSlot = root.querySelector('[data-idle-slot="last_game"]');
       if (freshSlot && liveSlot) liveSlot.innerHTML = freshSlot.innerHTML;
     }
+
+    // Live kill/vote/role-reveal status (see /live-control, overlay.py's
+    // _build_live_state_sig) — a caster can click these several times a
+    // minute, so this is its own tiny channel, patched in place on the
+    // existing .ms-seat-card elements. Skipped entirely when sigChanged
+    // already did a full replace this same cycle (the fresh DOM already
+    // reflects the current live state server-side).
+    if (!sigChanged && newLiveSig !== currentLiveSig) {
+      patchLiveSeatCards(newRoot);
+    }
+    currentLiveSig = newLiveSig;
 
     if (newLastFinishedId !== lastFinishedId) {
       lastFinishedId = newLastFinishedId;

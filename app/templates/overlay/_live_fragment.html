@@ -68,7 +68,7 @@
 {% set hero_don_slot = (hero_slots | selectattr('role.value', 'equalto', 'don') | list | first) if hero_slots else none %}
 {% set hero_win = hero_game.win_side.value if hero_game else none %}
 
-<div class="overlay-fragment" data-sig="{{ sig }}" data-last-finished-id="{{ last_game.id if last_game else '' }}" data-ctl="{{ ctl_sig }}">
+<div class="overlay-fragment" data-sig="{{ sig }}" data-last-finished-id="{{ last_game.id if last_game else '' }}" data-ctl="{{ ctl_sig }}" data-live-sig="{{ live_sig }}">
 
   <div class="ovl-viewport-frame" aria-hidden="true">
     <span class="ovl-viewport-frame__corner ovl-viewport-frame__corner--tl"></span>
@@ -120,13 +120,20 @@
   <div class="overlay-seat-strip {{ '' if control.show_seats else 'is-hidden' }}">
     <div class="overlay-seat-strip__ignite" aria-hidden="true"></div>
     {% for slot in current_slots %}
-    <div class="ms-seat-card {{ 'dead' if slot.is_eliminated else '' }}" style="--d:{{ loop.index0 * 70 }}ms; --seed:{{ loop.index0 }}">
+    {% set dead_class = 'dead dead--killed' if slot.elimination_type and slot.elimination_type.value == 'killed' else ('dead dead--voted' if slot.elimination_type and slot.elimination_type.value == 'voted' else ('dead' if slot.is_eliminated else '')) %}
+    <div class="ms-seat-card {{ dead_class }}" data-slot-id="{{ slot.id }}" style="--d:{{ loop.index0 * 70 }}ms; --seed:{{ loop.index0 }}">
       <div class="ms-seat-card__glow" aria-hidden="true"></div>
       <div class="ms-seat-card__inner">
         <span class="ms-seat-card__slotchip" title="Место {{ slot.seat_number }}">{{ slot.seat_number }}</span>
         {{ seat_card_media(slot.player, equipped_bulk.get(slot.player_id, {})) }}
         <div class="ms-seat-card__grain" aria-hidden="true"></div>
         <div class="ms-seat-card__frame" aria-hidden="true"></div>
+        {# Раскрытие роли по ходу игры — опционально, только когда ведущий
+           явно нажал "Раскрыть" на live-пульте (live_role), никогда не
+           показывается сама по себе автоматически. #}
+        <span class="ms-seat-card__role-badge ms-seat-card__role-badge--{{ slot.live_role.value if slot.live_role else '' }}" data-role-badge {{ '' if slot.live_role else 'hidden' }}>
+          {{ role_labels.get(slot.live_role.value, '') if slot.live_role else '' }}
+        </span>
         <div class="ms-seat-card__plate">
           <div class="ms-seat-card__name">{{ player_name(slot.player, equipped_bulk.get(slot.player_id, {})) }}</div>
         </div>

@@ -531,6 +531,44 @@ html, body {
 }
 @keyframes ms-slash-wipe { to { clip-path: inset(0 0 0 0); } }
 
+/* Two different causes of the same "out" mark, from the live-control
+   panel (see LiveGameControlService) — killed (night) stays the default
+   red already set above, voted-out (day) gets the dock's amber instead,
+   so a viewer can tell them apart at a glance without reading anything. */
+.ms-seat-card.dead--voted .ms-seat-card__media::after {
+  background:
+    linear-gradient(115deg, transparent calc(50% - 1.5px),
+      rgba(245,166,35,.9) calc(50% - 1.5px), rgba(245,166,35,.9) calc(50% + 1.5px),
+      transparent calc(50% + 1.5px)),
+    linear-gradient(180deg, transparent 50%, rgba(245,166,35,.4) 100%);
+}
+
+/* Optional live role reveal (ведущий explicitly hits "Раскрыть" on the
+   live-control panel) — small tag opposite the seat-number chip, same
+   "shield tag" family, colored the same way .reveal-card__role--* already
+   colors roles everywhere else post-game. Server renders it (possibly
+   empty/[hidden]) so overlay.js's point-patch only ever has to toggle
+   [hidden] + textContent, never create/destroy the node. */
+.ms-seat-card__role-badge {
+  position: absolute;
+  top: .5rem; right: .5rem;
+  z-index: 3;
+  padding: .15rem .45rem;
+  border-radius: 4px;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  background: rgba(10,9,8,.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,.15);
+}
+.ms-seat-card__role-badge[hidden] { display: none; }
+.ms-seat-card__role-badge--civilian { color: var(--ms-text, #F2F2F2); }
+.ms-seat-card__role-badge--sheriff  { color: var(--ovl-steel-light, #B7C0CE); }
+.ms-seat-card__role-badge--don      { color: var(--ovl-crimson, #C4232D); }
+.ms-seat-card__role-badge--mafia    { color: var(--ovl-signal-light, #FF3B3B); }
+
 /* ═══ SECTION 3: last-game results reveal — THE STANDARD ═════════════════
    A physical banner, not a flash+bounce: crossbar extends → finials/crest
    pop → cloth unfurls into the shield taper (clip-path animation) with a
