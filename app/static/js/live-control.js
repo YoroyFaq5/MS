@@ -11,7 +11,9 @@
   const POLL_MS = 5000;
 
   const statusEl = document.getElementById('lc-status');
-  const noActiveEl = document.getElementById('lc-noactive');
+  const tournamentNameEl = document.getElementById('lc-tournament-name');
+  const noActiveEl = document.getElementById('lc-noactive');   // /current/* и вообще ничего не активно
+  const noGameEl = document.getElementById('lc-nogame');       // турнир есть, но нет текущей игры
   const dashboardEl = document.getElementById('lc-dashboard');
   const seatsEl = document.getElementById('lc-seats');
   const protocolEl = document.getElementById('lc-protocol');
@@ -89,11 +91,25 @@
     consecutiveFailures = 0;
 
     if (state.active === false) {
+      // Только /current/live-control с ничем не активным — нет вообще
+      // никакого турнира, к которому можно было бы привязаться.
+      tournamentNameEl.textContent = '—';
       noActiveEl.hidden = false;
+      noGameEl.hidden = true;
       dashboardEl.style.display = 'none';
       return;
     }
     noActiveEl.hidden = true;
+    tournamentNameEl.textContent = state.tournament_name || tournamentNameEl.textContent;
+
+    if (state.has_game === false) {
+      // Турнир резолвлен, но прямо сейчас нет незавершённой игры — нечего
+      // отмечать до следующего раунда.
+      noGameEl.hidden = false;
+      dashboardEl.style.display = 'none';
+      return;
+    }
+    noGameEl.hidden = true;
     dashboardEl.style.display = '';
 
     paintSeats(state.slots || []);

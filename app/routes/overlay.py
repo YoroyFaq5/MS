@@ -961,6 +961,12 @@ def overlay_obs_control_reset(tournament_id):
 # /obs-control/* выше, но привязан к текущей НЕЗАВЕРШЁННОЙ игре турнира,
 # а не к OverlayControl-настройкам показа — отдельная, самостоятельная
 # admin-поверхность, никак не пересекается с этими выше.
+#
+# Как и /obs-control, есть в двух вариантах — /<id>/live-control (конкретный
+# турнир) и /current/live-control (id-less, резолвит "активный турнир" через
+# ActiveBroadcastService, см. _resolve_obs_control_tournament_id) — чтобы
+# сохранённый однажды URL пульта не приходилось менять при переключении
+# турнира между эфирами, ровно как уже сделано для /obs-control.
 
 def _current_unfinished_game(tournament_id: int):
     return (
@@ -973,10 +979,10 @@ def _current_unfinished_game(tournament_id: int):
 
 def _live_control_slot_or_404(tournament_id: int, slot_id: int) -> GameSlot:
     """Проверяет, что место реально принадлежит ТЕКУЩЕЙ незавершённой игре
-    этого турнира — не даёт через подмену slot_id в запросе дотянуться до
-    места чужого турнира или уже завершённой игры (сама mutation-логика в
-    LiveGameControlService тоже блокирует finished-игры, это ещё и защита
-    от чужого tournament_id)."""
+    ЭТОГО (уже резолвленного) турнира — не даёт через подмену slot_id в
+    запросе дотянуться до места чужого турнира или уже завершённой игры
+    (сама mutation-логика в LiveGameControlService тоже блокирует
+    finished-игры, это ещё и защита от чужого tournament_id)."""
     slot = db.session.get(GameSlot, slot_id) or abort(404)
     game = _current_unfinished_game(tournament_id)
     if not game or slot.game_id != game.id:
@@ -987,38 +993,59 @@ def _live_control_slot_or_404(tournament_id: int, slot_id: int) -> GameSlot:
 def _live_control_response(result, game_id: int):
     state = LiveGameControlService.get_state(game_id) or {"active": False}
     state["active"] = True
+    state["has_game"] = True
     state["ok"] = result.ok
     state["message"] = result.message
     return jsonify(state)
 
 
 @overlay_bp.route("/<int:tournament_id>/live-control")
+@overlay_bp.route("/current/live-control", defaults={"tournament_id": None})
 @admin_required
 def overlay_live_control(tournament_id):
-    tournament = db.session.get(Tournament, tournament_id) or abort(404)
+    is_current = tournament_id is None
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    tournament = db.session.get(Tournament, resolved_id) if resolved_id is not None else None
+    if not is_current and tournament is None:
+        abort(404)
+    action_base = "/overlay/current/live-control" if is_current else f"/overlay/{resolved_id}/live-control"
+    state_url = url_for("overlay.overlay_live_control_state") if is_current \
+        else url_for("overlay.overlay_live_control_state", tournament_id=resolved_id)
     return render_template(
         "overlay/live_control.html",
-        tournament=tournament,
-        state_url=url_for("overlay.overlay_live_control_state", tournament_id=tournament_id),
-        action_base=f"/overlay/{tournament_id}/live-control",
+        tournament=tournament, is_current=is_current,
+        state_url=state_url, action_base=action_base,
     )
 
 
 @overlay_bp.route("/<int:tournament_id>/live-control/state")
+@overlay_bp.route("/current/live-control/state", defaults={"tournament_id": None})
 @admin_required
 def overlay_live_control_state(tournament_id):
-    game = _current_unfinished_game(tournament_id)
-    if not game:
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
         return jsonify({"active": False})
+    tournament = db.session.get(Tournament, resolved_id)
+    if tournament is None:
+        return jsonify({"active": False})
+    game = _current_unfinished_game(resolved_id)
+    if not game:
+        return jsonify({"active": True, "has_game": False, "tournament_name": tournament.name})
     state = LiveGameControlService.get_state(game.id)
     state["active"] = True
+    state["has_game"] = True
+    state["tournament_name"] = tournament.name
     return jsonify(state)
 
 
 @overlay_bp.route("/<int:tournament_id>/live-control/<int:slot_id>/eliminate", methods=["POST"])
+@overlay_bp.route("/current/live-control/<int:slot_id>/eliminate", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
 def overlay_live_control_eliminate(tournament_id, slot_id):
-    slot = _live_control_slot_or_404(tournament_id, slot_id)
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    slot = _live_control_slot_or_404(resolved_id, slot_id)
     body = request.get_json(silent=True) or {}
     try:
         kind = EliminationType(body.get("kind"))
@@ -1029,17 +1056,25 @@ def overlay_live_control_eliminate(tournament_id, slot_id):
 
 
 @overlay_bp.route("/<int:tournament_id>/live-control/<int:slot_id>/revive", methods=["POST"])
+@overlay_bp.route("/current/live-control/<int:slot_id>/revive", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
 def overlay_live_control_revive(tournament_id, slot_id):
-    slot = _live_control_slot_or_404(tournament_id, slot_id)
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    slot = _live_control_slot_or_404(resolved_id, slot_id)
     result = LiveGameControlService.revive(slot.id, current_user.id)
     return _live_control_response(result, slot.game_id)
 
 
 @overlay_bp.route("/<int:tournament_id>/live-control/<int:slot_id>/reveal-role", methods=["POST"])
+@overlay_bp.route("/current/live-control/<int:slot_id>/reveal-role", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
 def overlay_live_control_reveal_role(tournament_id, slot_id):
-    slot = _live_control_slot_or_404(tournament_id, slot_id)
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    slot = _live_control_slot_or_404(resolved_id, slot_id)
     body = request.get_json(silent=True) or {}
     try:
         role = Role(body.get("role"))
@@ -1050,9 +1085,13 @@ def overlay_live_control_reveal_role(tournament_id, slot_id):
 
 
 @overlay_bp.route("/<int:tournament_id>/live-control/phase", methods=["POST"])
+@overlay_bp.route("/current/live-control/phase", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
 def overlay_live_control_phase(tournament_id):
-    game = _current_unfinished_game(tournament_id) or abort(404)
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    game = _current_unfinished_game(resolved_id) or abort(404)
     body = request.get_json(silent=True) or {}
     try:
         phase = LivePhase(body.get("phase"))
@@ -1064,9 +1103,13 @@ def overlay_live_control_phase(tournament_id):
 
 
 @overlay_bp.route("/<int:tournament_id>/live-control/event/<int:event_id>/revoke", methods=["POST"])
+@overlay_bp.route("/current/live-control/event/<int:event_id>/revoke", methods=["POST"], defaults={"tournament_id": None})
 @admin_required
 def overlay_live_control_revoke_event(tournament_id, event_id):
-    game = _current_unfinished_game(tournament_id) or abort(404)
+    resolved_id = _resolve_obs_control_tournament_id(tournament_id)
+    if resolved_id is None:
+        abort(409)
+    game = _current_unfinished_game(resolved_id) or abort(404)
     event = db.session.get(GameEvent, event_id) or abort(404)
     if event.game_id != game.id:
         abort(404)

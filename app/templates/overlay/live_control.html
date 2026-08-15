@@ -61,14 +61,24 @@
 
     <div class="dock-header">
       <div class="dock-header__brand"><span class="dock-header__brand-dot" aria-hidden="true"></span>Mafia Style · Live-пульт</div>
-      <div class="dock-header__tournament">{{ tournament.name }}</div>
+      <div class="dock-header__tournament" id="lc-tournament-name">{{ tournament.name if tournament else '—' }}</div>
     </div>
 
     <div class="dock-status is-connecting" id="lc-status">
       <span class="dock-status__dot" aria-hidden="true"></span><span class="dock-status__label"></span>
     </div>
 
+    {# Только для /current/live-control — по аналогии с obs_control.html:
+       нечего резолвить вообще, ни один турнир не сделан активным. #}
     <div class="dock-section" id="lc-noactive" hidden>
+      <div class="dock-active-banner dock-active-banner--warn">
+        <span>⚠ Нет активного турнира — откройте «Управление оверлеем» нужного турнира и нажмите «Сделать активным для OBS».</span>
+      </div>
+    </div>
+
+    {# Турнир резолвлен, но прямо сейчас нет незавершённой игры (между
+       раундами/до старта) — пульту просто нечего показывать. #}
+    <div class="dock-section" id="lc-nogame" hidden>
       <div class="dock-active-banner dock-active-banner--warn">
         <span>⚠ Нет незавершённой игры для этого турнира — пульт активируется, как только начнётся игра (создана, но не завершена).</span>
       </div>
