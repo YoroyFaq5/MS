@@ -538,7 +538,7 @@
   // clean slate even if it happens mid-flourish.
   const DEATH_ANIM_MS = 950; // killed — keep in step with overlay.css's is-dying.dying--killed timings
   const VOTE_ANIM_MS  = 950; // voted  — keep in step with overlay.css's is-dying.dying--voted timings
-  const ROLE_REVEAL_MS = 550; // keep in step with overlay.css's ms-role-reveal
+  const ROLE_REVEAL_MS = 720; // keep in step with overlay.css's ms-role-rule-sweep + ms-role-text-reveal (.22s delay + .5s)
   const liveCardTimers = new Map(); // slotId -> { dying: handle|null, role: handle|null }
 
   function clearLiveCardTimer(slotId, key) {
@@ -619,18 +619,20 @@
         liveTag.textContent = newTag.textContent;
       }
 
-      const newBadge = newCard.querySelector('[data-role-badge]');
-      const liveBadge = liveCard.querySelector('[data-role-badge]');
-      if (newBadge && liveBadge) {
-        const wasRevealed = !liveBadge.hidden;
-        const willReveal = !newBadge.hasAttribute('hidden');
-        liveBadge.hidden = newBadge.hasAttribute('hidden');
-        liveBadge.textContent = newBadge.textContent;
-        liveBadge.className = newBadge.className; // carries the --{role} color modifier
+      const newMarker = newCard.querySelector('[data-role-marker]');
+      const liveMarker = liveCard.querySelector('[data-role-marker]');
+      if (newMarker && liveMarker) {
+        const wasRevealed = !liveMarker.hidden;
+        const willReveal = !newMarker.hasAttribute('hidden');
+        liveMarker.hidden = newMarker.hasAttribute('hidden');
+        liveMarker.className = newMarker.className; // carries the --{role} color modifier
+        const newMarkerText = newMarker.querySelector('.ms-seat-card__role-marker-text');
+        const liveMarkerText = liveMarker.querySelector('.ms-seat-card__role-marker-text');
+        if (newMarkerText && liveMarkerText) liveMarkerText.textContent = newMarkerText.textContent;
         if (!wasRevealed && willReveal && !REDUCED_MOTION) {
-          liveBadge.classList.add('is-revealing');
+          liveMarker.classList.add('is-revealing');
           setLiveCardTimer(slotId, 'role', () => {
-            liveBadge.classList.remove('is-revealing');
+            liveMarker.classList.remove('is-revealing');
           }, ROLE_REVEAL_MS);
         } else {
           clearLiveCardTimer(slotId, 'role');

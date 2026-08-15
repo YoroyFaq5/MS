@@ -677,8 +677,8 @@ html, body {
    filled condensed type + a thin double ring (box-shadow, not a border
    asset) instead of a chunky meme-stamp rectangle, impact-in with a short
    overshoot then settle. Always rendered (data-stamp, see template) so
-   the patch only toggles the [hidden] attribute — see role-badge above
-   for the same reasoning. */
+   the patch only toggles the [hidden] attribute — see the role-marker
+   section below for the same reasoning. */
 .ms-seat-card__stamp {
   position: absolute;
   left: 50%; top: 44%;
@@ -756,41 +756,76 @@ html, body {
 }
 
 /* Optional live role reveal (ведущий explicitly hits "Раскрыть" on the
-   live-control panel) — small tag opposite the seat-number chip, same
-   "shield tag" family, colored the same way .reveal-card__role--* already
-   colors roles everywhere else post-game. Server renders it (possibly
-   empty/[hidden]) so overlay.js's point-patch only ever has to toggle
-   [hidden] + textContent, never create/destroy the node. The suspenseful
-   "proves itself" moment lives in .is-revealing (added by overlay.js only
-   on the hidden→shown edge) — a clip-path wipe + a brief glow pulse in
-   the role's own color via currentColor, so one keyframe serves all four
-   roles without four copies. */
-.ms-seat-card__role-badge {
-  position: absolute;
-  top: .5rem; right: .5rem;
-  z-index: 3;
-  padding: .15rem .45rem;
-  border-radius: 4px;
-  font-size: .68rem;
+   live-control panel) — NOT a corner badge over the photo. Lives inside
+   the nameplate, above the name, as its own broadcast-caption line: a
+   thin colored rule + tracked type, the same typographic family as
+   __status-tag right below it, differing only by color/text — one design
+   system for all four roles, not four differently-styled boxes. Never
+   covers the face; the photo stays the card's one visual subject.
+   Server renders it (possibly empty/[hidden]) so overlay.js's point-patch
+   only ever has to toggle [hidden] + textContent, never create/destroy
+   the node.
+
+   Deliberately its own two colors here rather than reusing
+   .reveal-card__role--* verbatim: this is the ONLY place on the whole
+   overlay Дон reads gold/amber instead of crimson and Мирный reads cool
+   chrome-silver instead of plain text-white — an explicit, scoped choice
+   for this live in-progress-game marker, not a site-wide palette change
+   (the post-game results panel/ticker/idle-hero keep their existing
+   Дон=crimson convention untouched). */
+.ms-seat-card__role-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .18rem;
+  margin-bottom: .4rem;
+}
+.ms-seat-card__role-marker[hidden] { display: none; }
+.ms-seat-card__role-marker--civilian { color: var(--ovl-chrome, #D8D8D8); }
+.ms-seat-card__role-marker--sheriff  { color: var(--ovl-steel-light, #B7C0CE); }
+.ms-seat-card__role-marker--don      { color: var(--ovl-amber-light, #FFC35C); }
+.ms-seat-card__role-marker--mafia    { color: var(--ovl-signal-light, #FF3B3B); }
+
+.ms-seat-card__role-marker-rule {
+  display: block;
+  width: 1.5rem;
+  height: 2px;
+  background: currentColor;
+  transform: scaleX(1);
+  transform-origin: left center;
+  opacity: .85;
+}
+.ms-seat-card__role-marker-text {
+  font-family: var(--ovl-font-display, 'Oswald', 'Arial Narrow', sans-serif);
+  font-size: .74rem;
   font-weight: 700;
-  letter-spacing: .02em;
-  background: rgba(10,9,8,.72);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: 1px solid rgba(255,255,255,.15);
+  letter-spacing: .17em;
+  text-transform: uppercase;
+  color: currentColor;
+  text-shadow: 0 0 6px currentColor;
 }
-.ms-seat-card__role-badge[hidden] { display: none; }
-.ms-seat-card__role-badge--civilian { color: var(--ms-text, #F2F2F2); }
-.ms-seat-card__role-badge--sheriff  { color: var(--ovl-steel-light, #B7C0CE); }
-.ms-seat-card__role-badge--don      { color: var(--ovl-crimson, #C4232D); }
-.ms-seat-card__role-badge--mafia    { color: var(--ovl-signal-light, #FF3B3B); }
-.ms-seat-card__role-badge.is-revealing {
-  animation: ms-role-reveal .55s cubic-bezier(.2,.85,.25,1) both;
+
+/* The reveal choreography — line sweeps in first, THEN the name proves
+   itself out of it with a short overshoot, then both settle to the
+   plain resting values above (no ongoing animation, so a fresh page
+   load or prefers-reduced-motion just shows the settled result
+   instantly instead of needing its own override). Only runs once, added
+   by overlay.js only on the hidden->shown edge. */
+.ms-seat-card__role-marker.is-revealing .ms-seat-card__role-marker-rule {
+  animation: ms-role-rule-sweep .28s cubic-bezier(.65,0,.35,1) both;
 }
-@keyframes ms-role-reveal {
-  0%   { clip-path: inset(0 100% 0 0); opacity: 0; transform: scale(.92); box-shadow: inset 0 0 0 1px transparent, 0 0 0 transparent; }
-  55%  { clip-path: inset(0 -12% 0 0); opacity: 1; transform: scale(1.04); box-shadow: inset 0 0 0 1px currentColor, 0 0 16px currentColor; }
-  100% { clip-path: inset(0 0 0 0); opacity: 1; transform: scale(1); box-shadow: inset 0 0 0 1px rgba(255,255,255,.15), 0 0 0 transparent; }
+.ms-seat-card__role-marker.is-revealing .ms-seat-card__role-marker-text {
+  animation: ms-role-text-reveal .5s cubic-bezier(.2,.85,.25,1) .22s both;
+}
+@keyframes ms-role-rule-sweep {
+  0%   { transform: scaleX(0); opacity: 0; filter: drop-shadow(0 0 8px currentColor); }
+  70%  { transform: scaleX(1.15); opacity: 1; }
+  100% { transform: scaleX(1); opacity: .85; filter: drop-shadow(0 0 0 transparent); }
+}
+@keyframes ms-role-text-reveal {
+  0%   { clip-path: inset(0 100% 0 0); opacity: 0; transform: scale(.9); text-shadow: 0 0 0 transparent; }
+  60%  { clip-path: inset(0 -14% 0 0); opacity: 1; transform: scale(1.06); text-shadow: 0 0 14px currentColor; }
+  100% { clip-path: inset(0 0 0 0); opacity: 1; transform: scale(1); text-shadow: 0 0 6px currentColor; }
 }
 
 /* ═══ SECTION 3: last-game results reveal — THE STANDARD ═════════════════
