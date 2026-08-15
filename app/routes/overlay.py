@@ -29,11 +29,12 @@ last-game reveal open or suppressed on top of its normal ~25s auto-timer,
 and mark this tournament as the active one for `/overlay/current/*`.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
+from flask_login import current_user
 
 from app import db
 from app.models import (
-    Game, GameSlot, Player, Tournament, TournamentParticipant,
-    SeriesTournament, TournamentSeries,
+    Game, GameSlot, GameEvent, Player, Tournament, TournamentParticipant,
+    SeriesTournament, TournamentSeries, EliminationType, LivePhase, Role,
 )
 from app.services.rating_service import RatingService, RoleTournamentStats
 from app.services.shop_service import ShopService
@@ -41,6 +42,7 @@ from app.services.overlay_control_service import OverlayControlService
 from app.services.broadcast_scene_service import BroadcastSceneService
 from app.services.active_broadcast_service import ActiveBroadcastService
 from app.services.series_tournament_service import SeriesTournamentService
+from app.services.live_game_control_service import LiveGameControlService
 from app.auth_decorators import admin_required
 
 overlay_bp = Blueprint("overlay", __name__)
@@ -95,6 +97,27 @@ def _build_ctl_sig(control, effective_idle_content: str) -> str:
         f"|pg={control.pinned_game_id or 0}"
         f"|ic={effective_idle_content}"
     )
+
+
+def _build_live_state_sig(current_game) -> str:
+    """Separate, small change-detection string for per-seat live status
+    (killed/voted/revealed role, set from /live-control — see
+    LiveGameControlService) — deliberately NOT folded into `_build_sig()`.
+    A ведущий can click kill/reveal several times a minute; if that lived
+    in the main sig, every click would trigger a full DOM replace of the
+    whole page (replaying the camera frame/seat-strip entrance animations
+    — the exact thing _build_sig's own docstring calls out as a bad
+    trade-off for pinned_game_id, doubly so here at this click frequency).
+    overlay.js diffs this on its own and patches only the affected
+    .ms-seat-card elements in place — see poll()'s liveSig handling."""
+    if not current_game:
+        return "none"
+    parts = tuple(
+        f"{s.id}:{int(s.is_eliminated)}:{s.elimination_type.value if s.elimination_type else ''}:"
+        f"{s.live_role.value if s.live_role else ''}"
+        for s in sorted(current_game.slots, key=lambda s: s.seat_number)
+    )
+    return "|".join(parts)
 
 
 def _finished_games_list(tournament: Tournament) -> list:
@@ -340,6 +363,7 @@ def _build_live_context(tournament_id: int, layout_mode: str) -> dict:
         effective_idle_content=effective_idle_content,
         sig=_build_sig(tournament, current_game, last_game, standings_scope),
         ctl_sig=_build_ctl_sig(control, effective_idle_content),
+        live_sig=_build_live_state_sig(current_game),
     )
 
 
@@ -927,3 +951,124 @@ def overlay_obs_control_reset(tournament_id):
     state = _build_obs_control_state(resolved_id)
     state["active"] = True
     return jsonify(state)
+
+
+# ── Live-контроль карточек игроков (пульт ведущего) ─────────────────────────
+# Отдельная страница /overlay/<id>/live-control + JSON-эндпоинты поверх
+# LiveGameControlService — по ходу ЕЩЁ НЕ завершённой игры отмечает
+# убитых/выгнанных и опционально раскрывает роли, ведёт протокол
+# (GameEvent). Тот же "мутация → отдать свежий снапшот" паттерн, что и у
+# /obs-control/* выше, но привязан к текущей НЕЗАВЕРШЁННОЙ игре турнира,
+# а не к OverlayControl-настройкам показа — отдельная, самостоятельная
+# admin-поверхность, никак не пересекается с этими выше.
+
+def _current_unfinished_game(tournament_id: int):
+    return (
+        db.session.query(Game)
+        .filter(Game.tournament_id == tournament_id, Game.is_finished == False)
+        .order_by(Game.played_at.desc(), Game.id.desc())
+        .first()
+    )
+
+
+def _live_control_slot_or_404(tournament_id: int, slot_id: int) -> GameSlot:
+    """Проверяет, что место реально принадлежит ТЕКУЩЕЙ незавершённой игре
+    этого турнира — не даёт через подмену slot_id в запросе дотянуться до
+    места чужого турнира или уже завершённой игры (сама mutation-логика в
+    LiveGameControlService тоже блокирует finished-игры, это ещё и защита
+    от чужого tournament_id)."""
+    slot = db.session.get(GameSlot, slot_id) or abort(404)
+    game = _current_unfinished_game(tournament_id)
+    if not game or slot.game_id != game.id:
+        abort(404)
+    return slot
+
+
+def _live_control_response(result, game_id: int):
+    state = LiveGameControlService.get_state(game_id) or {"active": False}
+    state["active"] = True
+    state["ok"] = result.ok
+    state["message"] = result.message
+    return jsonify(state)
+
+
+@overlay_bp.route("/<int:tournament_id>/live-control")
+@admin_required
+def overlay_live_control(tournament_id):
+    tournament = db.session.get(Tournament, tournament_id) or abort(404)
+    return render_template(
+        "overlay/live_control.html",
+        tournament=tournament,
+        state_url=url_for("overlay.overlay_live_control_state", tournament_id=tournament_id),
+        action_base=f"/overlay/{tournament_id}/live-control",
+    )
+
+
+@overlay_bp.route("/<int:tournament_id>/live-control/state")
+@admin_required
+def overlay_live_control_state(tournament_id):
+    game = _current_unfinished_game(tournament_id)
+    if not game:
+        return jsonify({"active": False})
+    state = LiveGameControlService.get_state(game.id)
+    state["active"] = True
+    return jsonify(state)
+
+
+@overlay_bp.route("/<int:tournament_id>/live-control/<int:slot_id>/eliminate", methods=["POST"])
+@admin_required
+def overlay_live_control_eliminate(tournament_id, slot_id):
+    slot = _live_control_slot_or_404(tournament_id, slot_id)
+    body = request.get_json(silent=True) or {}
+    try:
+        kind = EliminationType(body.get("kind"))
+    except ValueError:
+        return jsonify(ok=False, message="Некорректный тип выбывания."), 400
+    result = LiveGameControlService.mark_eliminated(slot.id, kind, current_user.id)
+    return _live_control_response(result, slot.game_id)
+
+
+@overlay_bp.route("/<int:tournament_id>/live-control/<int:slot_id>/revive", methods=["POST"])
+@admin_required
+def overlay_live_control_revive(tournament_id, slot_id):
+    slot = _live_control_slot_or_404(tournament_id, slot_id)
+    result = LiveGameControlService.revive(slot.id, current_user.id)
+    return _live_control_response(result, slot.game_id)
+
+
+@overlay_bp.route("/<int:tournament_id>/live-control/<int:slot_id>/reveal-role", methods=["POST"])
+@admin_required
+def overlay_live_control_reveal_role(tournament_id, slot_id):
+    slot = _live_control_slot_or_404(tournament_id, slot_id)
+    body = request.get_json(silent=True) or {}
+    try:
+        role = Role(body.get("role"))
+    except ValueError:
+        return jsonify(ok=False, message="Некорректная роль."), 400
+    result = LiveGameControlService.reveal_role(slot.id, role, current_user.id)
+    return _live_control_response(result, slot.game_id)
+
+
+@overlay_bp.route("/<int:tournament_id>/live-control/phase", methods=["POST"])
+@admin_required
+def overlay_live_control_phase(tournament_id):
+    game = _current_unfinished_game(tournament_id) or abort(404)
+    body = request.get_json(silent=True) or {}
+    try:
+        phase = LivePhase(body.get("phase"))
+        turn = int(body.get("turn"))
+    except (ValueError, TypeError):
+        return jsonify(ok=False, message="Некорректная фаза/ход."), 400
+    result = LiveGameControlService.advance_phase(game.id, phase, turn, current_user.id)
+    return _live_control_response(result, game.id)
+
+
+@overlay_bp.route("/<int:tournament_id>/live-control/event/<int:event_id>/revoke", methods=["POST"])
+@admin_required
+def overlay_live_control_revoke_event(tournament_id, event_id):
+    game = _current_unfinished_game(tournament_id) or abort(404)
+    event = db.session.get(GameEvent, event_id) or abort(404)
+    if event.game_id != game.id:
+        abort(404)
+    result = LiveGameControlService.revoke_event(event_id, current_user.id)
+    return _live_control_response(result, game.id)

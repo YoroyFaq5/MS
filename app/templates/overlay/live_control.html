@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live-пульт — {{ tournament.name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/obs-control.css') }}">
+  <style>
+    /* Дополнения к общим .dock-* токенам/классам (obs-control.css) —
+       разметки, специфичной только для этой страницы (сетка карточек
+       игроков + лента протокола), в общем файле пульта нет смысла. */
+    .lc-seats {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: .6rem;
+    }
+    .lc-seat {
+      background: var(--dock-surface);
+      border: 1px solid var(--dock-border);
+      border-radius: 10px;
+      padding: .6rem;
+      display: flex;
+      flex-direction: column;
+      gap: .4rem;
+    }
+    .lc-seat.is-killed { border-color: rgba(227,30,36,.5); }
+    .lc-seat.is-voted { border-color: rgba(245,166,35,.5); }
+    .lc-seat__top { display: flex; align-items: center; gap: .4rem; }
+    .lc-seat__num {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--dock-surface-raised); border: 1px solid var(--dock-border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .7rem; color: var(--dock-text-dim); flex: none;
+    }
+    .lc-seat__name { font-weight: 600; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lc-seat__status { font-size: .68rem; color: var(--dock-text-faint); text-transform: uppercase; letter-spacing: .04em; }
+    .lc-seat.is-killed .lc-seat__status { color: var(--dock-red-light); }
+    .lc-seat.is-voted .lc-seat__status { color: var(--dock-amber); }
+    .lc-seat__actions { display: flex; gap: .3rem; flex-wrap: wrap; }
+    .lc-seat__actions .dock-btn { padding: .35rem .5rem; font-size: .7rem; }
+    .lc-seat__role-row { display: flex; gap: .3rem; margin-top: .1rem; }
+    .lc-seat__role-row select { flex: 1 1 auto; min-width: 0; }
+    .lc-phase-row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+    .lc-phase-row input { width: 64px; }
+    .lc-phase-state { font-weight: 700; margin-left: auto; }
+    .lc-protocol { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: .35rem; }
+    .lc-protocol__row {
+      display: flex; align-items: center; gap: .5rem;
+      font-size: .76rem; color: var(--dock-text-dim);
+      padding: .3rem .4rem; border-radius: 6px; background: var(--dock-surface);
+    }
+    .lc-protocol__row.is-revoked { opacity: .4; text-decoration: line-through; }
+    .lc-protocol__row button { margin-left: auto; flex: none; }
+  </style>
+</head>
+<body>
+  <div id="lc-root" data-tournament-id="{{ tournament.id }}"
+       data-state-url="{{ state_url }}" data-action-base="{{ action_base }}">
+
+    <div class="dock-header">
+      <div class="dock-header__brand"><span class="dock-header__brand-dot" aria-hidden="true"></span>Mafia Style · Live-пульт</div>
+      <div class="dock-header__tournament">{{ tournament.name }}</div>
+    </div>
+
+    <div class="dock-status is-connecting" id="lc-status">
+      <span class="dock-status__dot" aria-hidden="true"></span><span class="dock-status__label"></span>
+    </div>
+
+    <div class="dock-section" id="lc-noactive" hidden>
+      <div class="dock-active-banner dock-active-banner--warn">
+        <span>⚠ Нет незавершённой игры для этого турнира — пульт активируется, как только начнётся игра (создана, но не завершена).</span>
+      </div>
+    </div>
+
+    <div id="lc-dashboard">
+
+      <div class="dock-section">
+        <div class="dock-section__title">Ход</div>
+        <div class="lc-phase-row">
+          <button type="button" class="dock-btn" data-phase="night">🌙 Ночь</button>
+          <button type="button" class="dock-btn" data-phase="day">☀️ День</button>
+          <input type="number" id="lc-turn" min="1" step="1" value="1" class="dock-select">
+          <button type="button" class="dock-btn" id="lc-apply-phase">Применить</button>
+          <span class="lc-phase-state" id="lc-phase-state">—</span>
+        </div>
+      </div>
+
+      <div class="dock-section">
+        <div class="dock-section__title">Игроки</div>
+        <div class="lc-seats" id="lc-seats"></div>
+      </div>
+
+      <div class="dock-section">
+        <div class="dock-section__title">Протокол</div>
+        <div class="lc-protocol" id="lc-protocol"></div>
+      </div>
+
+    </div>
+
+  </div>
+  <script src="{{ url_for('static', filename='js/live-control.js') }}" defer></script>
+</body>
+</html>
