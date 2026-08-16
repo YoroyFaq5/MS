@@ -47,10 +47,15 @@
   /* Corner-cut geometry — same parameterized "flat rect, one/two corners
      sliced" recipe already used in the broadcast overlay
      (--ovl-panel-clip-*, --ms-card-clip in overlay.css), borrowed
-     deliberately as a shared brand motif. Used sparingly (hero panels,
-     featured cards, large CTAs) — not applied to every surface. */
-  --ms-cut-sm: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
-  --ms-cut-lg: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
+     deliberately as a shared brand motif. Sized big enough to actually
+     read as a cut edge at normal card widths (a 12px notch on a 300px+
+     card was practically invisible) — paired with a lit accent corner
+     via .ms-corner-cut/--lg below, since a bare clip-path corner has no
+     border of its own and can vanish against a similarly dark page bg. */
+  --ms-cut-sm-size: 22px;
+  --ms-cut-lg-size: 40px;
+  --ms-cut-sm: polygon(0 0, calc(100% - var(--ms-cut-sm-size)) 0, 100% var(--ms-cut-sm-size), 100% 100%, 0 100%);
+  --ms-cut-lg: polygon(0 0, calc(100% - var(--ms-cut-lg-size)) 0, 100% var(--ms-cut-lg-size), 100% 100%, 0 100%);
 
   /* Live/broadcast-borrowed accents — reserved for functional live/active
      status only (LIVE badge, "турнир идёт"). Distinct from --ms-wine,
@@ -211,13 +216,40 @@
   animation: ms-live-pulse 1.8s var(--ms-ease-standard) infinite;
 }
 
-/* Restrained corner-cut accent — opt-in via this class, not a global
-   card treatment. See --ms-cut-sm/-lg in :root for the geometry. */
-.ms-cut-accent {
+/* Corner-cut accent, opt-in via this class — not applied to every
+   surface. A bare clip-path corner has no border/shadow of its own
+   (browsers don't draw the box border along a clipped edge), so on a
+   dark card against a dark page it can vanish entirely. This pairs the
+   cut with a small lit diagonal in the notch itself, so the geometry
+   actually reads instead of just quietly trimming a corner. Element
+   needs position:relative (or already has it) and NOT overflow that
+   would clip the accent — it sits fully inside the box bounds so
+   overflow:hidden is fine. */
+.ms-corner-cut {
+  position: relative;
   clip-path: var(--ms-cut-sm);
 }
-.ms-cut-accent--lg {
+.ms-corner-cut::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 0;
+  width: var(--ms-cut-sm-size);
+  height: var(--ms-cut-sm-size);
+  background: linear-gradient(225deg, var(--ms-gold-light) 0%, transparent 60%);
+  opacity: .85;
+  pointer-events: none;
+}
+.ms-corner-cut--lg {
   clip-path: var(--ms-cut-lg);
+}
+.ms-corner-cut--lg::after {
+  width: var(--ms-cut-lg-size);
+  height: var(--ms-cut-lg-size);
+}
+/* Live-flavored variant — the notch glows red instead of gold, for
+   surfaces tied to an in-progress/live state. */
+.ms-corner-cut--live::after {
+  background: linear-gradient(225deg, var(--ms-live-bright) 0%, transparent 60%);
 }
 
 /* Base */
@@ -581,8 +613,11 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   position: relative;
 }
 .panel-header__title {
+  font-family: 'Oswald', 'Inter', sans-serif;
   font-weight: 600;
-  font-size: .95rem;
+  font-size: .9rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
 }
 
 /* Entrance animation — sections fade/slide in on load, staggered via a
@@ -4740,11 +4775,25 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 }
 
 .match-card {
+  position: relative;
   background: var(--ms-surface);
   border: 1px solid var(--ms-border);
   clip-path: var(--ms-cut-sm);
   overflow: hidden;
   transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+/* Lit accent in the cut notch — see .ms-corner-cut for why a bare
+   clip-path corner needs this to actually read as a cut. */
+.match-card::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 0;
+  width: var(--ms-cut-sm-size);
+  height: var(--ms-cut-sm-size);
+  background: linear-gradient(225deg, var(--ms-gold-light) 0%, transparent 60%);
+  opacity: .85;
+  pointer-events: none;
+  z-index: 2;
 }
 .match-card:hover, .match-card:focus-within {
   transform: translateY(-3px);

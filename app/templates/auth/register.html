@@ -3,7 +3,13 @@
 
 {% block head %}
 <style>
-.auth-card { clip-path: var(--ms-cut-lg); }
+.auth-card { position: relative; clip-path: var(--ms-cut-lg); }
+.auth-card::after {
+  content: ""; position: absolute; top: 0; right: 0;
+  width: var(--ms-cut-lg-size); height: var(--ms-cut-lg-size);
+  background: linear-gradient(225deg, var(--ms-gold-light) 0%, transparent 60%);
+  opacity: .9; pointer-events: none;
+}
 </style>
 {% endblock %}
 

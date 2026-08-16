@@ -144,8 +144,10 @@
   position: relative; overflow: hidden;
   display: flex; flex-direction: column;
   background: var(--ms-surface); border: 1px solid var(--ms-border);
-  /* Small corner-cut on every card (not just the featured one) — a
-     consistently-present, low-key brand signature rather than a one-off. */
+  /* Corner-cut on every card (not just the featured one) — a
+     consistently-present brand signature rather than a one-off. Paired
+     with a lit notch (::after below) since a bare clip-path edge has no
+     border of its own and is easy to miss against the dark page bg. */
   clip-path: var(--ms-cut-sm);
   padding: 1.5rem;
   transition: transform .25s cubic-bezier(.2,.7,.3,1), box-shadow .25s ease, border-color .25s ease;
@@ -154,6 +156,15 @@
   content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
   background: linear-gradient(90deg, transparent, rgba(199,165,82,.4), transparent);
   opacity: 0; transition: opacity .25s ease;
+}
+.tourney-card::after {
+  content: ""; position: absolute; top: 0; right: 0;
+  width: var(--ms-cut-sm-size); height: var(--ms-cut-sm-size);
+  background: linear-gradient(225deg, var(--ms-gold-light) 0%, transparent 60%);
+  opacity: .85; pointer-events: none; z-index: 1;
+}
+.tourney-card--active::after {
+  background: linear-gradient(225deg, var(--ms-live-bright) 0%, transparent 60%);
 }
 .tourney-card:hover { transform: translateY(-6px); box-shadow: 0 20px 44px rgba(0,0,0,.45); border-color: rgba(199,165,82,.26); }
 .tourney-card:hover::before { opacity: 1; }
@@ -219,6 +230,12 @@
   clip-path: var(--ms-cut-lg);
   padding: 1.75rem; margin-bottom: 1.75rem;
   transition: transform .25s cubic-bezier(.2,.7,.3,1), box-shadow .25s ease;
+}
+.tourney-featured::after {
+  content: ""; position: absolute; top: 0; right: 0;
+  width: var(--ms-cut-lg-size); height: var(--ms-cut-lg-size);
+  background: linear-gradient(225deg, var(--ms-gold-light) 0%, transparent 60%);
+  opacity: .9; pointer-events: none;
 }
 .tourney-featured:hover { transform: translateY(-4px); box-shadow: 0 24px 54px rgba(0,0,0,.5), 0 0 50px rgba(199,165,82,.1); }
 .tourney-featured__crest {

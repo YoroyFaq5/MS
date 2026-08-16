@@ -164,10 +164,11 @@ a.lb-hero__stat:hover .lb-hero__stat-arrow { transform: translateX(3px); color: 
 .hof-podium::after {
   content: "";
   position: absolute;
-  left: 8%; right: 8%; bottom: -1px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--ms-chrome), transparent);
-  opacity: .4;
+  left: 4%; right: 4%; bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--ms-chrome-light, #fff) 15%, var(--ms-chrome) 50%, var(--ms-chrome-light, #fff) 85%, transparent);
+  box-shadow: 0 0 12px rgba(216,216,216,.35);
+  opacity: .85;
   pointer-events: none;
 }
 
