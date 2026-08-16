@@ -1,9 +1,10 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
 from app import db
 from app.models import Player
-from app.services import RatingService
+from app.services import RatingService, ProfileService
 from app.services.economy_service import EconomyService
 from app.services.shop_service import ShopService
+from app.services.avatar_service import AvatarService
 from app.auth_decorators import admin_required
 
 players_bp = Blueprint("players", __name__)
@@ -85,6 +86,37 @@ def edit_player(player_id: int):
         return redirect(url_for("players.list_players"))
 
     return render_template("players/form.html", player=player)
+
+
+@players_bp.route("/<int:player_id>/avatar/upload", methods=["POST"])
+@admin_required
+def admin_upload_avatar(player_id: int):
+    player = db.session.get(Player, player_id) or abort(404)
+    result = AvatarService.save_avatar(player, request.files.get("avatar"))
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("players.edit_player", player_id=player_id))
+
+
+@players_bp.route("/<int:player_id>/avatar/url", methods=["POST"])
+@admin_required
+def admin_set_avatar_url(player_id: int):
+    player = db.session.get(Player, player_id) or abort(404)
+    avatar_url = request.form.get("avatar_url", "").strip()
+    if not avatar_url:
+        flash("Укажите ссылку на изображение.", "danger")
+        return redirect(url_for("players.edit_player", player_id=player_id))
+    result = ProfileService.update_profile(player, avatar_url=avatar_url)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("players.edit_player", player_id=player_id))
+
+
+@players_bp.route("/<int:player_id>/avatar/remove", methods=["POST"])
+@admin_required
+def admin_remove_avatar(player_id: int):
+    player = db.session.get(Player, player_id) or abort(404)
+    result = AvatarService.remove_avatar(player)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("players.edit_player", player_id=player_id))
 
 
 @players_bp.route("/<int:player_id>/delete", methods=["POST"])

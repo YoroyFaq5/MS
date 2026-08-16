@@ -40,6 +40,56 @@
         </form>
       </div>
     </div>
+
+    {# Avatar can only be set for an already-created player (upload/URL/remove
+       routes all need player.id) — new players save the base form first,
+       then come back here to set the photo. #}
+    {% if player %}
+    <div class="card mt-4">
+      <div class="card-body p-4">
+        <h5 class="fw-bold mb-3"><i class="bi bi-image me-1"></i>Аватар</h5>
+
+        <div class="d-flex align-items-center gap-3 mb-4">
+          <div class="avatar-circle" style="width:96px;height:96px;font-size:2.4rem;">
+            {% if player.avatar_url %}
+              <img src="{{ player.avatar_url }}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
+            {% else %}
+              <span>{{ player.display_name[0]|upper }}</span>
+            {% endif %}
+          </div>
+          {% if player.avatar_url %}
+          <form method="POST" action="{{ url_for('players.admin_remove_avatar', player_id=player.id) }}"
+                data-confirm="Удалить аватар игрока «{{ player.display_name }}»?" data-confirm-tone="danger">
+            <button type="submit" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-x-lg me-1"></i>Удалить аватар
+            </button>
+          </form>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-medium small">Загрузить файл</label>
+          <form method="POST" action="{{ url_for('players.admin_upload_avatar', player_id=player.id) }}"
+                enctype="multipart/form-data" class="d-flex gap-2">
+            <input type="file" name="avatar" class="form-control form-control-sm"
+                   accept="image/png,image/jpeg,image/gif,image/webp" required>
+            <button type="submit" class="btn btn-outline-danger btn-sm flex-shrink-0">Загрузить</button>
+          </form>
+          <div class="form-text">PNG, JPG, GIF или WEBP, до 3 МБ.</div>
+        </div>
+
+        <div>
+          <label class="form-label fw-medium small">Или вставить ссылку на изображение</label>
+          <form method="POST" action="{{ url_for('players.admin_set_avatar_url', player_id=player.id) }}"
+                class="d-flex gap-2">
+            <input type="url" name="avatar_url" class="form-control form-control-sm"
+                   placeholder="https://..." value="{{ player.avatar_url if player.avatar_url else '' }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm flex-shrink-0">Сохранить</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
