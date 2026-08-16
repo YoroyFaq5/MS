@@ -44,6 +44,15 @@ def create_app(config_name: str = "default") -> Flask:
             return {"current_user_equipped": ShopService.get_equipped(_current_user.player_id)}
         return {"current_user_equipped": {}}
 
+    # Единый источник подписей роль/исход-игры для всех шаблонов — см.
+    # app/labels.py. Роуты по-прежнему могут передавать role_labels/
+    # win_side_labels явно (например games.py, для фильтров) — явная
+    # передача просто переопределяет то же самое значение.
+    @app.context_processor
+    def inject_domain_labels():
+        from .labels import ROLE_LABELS, WIN_SIDE_LABELS
+        return {"role_labels": ROLE_LABELS, "win_side_labels": WIN_SIDE_LABELS}
+
     # Blueprints
     from .routes.main import main_bp
     from .routes.players import players_bp

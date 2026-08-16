@@ -11,6 +11,7 @@ from app.services import RatingService
 from app.services.season_service import SeasonService
 from app.services.shop_service import ShopService
 from app.auth_decorators import admin_required
+from app.labels import ROLE_LABELS, WIN_SIDE_LABELS
 
 games_bp = Blueprint("games", __name__)
 
@@ -264,19 +265,6 @@ def _new_game_form_context(tournaments, preselect_tournament=None, preselect_sta
 # ── Public: просмотр ──────────────────────────────────────────────────────────
 
 GAMES_PER_PAGE = 12
-
-ROLE_LABELS = {
-    "civilian": "Мирный",
-    "sheriff": "Шериф",
-    "don": "Дон",
-    "mafia": "Мафия",
-}
-
-WIN_SIDE_LABELS = {
-    "city": "Победа города",
-    "mafia": "Победа мафии",
-    "none": "Ничья",
-}
 
 
 def _tournaments_with_finished_games():
