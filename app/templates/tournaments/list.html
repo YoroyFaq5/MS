@@ -75,8 +75,8 @@
 .tourney-hero__count-wrap { display: flex; flex-direction: column; }
 .tourney-hero__eyebrow { font-size: .68rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ms-muted); margin-bottom: .15rem; }
 .tourney-hero__count {
-  font-family: 'Playfair Display', Georgia, serif; font-weight: 700;
-  font-size: clamp(2.75rem, 3.2vw + 1.5rem, 4.5rem); line-height: 1.2; white-space: nowrap;
+  font-family: 'Bebas Neue', 'Oswald', 'Playfair Display', Georgia, serif; font-weight: 400;
+  font-size: clamp(2.75rem, 3.2vw + 1.5rem, 4.5rem); line-height: 1.1; white-space: nowrap;
   background: linear-gradient(180deg, #F3E4B8 0%, #D4B06A 32%, #C7A552 58%, #9C7C3E 82%, #C7A552 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 2px 10px rgba(0,0,0,.5));
@@ -143,7 +143,10 @@
 .tourney-card {
   position: relative; overflow: hidden;
   display: flex; flex-direction: column;
-  background: var(--ms-surface); border: 1px solid var(--ms-border); border-radius: var(--ms-radius);
+  background: var(--ms-surface); border: 1px solid var(--ms-border);
+  /* Small corner-cut on every card (not just the featured one) — a
+     consistently-present, low-key brand signature rather than a one-off. */
+  clip-path: var(--ms-cut-sm);
   padding: 1.5rem;
   transition: transform .25s cubic-bezier(.2,.7,.3,1), box-shadow .25s ease, border-color .25s ease;
 }

@@ -275,10 +275,16 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
   height: 64px;
 }
 
+/* The wordmark itself — as opposed to headings/editorial text, which
+   keep Playfair Display — switches to Bebas Neue, matching how the
+   broadcast overlay renders "MAFIA STYLE" (broadcast-brand.css
+   .ovl-display). This is the single highest-visibility "same brand on
+   both surfaces" touchpoint: it appears in the navbar and footer on
+   every page, plus login/register/homepage. */
 .brand-wordmark {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-weight: 700;
-  letter-spacing: .12em;
+  font-family: 'Bebas Neue', 'Oswald', 'Playfair Display', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: .04em;
   color: var(--ms-text);
 }
 
@@ -520,6 +526,9 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 .hero-section h1,
 .hero-section .display-5 {
   font-size: clamp(1.75rem, 4.5vw + 1rem, 3rem);
+  font-family: 'Bebas Neue', 'Oswald', 'Playfair Display', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: .04em;
 }
 
 .hero-slogan {
@@ -842,11 +851,16 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 .stat-icon { font-size: 1.5rem; }
 
 .stat-value {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-size: clamp(1.15rem, 1rem + 1vw, 1.5rem);
-  font-weight: 700;
-  line-height: 1.2;
+  /* Broadcast-style "counter" numeral (see --ms-* design notes) instead
+     of Playfair — KPI numbers now read closer to the overlay's on-air
+     data displays. */
+  font-family: 'Bebas Neue', 'Oswald', 'Playfair Display', Georgia, serif;
+  font-size: clamp(1.3rem, 1.05rem + 1.1vw, 1.75rem);
+  font-weight: 400;
+  letter-spacing: .02em;
+  line-height: 1.15;
   margin-bottom: .25rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-label {
@@ -4728,7 +4742,7 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 .match-card {
   background: var(--ms-surface);
   border: 1px solid var(--ms-border);
-  border-radius: var(--ms-radius);
+  clip-path: var(--ms-cut-sm);
   overflow: hidden;
   transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
 }
