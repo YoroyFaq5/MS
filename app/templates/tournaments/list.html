@@ -108,10 +108,13 @@
   font-size: .72rem; font-weight: 700; white-space: nowrap;
 }
 .tourney-status--pending { background: rgba(138,138,138,.12); color: var(--ms-muted); border: 1px solid var(--ms-border); }
-.tourney-status--active  { background: rgba(199,165,82,.16); color: var(--ms-gold-light); border: 1px solid rgba(199,165,82,.3); }
+/* "Активен" — genuinely in-progress state, so it borrows the broadcast
+   live-red accent (see --ms-live in main.css :root) rather than gold —
+   gold stays reserved for premium/achievement, red for "happening now". */
+.tourney-status--active  { background: var(--ms-live-glow); color: var(--ms-live-bright); border: 1px solid var(--ms-live); }
 .tourney-status--finished{ background: rgba(138,138,138,.08); color: var(--ms-text-dim); border: 1px solid var(--ms-border); }
 .tourney-status--active .tourney-status__dot {
-  width: 6px; height: 6px; border-radius: 50%; background: var(--ms-gold-light);
+  width: 6px; height: 6px; border-radius: 50%; background: var(--ms-live-bright);
   animation: tourney-live-pulse 1.6s ease-in-out infinite;
 }
 @keyframes tourney-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
@@ -207,7 +210,10 @@
   position: relative; overflow: hidden;
   display: flex; gap: 1.75rem;
   background: linear-gradient(180deg, rgba(199,165,82,.06), var(--ms-surface) 55%);
-  border: 1px solid rgba(199,165,82,.3); border-radius: var(--ms-radius);
+  border: 1px solid rgba(199,165,82,.3);
+  /* Corner-cut brand accent (see --ms-cut-lg) — only the featured
+     tournament card gets this, not the whole grid, per redesign plan. */
+  clip-path: var(--ms-cut-lg);
   padding: 1.75rem; margin-bottom: 1.75rem;
   transition: transform .25s cubic-bezier(.2,.7,.3,1), box-shadow .25s ease;
 }
