@@ -27,7 +27,50 @@
   --ms-wine:           #7B0F0F;  /* danger/deep accent */
   --ms-wine-light:     #8E1C1C;
 
-  --ms-radius: 10px;
+  /* Podium/rarity neutrals — previously typed as raw hex in ~7 places
+     (rank rows, achv-rare). Same values, now a single source. */
+  --ms-silver:         #B8B8B8;
+  --ms-bronze:         #B08D57;
+
+  --ms-radius:    10px;
+  --ms-radius-sm: 8px;   /* aligns .form-control, which hardcoded 8px */
+  --ms-radius-lg: 16px;  /* large hero/panel surfaces */
+
+  /* Elevation — consolidates ~8 near-duplicate inline box-shadows into
+     three levels. Existing components keep their own shadow until they're
+     touched; new/updated components should reference these instead of a
+     literal rgba(). */
+  --ms-shadow-sm: 0 4px 14px rgba(0,0,0,.35);
+  --ms-shadow-md: 0 10px 28px rgba(0,0,0,.4);
+  --ms-shadow-lg: 0 20px 48px rgba(0,0,0,.5);
+
+  /* Corner-cut geometry — same parameterized "flat rect, one/two corners
+     sliced" recipe already used in the broadcast overlay
+     (--ovl-panel-clip-*, --ms-card-clip in overlay.css), borrowed
+     deliberately as a shared brand motif. Used sparingly (hero panels,
+     featured cards, large CTAs) — not applied to every surface. */
+  --ms-cut-sm: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  --ms-cut-lg: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
+
+  /* Live/broadcast-borrowed accents — reserved for functional live/active
+     status only (LIVE badge, "турнир идёт"). Distinct from --ms-wine,
+     which keeps its existing danger/mafia-loss meaning; the two must not
+     be conflated. Exact hex values match the overlay's --ovl-signal /
+     --ovl-chrome / --ovl-steel so the two surfaces read as one brand. */
+  --ms-live:        #E31E24;
+  --ms-live-bright: #FF3B3B;
+  --ms-live-glow:   rgba(227,30,36,.28);
+
+  --ms-chrome:       #D8D8D8;
+  --ms-chrome-light: #FFFFFF;
+  --ms-steel:        #8B95A6;
+
+  /* Motion — codifies the site's de facto standard so new components
+     don't reinvent it; kept calmer than the overlay's constant live
+     motion (see prefers-reduced-motion guard below and .ms-live-pulse). */
+  --ms-ease-standard:  cubic-bezier(.4, 0, .2, 1);
+  --ms-duration-fast:  .2s;
+  --ms-duration-base:  .25s;
 
   /* ── Re-theme Bootstrap's own semantic variables ─────────────
      Bootstrap 5.3 drives .btn-*/.bg-*/.text-*/.border-*/.alert-* off
@@ -58,6 +101,125 @@
   --bs-secondary: var(--ms-muted);       --bs-secondary-rgb: 138,138,138;
 }
 
+/* ============================================================
+   Shared components — "club + broadcast" bridge
+   ------------------------------------------------------------
+   .page-hero    — consolidates 4 near-duplicate hero blocks that were
+                   hand-copied per page (tourney-hero/lb-hero/games-hero/
+                   players-hero, ~150-250 lines of inline <style> each).
+                   Pages opt in with this class + modifiers instead of
+                   redefining the pattern.
+   .status-badge — replaces the repeated 3-4 class Bootstrap utility
+                   combo (badge bg-*-subtle text-* border-*-subtle) that
+                   was copy-pasted per status per template.
+   Both are additive: existing bespoke page styles are left as-is until
+   a page is migrated onto these (see redesign plan, Задача 5).
+   ============================================================ */
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes ms-live-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--ms-live-glow); }
+    50%      { box-shadow: 0 0 0 5px transparent; }
+  }
+}
+
+.page-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--ms-radius-lg);
+  border: 1px solid var(--ms-border);
+  background:
+    linear-gradient(135deg, rgba(199,165,82,.08), transparent 55%),
+    var(--ms-surface);
+  box-shadow: var(--ms-shadow-md);
+  padding: 2rem 2rem 1.75rem;
+  margin-bottom: 1.5rem;
+}
+.page-hero::before {
+  /* thin diagonal accent line — restrained echo of the overlay's
+     "bегущие линии" motif, static here (site ≠ constant broadcast motion) */
+  content: "";
+  position: absolute;
+  top: 0; right: 12%;
+  width: 1px; height: 100%;
+  background: linear-gradient(180deg, transparent, var(--ms-gold-glow), transparent);
+  pointer-events: none;
+}
+.page-hero--live {
+  border-color: var(--ms-live-glow);
+}
+.page-hero__eyebrow {
+  font-family: 'Oswald', 'Inter', sans-serif;
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+  margin-bottom: .35rem;
+}
+.page-hero__title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(1.6rem, 2.4vw, 2.4rem);
+  color: var(--ms-text);
+  margin: 0 0 .5rem;
+}
+.page-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 1.25rem;
+  color: var(--ms-text-dim);
+  font-size: .9rem;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .3rem .65rem;
+  border-radius: 99px;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  line-height: 1;
+}
+.status-badge--pending {
+  color: var(--ms-muted);
+  background: rgba(138,138,138,.12);
+  border-color: rgba(138,138,138,.25);
+}
+.status-badge--active {
+  color: var(--ms-gold-light);
+  background: var(--ms-gold-glow);
+  border-color: rgba(199,165,82,.35);
+}
+.status-badge--finished {
+  color: var(--ms-text-dim);
+  background: rgba(217,210,193,.08);
+  border-color: rgba(217,210,193,.18);
+}
+.status-badge--live {
+  color: #fff;
+  background: var(--ms-live);
+  border-color: var(--ms-live-bright);
+}
+.status-badge--live .status-badge__dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #fff;
+  animation: ms-live-pulse 1.8s var(--ms-ease-standard) infinite;
+}
+
+/* Restrained corner-cut accent — opt-in via this class, not a global
+   card treatment. See --ms-cut-sm/-lg in :root for the geometry. */
+.ms-cut-accent {
+  clip-path: var(--ms-cut-sm);
+}
+.ms-cut-accent--lg {
+  clip-path: var(--ms-cut-lg);
+}
+
 /* Base */
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -85,27 +247,32 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-5 {
 }
 
 /* ── Brand mark ──────────────────────────────────────────────── */
+/* Holds the club shield badge (app/static/img/mafia-style-badge.png —
+   the same asset the broadcast overlay already uses, see
+   broadcast-scenes.css .bc-logo-3d__mark). It's a transparent-background
+   cutout, not a filled card, so the container itself carries no
+   border/background of its own — the shield supplies its own edge. This
+   is the "one wordmark on both surfaces" bridge from the redesign plan;
+   previously the site showed a plain gold-bordered "MS" text monogram
+   while the overlay used this shield — now both do. */
 .brand-monogram {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--ms-gold);
-  border-radius: 4px;
-  font-family: 'Playfair Display', Georgia, serif;
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--ms-gold);
-  letter-spacing: 0;
   flex-shrink: 0;
+}
+.brand-monogram__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.45));
 }
 
 .brand-monogram-lg {
   width: 64px;
   height: 64px;
-  font-size: 1.75rem;
-  border-width: 1.5px;
 }
 
 .brand-wordmark {

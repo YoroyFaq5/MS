@@ -13,17 +13,12 @@ ChartDataService
 from __future__ import annotations
 
 from collections import Counter
-from typing import Dict, List
+from typing import List
 
 from app import db
 from app.models import Game, GameSlot, WinSide
+from app.labels import ROLE_LABELS
 
-ROLE_LABELS: Dict[str, str] = {
-    "civilian": "Мирный",
-    "sheriff": "Шериф",
-    "mafia": "Мафия",
-    "don": "Дон",
-}
 ROLE_ORDER = ["civilian", "sheriff", "mafia", "don"]
 
 

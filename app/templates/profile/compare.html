@@ -2,7 +2,7 @@
 {% from "_macros.html" import player_name %}
 {% block title %}Сравнение игроков{% endblock %}
 
-{% set ROLE_LABELS = {'civilian': 'Мирный', 'mafia': 'Мафия', 'don': 'Дон', 'sheriff': 'Шериф'} %}
+{% set ROLE_LABELS = role_labels %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
