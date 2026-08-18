@@ -118,7 +118,13 @@
         {% if tournament.participants %}
         <div class="d-flex flex-wrap gap-2 p-3">
           {% for p in tournament.participants %}
+          {% if p.is_eliminated %}
+          <span class="badge bg-body-secondary text-muted border text-decoration-line-through" title="Отсечён">
+            <i class="bi bi-scissors me-1"></i>{{ player_name(p.player, equipped_bulk.get(p.player_id, {})) if p.player else '—' }}
+          </span>
+          {% else %}
           <span class="badge bg-body-secondary text-body border">{{ player_name(p.player, equipped_bulk.get(p.player_id, {})) if p.player else '—' }}</span>
+          {% endif %}
           {% endfor %}
         </div>
         {% else %}
@@ -140,6 +146,29 @@
       </div>
       {% endif %}
     </div>
+
+    {% if tournament.status != 'finished' and current_user.is_authenticated and current_user.is_admin %}
+    <div class="card mb-3 border-warning">
+      <div class="card-header fw-semibold"><i class="bi bi-scissors me-2"></i>Отсечь до топ-N</div>
+      <div class="card-body">
+        <p class="text-muted small">
+          По текущему общему рейтингу — топ-N остаются в игре, остальные
+          помечаются отсечёнными и пропадают из выбора игроков для рассадки
+          будущих серий. Коэффициент на новую (более "дорогую") серию
+          настраивается отдельно при её создании. Безопасно запускать
+          повторно — пересчитывает заново по текущим очкам.
+        </p>
+        <form method="POST" action="{{ url_for('series_tournaments.cut_participants', series_tournament_id=series_tournament.id) }}"
+              class="d-flex gap-2"
+              data-confirm="Отсечь по текущему рейтингу? Игроки вне топ-N будут исключены из будущих серий."
+              data-confirm-tone="danger">
+          <input type="number" name="cutoff_size" class="form-control" value="{{ tournament.cutoff_size }}" min="1"
+                 title="Сколько игроков остаётся">
+          <button type="submit" class="btn btn-warning text-dark text-nowrap px-3">Отсечь</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
 
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">

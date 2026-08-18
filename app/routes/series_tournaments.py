@@ -10,7 +10,7 @@ TournamentService. Там, где действие уже существует �
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 
 from app import db
-from app.models import Player, TournamentSeries, TournamentType, Team
+from app.models import Player, TournamentSeries, TournamentType, Team, TournamentParticipant
 from app.services import SeriesTournamentService, TournamentService, RatingService
 from app.services.rating_service import RoleTournamentStats
 from app.services.shop_service import ShopService
@@ -82,6 +82,16 @@ def series_tournament_detail(series_tournament_id: int):
     )
 
 
+@series_tournaments_bp.route("/<int:series_tournament_id>/cut", methods=["POST"])
+@admin_required
+def cut_participants(series_tournament_id: int):
+    _get_series_tournament_or_404(series_tournament_id)
+    cutoff_size = request.form.get("cutoff_size", type=int)
+    result = SeriesTournamentService.cut_participants(series_tournament_id, cutoff_size=cutoff_size)
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("series_tournaments.series_tournament_detail", series_tournament_id=series_tournament_id))
+
+
 # ── Серии ──────────────────────────────────────────────────────────────────────
 
 @series_tournaments_bp.route("/<int:series_tournament_id>/series/new", methods=["GET", "POST"])
@@ -100,8 +110,10 @@ def new_series(series_tournament_id: int):
                 flash("Неверный формат даты.", "danger")
                 return redirect(url_for("series_tournaments.new_series", series_tournament_id=series_tournament_id))
 
+        score_multiplier = request.form.get("score_multiplier", default=1.0, type=float) or 1.0
         result = SeriesTournamentService.add_series(
             series_tournament_id, name=request.form.get("name", ""), series_date=series_date,
+            score_multiplier=score_multiplier,
         )
         flash(result.message, "success" if result.ok else "danger")
         if result.ok:
@@ -124,10 +136,17 @@ def series_detail(series_tournament_id: int, series_id: int):
     leaderboard = SeriesTournamentService.get_series_leaderboard(series_id)
     games = sorted(series.stage.games, key=lambda g: g.played_at, reverse=True) if series.stage else []
 
+    # Cut participants (see SeriesTournamentService.cut_participants) are
+    # left out of every seating/roster picker on this page entirely —
+    # simplest way to make sure they can't accidentally get seated in a
+    # future series, including the confirmed_player_ids one-click button
+    # below (that list is filtered against this same set).
     tournament_players = sorted(
-        (p.player for p in st.tournament.participants if p.player),
+        (p.player for p in st.tournament.participants if p.player and not p.is_eliminated),
         key=lambda pl: pl.name,
     )
+    tournament_player_ids = {p.id for p in tournament_players}
+    cut_count = sum(1 for p in st.tournament.participants if p.is_eliminated)
 
     equipped_bulk = ShopService.get_equipped_bulk(
         [r.player_id for r in leaderboard] + [p.id for p in tournament_players]
@@ -151,6 +170,8 @@ def series_detail(series_tournament_id: int, series_id: int):
         leaderboard=leaderboard,
         games=games,
         tournament_players=tournament_players,
+        tournament_player_ids=tournament_player_ids,
+        cut_count=cut_count,
         equipped_bulk=equipped_bulk,
         superlatives=superlatives,
     )
@@ -236,6 +257,23 @@ def generate_series_seating(series_id: int):
         player_ids = request.form.getlist("player_ids", type=int)
         if len(player_ids) < 10:
             flash(f"Нужно выбрать минимум 10 игроков. Выбрано: {len(player_ids)}.", "danger")
+            return redirect(url_for(
+                "series_tournaments.series_detail",
+                series_tournament_id=series.series_tournament_id, series_id=series_id,
+            ))
+        # Belt-and-suspenders — the checkbox grid already excludes cut
+        # players (see series_detail.html), but a resubmitted/stale form
+        # shouldn't be able to seat them anyway.
+        cut_ids = {
+            p.player_id for p in
+            db.session.query(TournamentParticipant).filter(
+                TournamentParticipant.tournament_id == series.series_tournament.tournament_id,
+                TournamentParticipant.player_id.in_(player_ids),
+                TournamentParticipant.is_eliminated == True,
+            ).all()
+        }
+        if cut_ids:
+            flash("Среди выбранных есть отсечённые игроки — уберите их и повторите.", "danger")
             return redirect(url_for(
                 "series_tournaments.series_detail",
                 series_tournament_id=series.series_tournament_id, series_id=series_id,

@@ -20,9 +20,15 @@
                    placeholder="Серия 1 — 12 июля" required autofocus>
           </div>
 
-          <div class="mb-4">
+          <div class="mb-3">
             <label class="form-label fw-medium">Дата игрового вечера</label>
             <input type="date" name="series_date" class="form-control">
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-medium">Коэффициент очков <span class="text-muted small">(необязательно)</span></label>
+            <input type="number" name="score_multiplier" class="form-control" value="1" step="0.1" min="0.1">
+            <div class="form-text">Очки за игры этой серии умножаются на коэффициент. 1 — без изменений; нужно не в каждом турнире (например, для финальной серии после отсева).</div>
           </div>
 
           <div class="d-flex gap-2">

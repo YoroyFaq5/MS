@@ -30,7 +30,7 @@ from app import db
 from app.models import (
     Tournament, TournamentType, StageType,
     SeriesTournament, TournamentSeries, SeriesStatus,
-    Game, GameSlot,
+    Game, GameSlot, TournamentParticipant,
 )
 from app.services.tournament_service import TournamentService
 
@@ -141,15 +141,19 @@ class SeriesTournamentService:
     @staticmethod
     def add_series(
         series_tournament_id: int, name: str, series_date: Optional[date_type] = None,
+        score_multiplier: float = 1.0,
     ) -> SeriesResult:
         st = db.session.get(SeriesTournament, series_tournament_id)
         if not st:
             return SeriesResult.fail("Серийный турнир не найден.")
         if not name or not name.strip():
             return SeriesResult.fail("Название серии обязательно.")
+        if score_multiplier <= 0:
+            return SeriesResult.fail("Коэффициент очков должен быть положительным числом.")
 
         stage_result = TournamentService.add_stage(
             st.tournament_id, name=name.strip(), stage_type=StageType.GROUP,
+            score_multiplier=score_multiplier,
         )
         if not stage_result.ok:
             return SeriesResult.fail(stage_result.message)
@@ -227,6 +231,61 @@ class SeriesTournamentService:
         db.session.commit()
         logger.info(f"Series cancelled: {series.name!r} (id={series.id})")
         return SeriesResult.success(f"Серия «{series.name}» отменена.", data=series)
+
+    @staticmethod
+    def cut_participants(series_tournament_id: int, cutoff_size: Optional[int] = None) -> SeriesResult:
+        """
+        "Отсечь до топ-N" for a series tournament — the equivalent of the
+        generic bracket's run_cutoff, but there's no elimination-bracket
+        stage chain here to advance into: series are independent, always-
+        summed evenings, so cutting just means "stop offering these
+        players in the seating picker for future series" from now on.
+
+        Ranks by the current get_overall_leaderboard (same numbers already
+        shown on the series-tournament page), marks everyone outside the
+        top `cutoff_size` as TournamentParticipant.is_eliminated=True.
+        is_eliminated is otherwise unused anywhere in the tournament stack
+        (the generic bracket's own run_cutoff only ever touches
+        advanced_to_final, never is_eliminated) — safe to repurpose here
+        without colliding with that code path. generate_series_seating
+        excludes is_eliminated participants from the pickable pool.
+
+        Idempotent/re-runnable: always recomputed from current standings,
+        not additive — re-running after another series adjusts the line
+        (including un-cutting someone whose ranking recovered), it never
+        just piles more cuts on top of old ones.
+        """
+        st = db.session.get(SeriesTournament, series_tournament_id)
+        if not st:
+            return SeriesResult.fail("Серийный турнир не найден.")
+
+        tournament = st.tournament
+        if cutoff_size is not None:
+            if cutoff_size <= 0:
+                return SeriesResult.fail("Число проходящих должно быть положительным.")
+            tournament.cutoff_size = cutoff_size
+        n = tournament.cutoff_size
+
+        overall = SeriesTournamentService.get_overall_leaderboard(series_tournament_id)
+        if not overall:
+            return SeriesResult.fail("Нет данных для отсева — сыграйте хотя бы одну серию.")
+
+        advancing_ids = {e.player_id for e in overall[:n]}
+        cut_count = 0
+        for part in tournament.participants:
+            part.is_eliminated = part.player_id not in advancing_ids
+            if part.is_eliminated:
+                cut_count += 1
+        db.session.commit()
+
+        logger.info(
+            f"Series-tournament cut applied for series_tournament#{st.id}: "
+            f"{len(advancing_ids)} advance, {cut_count} cut."
+        )
+        return SeriesResult.success(
+            f"Отсев выполнен. В игре остаются {len(advancing_ids)} игроков, отсечено {cut_count}.",
+            data={"advancing_player_ids": sorted(advancing_ids)},
+        )
 
     # ── Лидерборды ─────────────────────────────────────────────────────────────
 
