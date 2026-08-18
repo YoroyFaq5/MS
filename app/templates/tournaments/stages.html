@@ -173,6 +173,42 @@
 </div>
 {% endfor %}
 
+{% if tournament.status == 'active' and current_user.is_authenticated and current_user.is_admin and not series_tournament_id %}
+<div class="card mb-4 border-warning">
+  <div class="card-header fw-semibold">🚀 Начать новый этап (задним числом / прямо сейчас)</div>
+  <div class="card-body">
+    <p class="text-muted small">
+      Одно действие вместо нескольких: если у турнира ещё вообще не было этапов —
+      все уже сыгранные игры сначала автоматически отнесутся к «текущему» этапу
+      (чтобы cutoff увидел их результаты), затем создастся новый этап с указанным
+      коэффициентом, и cutoff запустится сразу. Если этапы уже есть — просто
+      добавит новый после последнего и запустит cutoff в него, как обычно.
+    </p>
+    <form method="POST" action="{{ url_for('tournaments.start_new_stage_retroactive', tournament_id=tournament.id) }}"
+          class="row g-3"
+          data-confirm="Начать новый этап? Топ-N игроков (по текущим очкам) пройдут в него, остальные будут отсечены."
+          data-confirm-tone="danger">
+      <div class="col-md-4">
+        <input type="text" name="name" class="form-control" placeholder="Название нового этапа (напр. Финал)" required>
+      </div>
+      <div class="col-md-3">
+        <input type="number" name="score_multiplier" class="form-control" value="1" step="0.1" min="0.1"
+               title="Коэффициент очков за игры нового этапа (1 = без изменений)">
+        <div class="form-text">Коэффициент</div>
+      </div>
+      <div class="col-md-3">
+        <input type="number" name="cutoff_size" class="form-control" value="{{ tournament.cutoff_size }}" min="1"
+               title="Сколько игроков проходит в новый этап">
+        <div class="form-text">Проходят (топ-N)</div>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-warning text-dark w-100 fw-semibold">Начать этап</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 {% if tournament.status == 'active' and current_user.is_authenticated and current_user.is_admin %}
 <div class="card">
   <div class="card-header fw-semibold">➕ Добавить этап</div>

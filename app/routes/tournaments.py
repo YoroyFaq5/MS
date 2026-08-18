@@ -360,6 +360,25 @@ def add_stage(tournament_id: int):
     return redirect(url_for("tournaments.stages", tournament_id=tournament_id))
 
 
+@tournaments_bp.route("/<int:tournament_id>/stages/start-new", methods=["POST"])
+@admin_required
+def start_new_stage_retroactive(tournament_id: int):
+    if _get_series_tournament_id(tournament_id):
+        flash(_SERIES_ACTION_BLOCKED_MSG, "danger")
+        return redirect(url_for("tournaments.stages", tournament_id=tournament_id))
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Название нового этапа обязательно.", "danger")
+        return redirect(url_for("tournaments.stages", tournament_id=tournament_id))
+    score_multiplier = request.form.get("score_multiplier", default=1.0, type=float) or 1.0
+    cutoff_size = request.form.get("cutoff_size", type=int)
+    result = TournamentService.start_new_stage_retroactive(
+        tournament_id, name, score_multiplier=score_multiplier, cutoff_size=cutoff_size,
+    )
+    flash(result.message, "success" if result.ok else "danger")
+    return redirect(url_for("tournaments.stages", tournament_id=tournament_id))
+
+
 @tournaments_bp.route("/stages/<int:stage_id>/edit", methods=["POST"])
 @admin_required
 def edit_stage(stage_id: int):

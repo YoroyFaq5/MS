@@ -497,6 +497,94 @@ class TournamentService:
             },
         )
 
+    @staticmethod
+    def start_new_stage_retroactive(
+        tournament_id: int,
+        name: str,
+        score_multiplier: float = 1.0,
+        cutoff_size: Optional[int] = None,
+    ) -> ServiceResult:
+        """
+        One-click "start a new stage now" for a tournament that wasn't set
+        up with stages/cutoff from the start — the situation add_stage +
+        run_cutoff alone can't handle, since run_cutoff ranks players from
+        whichever games are already linked to a stage (Game.stage_id), and
+        a tournament that never had stages has every game played so far
+        sitting at stage_id=NULL.
+
+        What this does, in one action:
+        1. Turns on has_stages if it wasn't (add_stage requires it).
+        2. Optionally updates tournament.cutoff_size (there's no other way
+           to change it after creation).
+        3. Finds the "current" stage — the latest by `order`, or creates an
+           implicit one (name "Этап 1", order 0) if none exist yet.
+        4. Sweeps every already-finished game of this tournament that has
+           no stage (stage_id IS NULL) into that current stage, so its
+           results actually count towards the cutoff ranking. Only touches
+           NULL-stage games — never re-parents a game that's already
+           assigned to some other stage.
+        5. Adds the new stage (the one the admin actually wants to start)
+           right after it, with the given score_multiplier.
+        6. Runs the cutoff from the current stage into the new one —
+           exactly the existing run_cutoff, reused as-is.
+
+        Idempotent-ish: safe to call again later (a second call just finds
+        the previous "new" stage as the new "current" one and starts
+        another stage after it — chaining group -> semi -> final still
+        works the same way run_cutoff already supports).
+        """
+        t = db.session.get(Tournament, tournament_id)
+        if not t:
+            return ServiceResult.fail("Турнир не найден.")
+        if t.status == "finished":
+            return ServiceResult.fail("Турнир уже завершён.")
+        if score_multiplier <= 0:
+            return ServiceResult.fail("Коэффициент очков должен быть положительным числом.")
+        if cutoff_size is not None and cutoff_size <= 0:
+            return ServiceResult.fail("Число проходящих должно быть положительным.")
+
+        if not t.has_stages:
+            t.has_stages = True
+        if cutoff_size is not None:
+            t.cutoff_size = cutoff_size
+        db.session.commit()
+
+        sorted_stages = sorted(t.stages, key=lambda s: s.order)
+        current_stage = sorted_stages[-1] if sorted_stages else None
+
+        if current_stage is None:
+            current_stage = TournamentStage(
+                tournament_id=t.id, name="Этап 1", order=0,
+                type=StageType.GROUP, status="active", score_multiplier=1.0,
+            )
+            db.session.add(current_stage)
+            db.session.commit()
+
+        backfilled = (
+            db.session.query(Game)
+            .filter(
+                Game.tournament_id == t.id,
+                Game.stage_id.is_(None),
+                Game.is_finished == True,
+            )
+            .update({"stage_id": current_stage.id}, synchronize_session=False)
+        )
+        db.session.commit()
+
+        add_result = TournamentService.add_stage(
+            t.id, name, StageType.MAIN, order=current_stage.order + 1,
+            score_multiplier=score_multiplier,
+        )
+        if not add_result.ok:
+            return add_result
+
+        cutoff_result = TournamentService.run_cutoff(current_stage.id)
+        if not cutoff_result.ok:
+            return cutoff_result
+
+        prefix = f"Прошлые игры без этапа ({backfilled}) отнесены к «{current_stage.name}». " if backfilled else ""
+        return ServiceResult.success(prefix + cutoff_result.message, data=cutoff_result.data)
+
     # ── Game linkage ──────────────────────────────────────────────────────────
 
     @staticmethod
