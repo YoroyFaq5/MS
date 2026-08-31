@@ -27,8 +27,8 @@ from app.models import GG, Player, Season
 logger = logging.getLogger(__name__)
 
 MIN_REASON_LENGTH = 10
-MAX_SINGLE_GG_VALUE = 50.0          # one entry cannot exceed this magnitude
-DAILY_ADMIN_GG_CAP = 200.0          # total |value| an admin can grant per day
+MAX_SINGLE_GG_VALUE = 50000.0          # one entry cannot exceed this magnitude
+DAILY_ADMIN_GG_CAP = 200000.0          # total |value| an admin can grant per day
 
 
 @dataclass
