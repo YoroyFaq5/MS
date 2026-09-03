@@ -349,7 +349,7 @@
 
   {% if featured %}
   {% set t = featured %}
-  <a href="{{ url_for('tournaments.tournament_detail', tournament_id=t.id) }}" class="tourney-featured fade-in-up text-decoration-none text-reset" style="--d:0ms">
+  <a href="{{ url_for('series_tournaments.series_tournament_detail', series_tournament_id=series_tournament_ids[t.id]) if series_tournament_ids.get(t.id) else url_for('tournaments.tournament_detail', tournament_id=t.id) }}" class="tourney-featured fade-in-up text-decoration-none text-reset" style="--d:0ms">
     {% if t.status == 'pending' and not series_tournament_ids.get(t.id) %}<span class="tourney-ribbon">Скоро</span>{% endif %}
     <div class="tourney-featured__crest">
       <i class="bi {{ 'bi-people-fill' if t.type.value == 'team' else 'bi-person-badge-fill' }}"></i>
@@ -417,10 +417,15 @@
       </div>
 
       <div class="tourney-card__actions">
+        {% if series_tournament_ids.get(t.id) %}
+        <a href="{{ url_for('series_tournaments.series_tournament_detail', series_tournament_id=series_tournament_ids[t.id]) }}" class="tourney-cta">Открыть турнир</a>
+        <a href="{{ url_for('series_tournaments.leaderboard', series_tournament_id=series_tournament_ids[t.id]) }}" class="tourney-cta--outline" title="Рейтинг турнира"><i class="bi bi-trophy"></i></a>
+        {% else %}
         <a href="{{ url_for('tournaments.tournament_detail', tournament_id=t.id) }}" class="tourney-cta">Открыть турнир</a>
         <a href="{{ url_for('tournaments.leaderboard', tournament_id=t.id) }}" class="tourney-cta--outline" title="Рейтинг турнира"><i class="bi bi-trophy"></i></a>
         {% if t.has_stages %}
         <a href="{{ url_for('tournaments.stages', tournament_id=t.id) }}" class="tourney-cta--outline" title="Этапы"><i class="bi bi-diagram-3"></i></a>
+        {% endif %}
         {% endif %}
       </div>
 

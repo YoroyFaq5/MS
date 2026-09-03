@@ -70,7 +70,11 @@ def index():
         from app.services.season_rating_engine import SeasonRatingEngine
         from app.models import Game
         cs_ratings = SeasonRatingEngine.compute_season_ratings(current_season.id)
-        current_season_leader = cs_ratings[0] if cs_ratings else None
+        # rank == 1 specifically (not just index 0) — if nobody has met the
+        # top-5 games-played floor yet, cs_ratings[0] would be the highest
+        # RAW score below that floor (rank 6+), which must not be shown as
+        # "leading" the season (same rule as who can win it — see task 1).
+        current_season_leader = next((r for r in cs_ratings if r.rank == 1), None)
         current_season_games_count = (
             db.session.query(Game)
             .filter(Game.season_id == current_season.id, Game.is_finished == True)
@@ -128,7 +132,7 @@ def index():
 def detail(season_id: int):
     season = db.session.get(Season, season_id) or abort(404)
 
-    # Use SeasonRatingEngine (formula: TotalPoints * WR% + GG * 0.2)
+    # Use SeasonRatingEngine (formula: TotalPoints * WR% + GG * season.gg_weight)
     from app.services.season_rating_engine import SeasonRatingEngine
     from app.services.gg_service import GGService
     ratings = SeasonRatingEngine.compute_season_ratings(season_id)
@@ -179,6 +183,7 @@ def detail(season_id: int):
         season_nominations=season_nominations,
         equipped_bulk=equipped_bulk,
         avatars=avatars,
+        min_games_for_top5=SeasonRatingEngine.MIN_GAMES_FOR_TOP5,
     )
 
 

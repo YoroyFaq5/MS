@@ -445,6 +445,20 @@ class TournamentParticipant(db.Model):
     is_eliminated = Column(Boolean, default=False, nullable=False)
     seed = Column(Integer, nullable=True)  # tournament seeding
 
+    # Происхождение регистрации — НЕ NULL означает "эта строка была
+    # автоматически добавлена SeasonService._sync_year_tournament_participants
+    # как квалификант «Стола года» через сезон с этим id" (см.
+    # SeasonService.compute_year_qualifiers). NULL — обычная регистрация:
+    # вручную через tournaments.add_participant, либо неявно через
+    # games.py::_ensure_tournament_participants (игрок появился в игре
+    # турнира). Различие нужно только для «Стола года»: повторная
+    # синхронизация может безопасно удалить/заменить УСТАРЕВШУЮ авто-строку
+    # (её player_id указывает сюда), но никогда не трогает строку с NULL —
+    # та считается ручной и переживает любой пересчёт квалификантов.
+    qualified_via_season_id = Column(
+        Integer, ForeignKey("seasons.id", ondelete="SET NULL"), nullable=True
+    )
+
     registered_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -454,6 +468,7 @@ class TournamentParticipant(db.Model):
     tournament = relationship("Tournament", back_populates="participants")
     player = relationship("Player", back_populates="tournament_participations")
     team = relationship("Team", back_populates="participations")
+    qualified_via_season = relationship("Season", foreign_keys=[qualified_via_season_id])
 
     __table_args__ = (
         UniqueConstraint("tournament_id", "player_id", name="uq_tournament_participant"),
@@ -480,6 +495,7 @@ class TournamentParticipant(db.Model):
             "is_eliminated": self.is_eliminated,
             "seed": self.seed,
             "meta": self.meta,
+            "qualified_via_season_id": self.qualified_via_season_id,
         }
 
 
@@ -864,6 +880,15 @@ class Season(db.Model):
         Integer, ForeignKey("tournaments.id", ondelete="SET NULL"), nullable=True
     )
 
+    # Вес GG-бонуса в формуле сезонного рейтинга (SeasonRating = TotalPoints*WR%
+    # + GG*gg_weight), зафиксированный НА МОМЕНТ СОЗДАНИЯ сезона — см.
+    # SeasonService.ensure_year_exists (новые сезоны — 0.1) и миграцию
+    # migrate_season_gg_weight.py (все существующие на момент миграции сезоны
+    # навсегда остаются на 0.2). Хранится на самой записи, а не выводится из
+    # даты/номера сезона в момент расчёта — иначе смена коэффициента "на
+    # будущее" задним числом пересчитала бы уже закрытые сезоны.
+    gg_weight = Column(Float, nullable=False, default=0.2, server_default="0.2")
+
     winner  = relationship("Player", foreign_keys=[winner_player_id])
     games   = relationship("Game",   back_populates="season", foreign_keys="Game.season_id")
 
@@ -895,6 +920,7 @@ class Season(db.Model):
             "winner_player_id": self.winner_player_id,
             "winner_score":     self.winner_score,
             "winner_name":  self.winner.display_name if self.winner else None,
+            "gg_weight":    self.gg_weight,
         }
 
 

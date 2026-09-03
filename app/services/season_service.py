@@ -9,15 +9,25 @@ Business rules (immutable):
 - Seasons are NEVER created manually — only via ensure_year_exists().
 - A game is auto-assigned to a season by its played_at date.
 - Season is closed automatically once its period ends.
-- Winner = player with highest season_rating (TotalPoints*WR% + GG*0.2) in that season.
-- Tie → status = WAITING_TIEBREAK → admin picks manually.
+- Winner = player with highest season_rating (TotalPoints*WR% + GG*gg_weight,
+  gg_weight fixed per-season on Season.gg_weight — see SeasonRatingEngine and
+  NEW_SEASON_GG_WEIGHT below) in that season — but only among players who
+  actually occupy a top-5 place (>= SeasonRatingEngine.MIN_GAMES_FOR_TOP5
+  ranked games this season); a season can close with no winner at all if
+  nobody meets that floor.
+- Tie → status = WAITING_TIEBREAK → admin picks manually (same top-5/min-games
+  restriction applies to who can be picked).
 - TOP-2 of each finished season auto-qualify into "Стол года <year>" (TOP-1
-  only for the Nov–Dec season — see NOVEMBER_DECEMBER_SEASON_NUMBER) — but a
-  player only ever qualifies once per year: if already qualified via an
-  earlier-numbered season, the next unique player in that season's rating
-  takes the slot instead (see compute_year_qualifiers).
+  only for the Nov–Dec season — see NOVEMBER_DECEMBER_SEASON_NUMBER), drawn
+  only from players who occupy that season's top-5 — but a player only ever
+  qualifies once per year: if already qualified via an earlier-numbered
+  season, the next unique eligible player in that season's rating takes the
+  slot instead (see compute_year_qualifiers).
 - Year-end tournament participant list is (re)synced every time a season
-  closes and can also be rebuilt on demand via create_year_tournament().
+  closes and can also be rebuilt on demand via create_year_tournament() —
+  but only while that tournament is still "pending"; once it's active/
+  finished, composition is never changed silently (see
+  _sync_year_tournament_participants).
 """
 from __future__ import annotations
 
@@ -61,6 +71,16 @@ YEAR_TOURNAMENT_NAME_TEMPLATE = "Стол года {year}"
 # Сезон №6 (Ноябрь–Декабрь, см. SEASON_PERIODS) — особый случай квалификации
 # в «Стол года»: только 1 слот вместо 2. Остальные 5 сезонов — по 2 слота.
 NOVEMBER_DECEMBER_SEASON_NUMBER = 6
+
+# Вес GG в формуле сезонного рейтинга для НОВЫХ сезонов (см. Season.gg_weight
+# и SeasonRatingEngine). Существующие на момент введения этого поля сезоны
+# зафиксированы на 0.2 миграцией (migrate_season_gg_weight.py) и никогда не
+# меняются задним числом — это значение применяется только к сезонам,
+# создаваемым ensure_year_exists() отсюда и далее. Коэффициент фиксируется
+# на самой записи Season в момент создания, а не выводится из даты/номера
+# сезона при каждом расчёте — так что смена этой константы в будущем влияет
+# только на ещё не созданные сезоны.
+NEW_SEASON_GG_WEIGHT = 0.1
 
 
 def _qualifier_slots_for_season(season_number: int) -> int:
@@ -134,6 +154,18 @@ class SeasonResult:
         return cls(ok=False, message=msg)
 
 
+@dataclass
+class YearSyncResult:
+    """Result of SeasonService._sync_year_tournament_participants — see its
+    docstring. `warning` is set (and the tournament's participants are left
+    untouched) exactly when the year tournament is no longer 'pending' and
+    its composition would otherwise have needed to change."""
+    tournament: Tournament
+    added: List[str]
+    removed: List[str]
+    warning: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # SeasonService
 # ---------------------------------------------------------------------------
@@ -176,6 +208,7 @@ class SeasonService:
                 starts_at=starts_at,
                 ends_at=ends_at,
                 status=status,
+                gg_weight=NEW_SEASON_GG_WEIGHT,
             )
             db.session.add(s)
             seasons.append(s)
@@ -239,21 +272,35 @@ class SeasonService:
 
     @staticmethod
     def _close_season(season: Season) -> SeasonResult:
-        """Determine winner and transition season to FINISHED or WAITING_TIEBREAK."""
+        """Determine winner and transition season to FINISHED or WAITING_TIEBREAK.
+
+        Winner must actually occupy a top-5 place (see SeasonRatingEngine —
+        requires >= MIN_GAMES_FOR_TOP5 ranked games this season). If nobody
+        in the season met that floor, the season closes with no winner,
+        exactly like the "no games played" case — a season can end without
+        crowning anyone.
+        """
         from app.services.rating_service import RatingService
+        from app.services.season_rating_engine import SeasonRatingEngine
 
         ratings = RatingService.get_season_rating(season.id)
+        top5 = SeasonRatingEngine.top5_entries(ratings)
 
-        if not ratings:
-            # No games played — mark finished with no winner
+        if not top5:
+            # No games played, or nobody met the top-5 games-played floor —
+            # mark finished with no winner either way.
             season.status = SeasonStatus.FINISHED
             db.session.commit()
-            return SeasonResult.success(
-                f"{season.name}: нет игр, завершён без победителя.", data=season
+            msg = (
+                f"{season.name}: нет игр, завершён без победителя."
+                if not ratings else
+                f"{season.name}: ни один игрок не набрал минимум "
+                f"{SeasonRatingEngine.MIN_GAMES_FOR_TOP5} игр — завершён без победителя."
             )
+            return SeasonResult.success(msg, data=season)
 
-        top_score = ratings[0].season_rating
-        leaders   = [r for r in ratings if r.season_rating == top_score]
+        top_score = top5[0].season_rating
+        leaders   = [r for r in top5 if r.season_rating == top_score]
 
         if len(leaders) == 1:
             winner = leaders[0]
@@ -327,11 +374,18 @@ class SeasonService:
             return SeasonResult.fail("Игрок не найден.")
 
         from app.services.rating_service import RatingService
+        from app.services.season_rating_engine import SeasonRatingEngine
         ratings = RatingService.get_season_rating(season_id)
         player_rating = next((r for r in ratings if r.player_id == winner_player_id), None)
         if not player_rating:
             return SeasonResult.fail(
                 f"Игрок «{player.display_name}» не участвовал в этом сезоне."
+            )
+        if player_rating.rank > SeasonRatingEngine.TOP5_SLOTS:
+            return SeasonResult.fail(
+                f"«{player.display_name}» сыграл(а) {player_rating.games_played} игр(ы) "
+                f"в этом сезоне — минимум {SeasonRatingEngine.MIN_GAMES_FOR_TOP5} требуется, "
+                f"чтобы претендовать на победу."
             )
 
         season.status           = SeasonStatus.FINISHED
@@ -384,17 +438,23 @@ class SeasonService:
         - неактивные (soft-deleted) игроки в квалификацию не допускаются —
           тот же флаг Player.is_active, что уже используется в
           TournamentService.register_participant;
+        - кандидат обязан реально занимать место 1-5 сезона (см. задачу про
+          минимум 8 игр — SeasonRatingEngine.MIN_GAMES_FOR_TOP5); игрок,
+          которого правило top-5 отодвинуло на ранг 6+, кандидатом не
+          считается, даже если его season_rating выше, чем у пятого места;
         - если подходящих кандидатов в сезоне меньше N — берётся сколько есть.
 
         Чистая функция чтения (ничего не пишет в БД). Расчёт рейтинга сезона
         не дублируется — переиспользуется RatingService.get_season_rating()
-        (= SeasonRatingEngine), эта функция только выбирает из готового
-        рейтинга нужных кандидатов.
+        (= SeasonRatingEngine), эта функция только выбирает из готового,
+        уже отсортированного по месту (rank 1..N по возрастанию) рейтинга
+        нужных кандидатов.
 
         Возвращает список (Season, [SeasonRatingEntry, ...]) по всем
         рассмотренным сезонам, в порядке номера сезона.
         """
         from app.services.rating_service import RatingService
+        from app.services.season_rating_engine import SeasonRatingEngine
 
         seasons = (
             db.session.query(Season)
@@ -414,14 +474,14 @@ class SeasonService:
 
         for season in seasons:
             ratings = RatingService.get_season_rating(season.id)
-            # Вторичная сортировка по player_id — только для детерминированного
-            # выбора кандидатов при равенстве очков; исходный список/rank
-            # (используемый для отображения рейтинга) не изменяется.
-            ordered = sorted(ratings, key=lambda e: (-e.season_rating, e.player_id))
+            # top5_entries — уже отсортированы по rank (1..N, N<=5), тот же
+            # детерминированный порядок при равенстве очков (по player_id),
+            # что использует сам SeasonRatingEngine для присвоения rank.
+            candidates = SeasonRatingEngine.top5_entries(ratings)
 
             slots = _qualifier_slots_for_season(season.number)
             picks = []
-            for entry in ordered:
+            for entry in candidates:
                 if entry.player_id in qualified or entry.player_id not in active_ids:
                     continue
                 picks.append(entry)
@@ -434,47 +494,107 @@ class SeasonService:
         return result
 
     @staticmethod
-    def _sync_year_tournament_participants(year: int) -> Tuple[Tournament, List[str]]:
+    def _sync_year_tournament_participants(year: int) -> "YearSyncResult":
         """
         Пересчитывает квалификантов «Стола года» по всем завершённым сезонам
-        года (compute_year_qualifiers) и добавляет недостающих участников.
+        года (compute_year_qualifiers) и приводит состав турнира ТОЧНО к
+        этому набору — не только добавляет недостающих, но и убирает
+        устаревших автоматических квалификантов (например, если сезоны
+        закрылись не по порядку и пересчёт отдал чей-то слот игроку с
+        приоритетом более раннего сезона).
 
-        Идемпотентно и безопасно вызывать многократно, в любой момент и в
-        любом порядке закрытия сезонов — уже зарегистрированные участники
-        никогда не удаляются, только добавляются недостающие (если более
-        ранний сезон закрывается позже более позднего, второй слот позднего
-        сезона мог быть временно занят игроком, который по приоритету должен
-        был пройти через более ранний сезон — но т.к. TournamentParticipant
-        не хранит «через какой сезон» игрок квалифицировался, а полный
-        пересчёт всегда добавляет недостающих, итоговый набор всегда
-        сходится к корректному без необходимости удалений).
+        Различие "автоматический / ручной" участник — TournamentParticipant.
+        qualified_via_season_id: НЕ NULL значит "эту строку добавила именно
+        эта функция, как квалификанта через сезон с этим id" — только такие
+        строки может удалить повторная синхронизация. Участник с
+        qualified_via_season_id IS NULL (обычная регистрация — вручную или
+        через участие в игре турнира) НИКОГДА не удаляется и не
+        переклассифицируется здесь, даже если его player_id совпадает с
+        кем-то из актуальных квалификантов (в этом случае просто ничего не
+        делаем — он и так уже в турнире).
+
+        Идемпотентно: повторный вызов с тем же набором квалификантов не
+        создаёт дублей и не производит лишних добавлений/удалений.
+
+        Состав меняется молча ТОЛЬКО пока турнир в статусе "pending" — для
+        уже активного или завершённого «Стола года» состав никогда не
+        трогается автоматически; вместо этого возвращается предупреждение
+        (YearSyncResult.warning), которое вызывающий код обязан показать
+        администратору, а не проглотить.
         """
         qualifiers = SeasonService.compute_year_qualifiers(year)
         t = _get_or_create_year_tournament(year)
 
-        existing_ids = {
-            pid for (pid,) in
-            db.session.query(TournamentParticipant.player_id)
-            .filter_by(tournament_id=t.id).all()
-        }
-
-        added: List[str] = []
+        # desired[player_id] = id сезона, через который он квалифицировался —
+        # уникальность игрока по всему году уже гарантирована compute_year_
+        # qualifiers, так что здесь каждый player_id встречается максимум
+        # у одного сезона.
+        desired: dict[int, int] = {}
+        name_by_pid: dict[int, str] = {}
         for season, picks in qualifiers:
             if picks:
                 season.year_tournament_id = t.id
             for entry in picks:
-                if entry.player_id not in existing_ids:
-                    db.session.add(TournamentParticipant(
-                        tournament_id=t.id,
-                        player_id=entry.player_id,
-                    ))
-                    existing_ids.add(entry.player_id)
-                    added.append(entry.display_name)
+                desired[entry.player_id] = season.id
+                name_by_pid[entry.player_id] = entry.display_name
+
+        existing = (
+            db.session.query(TournamentParticipant)
+            .filter_by(tournament_id=t.id)
+            .all()
+        )
+        existing_by_pid = {p.player_id: p for p in existing}
+
+        missing_pids = [pid for pid in desired if pid not in existing_by_pid]
+        stale_auto = [
+            p for p in existing
+            if p.qualified_via_season_id is not None and p.player_id not in desired
+        ]
+
+        if t.status != "pending":
+            # Метаданные на самих Season (какой сезон "ведёт" в какой год-
+            # турнир) — не состав турнира — можно фиксировать всегда.
+            db.session.commit()
+            if missing_pids or stale_auto:
+                warning = (
+                    f"«{t.name}» уже в статусе «{t.status}» — автосинхронизация "
+                    f"состава пропущена, хотя актуальные квалификанты отличаются "
+                    f"(не хватает: {len(missing_pids)}, устарело: {len(stale_auto)}). "
+                    f"Проверьте состав вручную."
+                )
+                logger.warning(warning)
+                return YearSyncResult(tournament=t, added=[], removed=[], warning=warning)
+            return YearSyncResult(tournament=t, added=[], removed=[])
+
+        added: List[str] = []
+        removed: List[str] = []
+
+        for p in stale_auto:
+            removed.append(p.player.display_name if p.player else str(p.player_id))
+            db.session.delete(p)
+
+        for pid, season_id in desired.items():
+            row = existing_by_pid.get(pid)
+            if row is None:
+                db.session.add(TournamentParticipant(
+                    tournament_id=t.id,
+                    player_id=pid,
+                    qualified_via_season_id=season_id,
+                ))
+                added.append(name_by_pid[pid])
+            elif row.qualified_via_season_id is not None and row.qualified_via_season_id != season_id:
+                # Уже был авто-квалификантом, но через другой сезон (сезоны
+                # закрылись не по порядку) — переклассифицируем. Ручные
+                # регистрации (qualified_via_season_id is None) сюда не
+                # попадают вообще — ветка elif требует "not None".
+                row.qualified_via_season_id = season_id
 
         db.session.commit()
         if added:
             logger.info(f"Year tournament {t.name!r} synced: added {added}")
-        return t, added
+        if removed:
+            logger.info(f"Year tournament {t.name!r} synced: removed stale auto-qualifiers {removed}")
+        return YearSyncResult(tournament=t, added=added, removed=removed)
 
     @staticmethod
     def _register_winner_in_year_tournament(season: Season) -> None:
@@ -484,7 +604,10 @@ class SeasonService:
         теперь квалификация — TOP-2 на сезон с уникальностью по всему году
         (см. compute_year_qualifiers), поэтому пересчитывается весь год
         целиком, а не только этот сезон — сигнатура/точки вызова не
-        изменились, обратная совместимость сохранена.
+        изменились, обратная совместимость сохранена. Предупреждение (если
+        «Стол года» уже не pending) уже залогировано внутри sync — здесь
+        нет UI, которому можно было бы его показать (сезон закрывается сам,
+        без отдельного flash-сообщения про год-турнир).
         """
         if not season.winner_player_id:
             return
@@ -518,12 +641,17 @@ class SeasonService:
                 f"Нельзя создать «Стол года» — не разрешены ничьи: {names}."
             )
 
-        t, added = SeasonService._sync_year_tournament_participants(year)
+        sync = SeasonService._sync_year_tournament_participants(year)
+        t = sync.tournament
+
+        if sync.warning:
+            return SeasonResult.fail(sync.warning)
 
         msg = (
             f"«{t.name}» готов. "
             f"Завершено сезонов: {finished_count}/6. "
-            f"Добавлено участников: {len(added)}."
+            f"Добавлено участников: {len(sync.added)}."
+            + (f" Удалено устаревших: {len(sync.removed)}." if sync.removed else "")
         )
         return SeasonResult.success(msg, data=t)
 
@@ -554,13 +682,19 @@ class SeasonService:
 
     @staticmethod
     def get_tiebreak_candidates(season_id: int) -> list:
-        """Return top-tied players for admin tiebreak UI."""
+        """Return top-tied players for admin tiebreak UI — restricted to
+        players who actually occupy a top-5 place (>= MIN_GAMES_FOR_TOP5
+        games this season, see SeasonRatingEngine); a player below that
+        floor can never be a tiebreak candidate even if their raw score
+        happens to match the top5 leaders' score."""
         from app.services.rating_service import RatingService
+        from app.services.season_rating_engine import SeasonRatingEngine
         ratings = RatingService.get_season_rating(season_id)
-        if not ratings:
+        top5 = SeasonRatingEngine.top5_entries(ratings)
+        if not top5:
             return []
-        top = ratings[0].season_rating
-        return [r for r in ratings if r.season_rating == top]
+        top = top5[0].season_rating
+        return [r for r in top5 if r.season_rating == top]
 
     # ── Season stat panel (nominations page) ──────────────────────────────────
 

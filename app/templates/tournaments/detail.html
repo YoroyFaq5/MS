@@ -86,13 +86,18 @@
     </form>
     {% endif %}
     {% endif %}
+    {% if series_tournament_id %}
+    <a href="{{ url_for('series_tournaments.leaderboard', series_tournament_id=series_tournament_id) }}"
+       class="btn btn-outline-warning"><i class="bi bi-trophy me-1"></i>Рейтинг</a>
+    {% else %}
     <a href="{{ url_for('tournaments.leaderboard', tournament_id=tournament.id) }}"
        class="btn btn-outline-warning"><i class="bi bi-trophy me-1"></i>Рейтинг</a>
+    {% endif %}
     {% if current_user.is_authenticated and current_user.is_admin %}
     <a href="{{ url_for('overlay.overlay_control', tournament_id=tournament.id) }}"
        class="btn btn-outline-warning"><i class="bi bi-camera-reels me-1"></i>Оверлей</a>
     {% endif %}
-    {% if tournament.has_stages %}
+    {% if tournament.has_stages and not series_tournament_id %}
     <a href="{{ url_for('tournaments.stages', tournament_id=tournament.id) }}"
        class="btn btn-outline-info"><i class="bi bi-list-ol me-1"></i>Этапы</a>
     {% endif %}
@@ -184,7 +189,7 @@
                 {% else %}—{% endif %}
               </td>
               <td class="pe-3 text-end">
-                {% if tournament.status != 'active' and current_user.is_authenticated and current_user.is_admin %}
+                {% if tournament.status == 'pending' and current_user.is_authenticated and current_user.is_admin %}
                 <form method="POST" action="{{ url_for('tournaments.remove_participant', tournament_id=tournament.id, player_id=p.player_id) }}">
                   <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2">✕</button>
                 </form>
@@ -199,7 +204,7 @@
         <div class="text-center text-muted py-4">Участников нет</div>
         {% endif %}
       </div>
-      {% if tournament.status != 'finished' and available_players and current_user.is_authenticated and current_user.is_admin %}
+      {% if tournament.status == 'pending' and available_players and current_user.is_authenticated and current_user.is_admin %}
       <div class="card-footer">
         <form method="POST" action="{{ url_for('tournaments.add_participant', tournament_id=tournament.id) }}"
               class="d-flex gap-2 position-relative" id="addParticipantForm">

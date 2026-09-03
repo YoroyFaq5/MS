@@ -10,6 +10,7 @@ from app.models import Game, GameSlot, Player, Role, WinSide, Tournament, Tourna
 from app.services import RatingService
 from app.services.season_service import SeasonService
 from app.services.shop_service import ShopService
+from app.services.navigation_service import NavigationService
 from app.auth_decorators import admin_required
 from app.labels import ROLE_LABELS, WIN_SIDE_LABELS
 
@@ -259,6 +260,11 @@ def _new_game_form_context(tournaments, preselect_tournament=None, preselect_sta
         "preselect_stage": preselect_stage,
         "team_membership": team_membership,
         "team_names": team_names,
+        # Where "Назад"/cancel on this page returns to — resolved server-
+        # side from tournament_id/stage_id (never a client-supplied URL,
+        # see NavigationService), so the game-creation flow never loses its
+        # origin context on cancel or on a validation error redisplay.
+        "cancel_url": NavigationService.game_context_url(preselect_tournament, preselect_stage),
     }
 
 
@@ -583,11 +589,14 @@ def game_detail(game_id: int):
         if current_user.is_authenticated and current_user.is_admin else None
     )
 
+    back_url = NavigationService.game_context_url(game.tournament_id, game.stage_id)
+
     return render_template("games/detail.html", game=game, slots=slots,
                            roles_editable=roles_editable, edit_mode=edit_mode,
                            tournaments=tournaments,
                            equipped_bulk=equipped_bulk,
-                           external_import=external_import)
+                           external_import=external_import,
+                           back_url=back_url)
 
 
 @games_bp.route("/api/<int:game_id>")
@@ -607,13 +616,14 @@ def new_game():
     tournaments = _active_tournaments()
 
     if request.method == "POST":
-        if len(players) < TOTAL_PLAYERS:
-            flash(f"Нужно минимум {TOTAL_PLAYERS} активных игроков.", "danger")
-            return redirect(url_for("games.new_game"))
-
-        notes = request.form.get("notes", "").strip() or None
         tournament_id = request.form.get("tournament_id", type=int) or None
         stage_id = request.form.get("stage_id", type=int) or None
+
+        if len(players) < TOTAL_PLAYERS:
+            flash(f"Нужно минимум {TOTAL_PLAYERS} активных игроков.", "danger")
+            return redirect(url_for("games.new_game", tournament_id=tournament_id, stage_id=stage_id))
+
+        notes = request.form.get("notes", "").strip() or None
 
         # Дата/время игры — необязательное поле, нужно в первую очередь для
         # внесения старых игр задним числом (например, при переносе истории
@@ -932,15 +942,10 @@ def finish_game(game_id: int):
             + ("серии." if series else "турнира."),
             "info",
         )
-    if series:
-        # Ведём сразу на страницу ЭТОГО вечера серии, а не на общую
-        # страницу турнира-обёртки, откуда до неё ещё два перехода.
-        return redirect(url_for(
-            "series_tournaments.series_detail",
-            series_tournament_id=series.series_tournament_id, series_id=series.id,
-        ))
     if game.tournament_id:
-        return redirect(url_for("tournaments.tournament_detail", tournament_id=game.tournament_id))
+        # Series-aware: this evening's page if the game belongs to one,
+        # else the tournament's own (also series-aware) canonical view.
+        return redirect(NavigationService.game_context_url(game.tournament_id, game.stage_id))
     return redirect(url_for("games.game_detail", game_id=game_id))
 
 
@@ -1081,7 +1086,7 @@ def edit_game(game_id: int):
         flash("Игра обновлена — ELO, монеты и рейтинг пересчитаны.", "success")
 
     if game.tournament_id:
-        return redirect(url_for("tournaments.tournament_detail", tournament_id=game.tournament_id))
+        return redirect(NavigationService.game_context_url(game.tournament_id, game.stage_id))
     return redirect(url_for("games.game_detail", game_id=game_id))
 
 
@@ -1090,9 +1095,8 @@ def edit_game(game_id: int):
 def delete_game(game_id: int):
     game = db.session.get(Game, game_id) or abort(404)
     tournament_id = game.tournament_id
+    stage_id = game.stage_id
     db.session.delete(game)
     db.session.commit()
     flash("Игра удалена.", "info")
-    if tournament_id:
-        return redirect(url_for("tournaments.tournament_detail", tournament_id=tournament_id))
-    return redirect(url_for("games.list_games"))
+    return redirect(NavigationService.game_context_url(tournament_id, stage_id))

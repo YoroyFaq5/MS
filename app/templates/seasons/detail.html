@@ -299,7 +299,13 @@
                    class="text-decoration-none fw-semibold">{{ player_name(r, equipped_bulk.get(r.player_id, {})) }}</a>
               </div>
             </td>
-            <td class="text-center text-muted tabular-nums">{{ r.games_played }}</td>
+            <td class="text-center text-muted tabular-nums">
+              {{ r.games_played }}
+              {% if not r.meets_top5_min_games %}
+              <i class="bi bi-info-circle text-warning ms-1"
+                 title="Ещё {{ r.games_needed_for_top5 }} игр(ы) до допуска на места 1–5 (нужно минимум {{ min_games_for_top5 }})"></i>
+              {% endif %}
+            </td>
             <td class="text-center text-muted tabular-nums">{{ r.games_won }}</td>
             <td class="text-center">
               <div class="side-meter justify-content-center">

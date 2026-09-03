@@ -119,8 +119,12 @@ def nominations():
 
         from app.services.rating_service import RatingService
         season_ratings = RatingService.get_season_rating(current_season.id)
-        if season_ratings:
-            leader_entry = season_ratings[0]
+        # rank == 1 specifically — season_ratings[0] could be a player below
+        # the top-5 games-played floor (see SeasonRatingEngine), who must
+        # never be shown as "leading" the season (same rule as who can
+        # actually win it).
+        leader_entry = next((r for r in season_ratings if r.rank == 1), None)
+        if leader_entry:
             season_live_leader = {
                 "player": db.session.get(Player, leader_entry.player_id),
                 "score": round(leader_entry.season_rating, 2),

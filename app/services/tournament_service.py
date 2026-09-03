@@ -165,14 +165,27 @@ class TournamentService:
         return ServiceResult.success(f"Турнир «{t.name}» завершён.", data=t)
 
     # ── Participants ──────────────────────────────────────────────────────────
+    # Regular (manual) registration/removal is symmetric: BOTH are allowed
+    # only while the tournament is "pending". Once it's active or finished,
+    # neither is allowed here — matches the actually-played roster, teams,
+    # seating and rating already anchored to whoever was pending at start.
+    # A genuine mid-tournament substitution (if ever needed) belongs in its
+    # own explicitly-named operation that checks games already played, teams,
+    # seating and rating — not as a side effect of these generic methods.
+    # Auto-registering a player who simply shows up in a tournament game
+    # (games.py::_ensure_tournament_participants) is a separate, narrower
+    # mechanism and is unaffected by this guard.
 
     @staticmethod
     def register_participant(tournament_id: int, player_id: int) -> ServiceResult:
         t = db.session.get(Tournament, tournament_id)
         if not t:
             return ServiceResult.fail("Турнир не найден.")
-        if t.status == "finished":
-            return ServiceResult.fail("Нельзя регистрировать в завершённый турнир.")
+        if t.status != "pending":
+            return ServiceResult.fail(
+                f"Изменение состава через регистрацию доступно только для турнира "
+                f"в статусе «pending» (сейчас: «{t.status}»)."
+            )
 
         player = db.session.get(Player, player_id)
         if not player or not player.is_active:
@@ -197,8 +210,11 @@ class TournamentService:
         t = db.session.get(Tournament, tournament_id)
         if not t:
             return ServiceResult.fail("Турнир не найден.")
-        if t.status == "active":
-            return ServiceResult.fail("Нельзя удалить участника из активного турнира.")
+        if t.status != "pending":
+            return ServiceResult.fail(
+                f"Удаление участника доступно только для турнира "
+                f"в статусе «pending» (сейчас: «{t.status}»)."
+            )
 
         p = db.session.query(TournamentParticipant).filter_by(
             tournament_id=tournament_id, player_id=player_id
