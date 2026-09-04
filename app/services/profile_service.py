@@ -347,6 +347,22 @@ class ProfileService:
         )
 
     @staticmethod
+    def count_game_history(player_id: int) -> int:
+        """Total finished-game count for get_game_history's same filter —
+        lets a paginated caller (Bot API /history) compute total_pages/
+        has_next instead of the presenter guessing from a same-size-page
+        heuristic (CLAUDE_TASK_BOT_RU_GROUPS.md, п.5.5)."""
+        return (
+            db.session.query(GameSlot)
+            .join(Game)
+            .filter(
+                GameSlot.player_id == player_id,
+                Game.is_finished == True,
+            )
+            .count()
+        )
+
+    @staticmethod
     def get_economy_history(player_id: int, limit: int = 30) -> List[CoinTransaction]:
         return (
             db.session.query(CoinTransaction)

@@ -140,3 +140,128 @@ def test_gifts_cannot_send_someone_elses_inventory_item(app_ctx, client):
     assert resp.status_code >= 400
     db.session.refresh(inv)
     assert inv.player_id == owner.id, "ownership must not have changed"
+
+
+def test_history_returns_total_pages_and_has_next(app_ctx, client):
+    """CLAUDE_TASK_BOT_RU_GROUPS.md п.5.5: the bot must not have to guess
+    "is there a next page" from a same-size-page heuristic."""
+    from helpers import make_season, play_ranked_game
+
+    player = make_player("Historian")
+    _link_player(player, "555000555")
+    season = make_season()
+    for _ in range(5):
+        play_ranked_game(player, season, won=True)
+    db.session.commit()
+
+    resp = client.get(
+        "/api/v1/bot/history",
+        query_string={"telegram_id": "555000555", "page": 1, "per_page": 2},
+        headers=_auth(),
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert data["total"] == 5
+    assert data["total_pages"] == 3
+    assert data["has_next"] is True
+
+    resp_last = client.get(
+        "/api/v1/bot/history",
+        query_string={"telegram_id": "555000555", "page": 3, "per_page": 2},
+        headers=_auth(),
+    )
+    assert resp_last.get_json()["data"]["has_next"] is False
+
+
+def test_player_public_detail_includes_rating_card(app_ctx, client):
+    """Public /player <ник> group command card — rank/games/wins/win_rate,
+    never coins/bio/telegram_id (CLAUDE_TASK_BOT_RU_GROUPS.md, раздел 3)."""
+    from helpers import make_season, play_ranked_game
+
+    player = make_player("CardPlayer")
+    season = make_season()
+    play_ranked_game(player, season, won=True)
+    play_ranked_game(player, season, won=False)
+    db.session.commit()
+
+    resp = client.get(f"/api/v1/bot/players/{player.id}", headers=_auth())
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert data["display_name"] == player.display_name
+    assert data["games_played"] == 2
+    assert data["games_won"] == 1
+    assert data["rank"] is not None
+    assert "coins" not in data and "bio" not in data and "telegram_id" not in data
+
+
+def test_player_public_detail_never_played_has_zero_stats_not_404(app_ctx, client):
+    player = make_player("NeverPlayed")
+    db.session.commit()
+
+    resp = client.get(f"/api/v1/bot/players/{player.id}", headers=_auth())
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert data["games_played"] == 0
+    assert data["rank"] is None
+
+
+def test_shop_item_can_buy_true_when_affordable_and_unowned(app_ctx, client):
+    from app.models import ShopItem, ShopCategory, Rarity, CoinSourceType
+    from app.services.economy_service import EconomyService
+
+    buyer = make_player("Buyer")
+    _link_player(buyer, "555000666")
+    EconomyService.add_coins(buyer, 1000.0, "top-up", CoinSourceType.SYSTEM_BONUS, commit=True)
+    item = ShopItem(
+        name="Affordable", category=ShopCategory.PROFILE_CUSTOMIZATION, subcategory="frame",
+        rarity=Rarity.COMMON, price=10.0,
+    )
+    db.session.add(item)
+    db.session.commit()
+
+    resp = client.get(
+        f"/api/v1/bot/shop/items/{item.id}",
+        query_string={"telegram_id": "555000666"},
+        headers=_auth(),
+    )
+    data = resp.get_json()["data"]
+    assert data["can_buy"] is True
+    assert data["unavailable_reason"] is None
+
+
+def test_shop_item_can_buy_false_when_insufficient_balance(app_ctx, client):
+    from app.models import ShopItem, ShopCategory, Rarity
+
+    buyer = make_player("PoorBuyer")
+    _link_player(buyer, "555000777")
+    item = ShopItem(
+        name="Expensive", category=ShopCategory.PROFILE_CUSTOMIZATION, subcategory="frame",
+        rarity=Rarity.COMMON, price=99999.0,
+    )
+    db.session.add(item)
+    db.session.commit()
+
+    resp = client.get(
+        f"/api/v1/bot/shop/items/{item.id}",
+        query_string={"telegram_id": "555000777"},
+        headers=_auth(),
+    )
+    data = resp.get_json()["data"]
+    assert data["can_buy"] is False
+    assert "монет" in data["unavailable_reason"].lower()
+
+
+def test_shop_item_can_buy_false_for_anonymous_caller(app_ctx, client):
+    from app.models import ShopItem, ShopCategory, Rarity
+
+    item = ShopItem(
+        name="Anon", category=ShopCategory.PROFILE_CUSTOMIZATION, subcategory="frame",
+        rarity=Rarity.COMMON, price=10.0,
+    )
+    db.session.add(item)
+    db.session.commit()
+
+    resp = client.get(f"/api/v1/bot/shop/items/{item.id}", headers=_auth())
+    data = resp.get_json()["data"]
+    assert data["can_buy"] is False
+    assert data["unavailable_reason"]

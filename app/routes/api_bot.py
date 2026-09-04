@@ -241,14 +241,31 @@ def compare():
 
 @api_bot_bp.route("/players/<int:player_id>")
 def player_public_detail(player_id: int):
-    """Minimal public identity lookup (id/display_name/elo/active) — used
-    wherever the bot only has a player_id in hand (e.g. after a name-search
-    pick) and needs the name back for a confirmation screen, without
-    exposing anything not already public via /players/search."""
+    """Public identity + public rating card (id/display_name/elo/rank/
+    games/wins/win_rate) — used both as the minimal name-lookup after a
+    search pick, and as the full card for the group `/player <ник>`
+    command (CLAUDE_TASK_BOT_RU_GROUPS.md, п.3). Never exposes coins, bio,
+    telegram_id, or anything else personal — same public-data boundary as
+    /players/search and the public /players/<id> page on the site itself.
+    rank/games_played/games_won/win_rate are None/0 for a player with no
+    ranked finished games yet (RatingService.get_player_rating returns
+    None) rather than a 404 — the player itself still exists."""
     player = db.session.get(Player, player_id)
     if not player or not player.is_active:
         return _fail("Игрок не найден.", 404)
-    return _ok({"id": player.id, "display_name": player.display_name, "elo": player.elo})
+
+    from app.services.rating_service import RatingService
+    rating = RatingService.get_player_rating(player_id)
+
+    return _ok({
+        "id": player.id,
+        "display_name": player.display_name,
+        "elo": player.elo,
+        "rank": rating.rank if rating else None,
+        "games_played": rating.games_played if rating else 0,
+        "games_won": rating.games_won if rating else 0,
+        "win_rate": rating.win_rate if rating else 0.0,
+    })
 
 
 @api_bot_bp.route("/players/compare")
@@ -317,6 +334,7 @@ def history():
     slots = ProfileService.get_game_history(
         player.id, limit=per_page, offset=(page - 1) * per_page,
     )
+    total = ProfileService.count_game_history(player.id)
     items = []
     for s in slots:
         won = (
@@ -332,7 +350,11 @@ def history():
             },
             "won": won,
         })
-    return _ok({"items": items, "page": page, "per_page": per_page})
+    total_pages = (total + per_page - 1) // per_page if per_page else 0
+    return _ok({
+        "items": items, "page": page, "per_page": per_page,
+        "total": total, "total_pages": total_pages, "has_next": page < total_pages,
+    })
 
 
 # ── Экономика ─────────────────────────────────────────────────────────────────
@@ -935,6 +957,26 @@ def shop_item_detail(item_id: int):
     if item.rarity.value in ("mythic", "ultra"):
         owner = ShopService.get_current_owner(item.id)
         d["current_owner_id"] = owner.player_id if owner else None
+
+    # can_buy/unavailable_reason: server-computed preview of the same
+    # conditions ShopService.purchase() itself enforces, so the bot never
+    # has to duplicate (or drift from) that business rule just to decide
+    # whether to show a "Купить" button (CLAUDE_TASK_BOT_RU_GROUPS.md, п.5.10).
+    if not player:
+        d["can_buy"] = False
+        d["unavailable_reason"] = "Нужно привязать аккаунт, чтобы купить."
+    elif d["already_owned"]:
+        d["can_buy"] = False
+        d["unavailable_reason"] = "Уже куплено."
+    elif d["current_owner_id"]:
+        d["can_buy"] = False
+        d["unavailable_reason"] = "Уникальный предмет — уже у другого игрока."
+    elif d["balance"] is not None and d["balance"] < item.price:
+        d["can_buy"] = False
+        d["unavailable_reason"] = "Недостаточно монет."
+    else:
+        d["can_buy"] = True
+        d["unavailable_reason"] = None
     return _ok(d)
 
 
