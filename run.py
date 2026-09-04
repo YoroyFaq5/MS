@@ -29,6 +29,25 @@ def init_db():
         print("OK: Database tables created.")
 
 
+@app.cli.command("outbox-drain")
+def outbox_drain():
+    """
+    Deliver due NotifyOutboxEvent rows to MS-TG (see
+    app/services/notify_outbox_service.py). Intended for a cron entry
+    (e.g. every minute) as the production-grade complement to the optional
+    in-process poller started by create_app() (OUTBOX_WORKER_ENABLED) —
+    run this from cron too if you'd rather not rely on a long-lived
+    gunicorn worker thread, or as a belt-and-suspenders backup either way.
+    """
+    from app.services.notify_outbox_service import NotifyOutboxService
+    with app.app_context():
+        summary = NotifyOutboxService.drain(limit=100)
+        print(
+            f"OK: claimed={summary['claimed']} delivered={summary['delivered']} "
+            f"requeued={summary['requeued']} failed={summary['failed']}"
+        )
+
+
 @app.cli.command("seed-players")
 def seed_players():
     """Seed 10 sample players for testing."""

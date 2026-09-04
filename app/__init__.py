@@ -53,6 +53,23 @@ def create_app(config_name: str = "default") -> Flask:
         from .labels import ROLE_LABELS, WIN_SIDE_LABELS
         return {"role_labels": ROLE_LABELS, "win_side_labels": WIN_SIDE_LABELS}
 
+    # Deep links into the Telegram bot (see MS-TG's bot/deeplink.py for the
+    # matching payload formats) — one helper so every template that wants
+    # a "Открыть в Telegram" link agrees on the same URL/payload shape.
+    # Returns None (template just omits the link) when the bot isn't
+    # configured on this deployment, same "feature off, not broken" pattern
+    # as TELEGRAM_BOT_TOKEN elsewhere.
+    @app.context_processor
+    def inject_telegram_deep_link():
+        username = app.config.get("TELEGRAM_BOT_USERNAME")
+
+        def telegram_deep_link(payload: str):
+            if not username:
+                return None
+            return f"https://t.me/{username}?start={payload}"
+
+        return {"telegram_deep_link": telegram_deep_link}
+
     # Blueprints
     from .routes.main import main_bp
     from .routes.players import players_bp
@@ -127,5 +144,31 @@ def create_app(config_name: str = "default") -> Flask:
             SeasonService.close_expired_seasons()
         except Exception:
             pass  # Tables may not exist yet on first run (before init-db)
+
+    # Optional in-process poller for the notify outbox (see
+    # app/services/notify_outbox_service.py) — zero-config alternative to a
+    # cron entry running `flask outbox-drain`. Off by default: every `flask
+    # ...` CLI invocation and every test run also calls create_app(), and
+    # none of those should spin up a background thread doing DB/network
+    # I/O. Enable explicitly in the real web deployment via
+    # OUTBOX_WORKER_ENABLED=true. Safe to run in multiple gunicorn workers
+    # at once — NotifyOutboxService.drain() claims rows atomically.
+    if os.environ.get("OUTBOX_WORKER_ENABLED", "").lower() == "true":
+        import threading
+        import time as _time
+
+        poll_seconds = float(os.environ.get("OUTBOX_POLL_SECONDS", "15"))
+
+        def _outbox_worker():
+            while True:
+                try:
+                    with app.app_context():
+                        from .services.notify_outbox_service import NotifyOutboxService
+                        NotifyOutboxService.drain(limit=50)
+                except Exception:
+                    app.logger.exception("Outbox poller iteration failed")
+                _time.sleep(poll_seconds)
+
+        threading.Thread(target=_outbox_worker, daemon=True, name="outbox-poller").start()
 
     return app

@@ -92,6 +92,8 @@ def _notify_next_slot(round_data: dict) -> None:
         {
             "telegram_id": telegram_ids[a["player_id"]],
             "tournament_name": tournament.name if tournament else None,
+            "tournament_id": tournament.id if tournament else None,
+            "game_id": a["game_id"],
             "round_number": a["round_number"],
             "table_number": a["table_number"],
             "seat_number": a["seat_number"],
@@ -891,7 +893,10 @@ def finish_game(game_id: int):
         )
         BotNotifyService.notify_player(
             slot.player_id, "game-finished",
-            {"won": won, "total_score": slot.total_score, "bonus_score": slot.bonus_score},
+            {
+                "won": won, "total_score": slot.total_score, "bonus_score": slot.bonus_score,
+                "game_id": game.id, "tournament_id": game.tournament_id,
+            },
         )
 
     # Никакого автосоздания следующего раунда здесь больше нет по явному

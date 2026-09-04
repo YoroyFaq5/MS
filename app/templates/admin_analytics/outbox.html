@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Очередь уведомлений боту{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="mb-0 fw-bold"><i class="bi bi-send-check me-2"></i>Очередь уведомлений Telegram-боту</h2>
+    <p class="text-muted small mb-0">NotifyOutboxEvent — доставка событий на MS-TG с ретраями</p>
+  </div>
+  <a href="{{ url_for('admin_analytics.social') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-people me-1"></i>Социальная аналитика
+  </a>
+</div>
+
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  {% for key, label in [(none, 'Все'), ('pending', '⏳ Pending'), ('processing', '🔄 Processing'), ('delivered', '✅ Delivered'), ('failed', '❌ Failed')] %}
+  <a href="{{ url_for('admin_analytics.outbox', status=key) }}"
+     class="btn btn-sm {{ 'btn-primary' if status_filter == key else 'btn-outline-secondary' }}">
+    {{ label }}{% if key and counts.get(key) %} ({{ counts[key] }}){% endif %}
+  </a>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle small">
+        <thead>
+          <tr>
+            <th class="ps-3">Создано</th>
+            <th>Тип</th>
+            <th>Статус</th>
+            <th>Попыток</th>
+            <th>Ошибка</th>
+            <th class="pe-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in events %}
+          <tr>
+            <td class="ps-3 text-muted">{{ e.created_at.strftime('%d.%m.%Y %H:%M:%S') }}</td>
+            <td>{{ e.event_type }}</td>
+            <td>
+              {% if e.status.value == 'delivered' %}<span class="badge bg-success">✅ delivered</span>
+              {% elif e.status.value == 'failed' %}<span class="badge bg-danger">❌ failed</span>
+              {% elif e.status.value == 'processing' %}<span class="badge bg-info text-dark">🔄 processing</span>
+              {% else %}<span class="badge bg-secondary">⏳ pending</span>{% endif %}
+            </td>
+            <td>{{ e.attempts }}/{{ e.max_attempts }}</td>
+            <td class="text-danger small">{{ e.last_error or '' }}</td>
+            <td class="pe-3 text-end">
+              {% if e.status.value == 'failed' %}
+              <form method="POST" action="{{ url_for('admin_analytics.outbox_requeue', event_id=e.event_id) }}">
+                <button type="submit" class="btn btn-outline-warning btn-sm">Повторить</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted py-4">Событий пока нет</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

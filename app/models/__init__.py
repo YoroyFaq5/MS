@@ -1878,6 +1878,96 @@ class TournamentSeries(db.Model):
 
 
 # ---------------------------------------------------------------------------
+# NotifyOutboxEvent — transactional-ish outbox for site -> bot notifications
+# (see app/services/bot_notify_service.py / notify_outbox_service.py). Sits
+# here rather than in its own module only because every other cross-cutting
+# model in this project already lives directly in this file — the handful
+# of models pulled into separate files (below) are the ones with enough of
+# their own domain logic to warrant it, which this one doesn't.
+# ---------------------------------------------------------------------------
+
+class OutboxEventStatus(PyEnum):
+    PENDING    = "pending"     # waiting to be (re)tried
+    PROCESSING = "processing"  # claimed by a worker right now
+    DELIVERED  = "delivered"   # bot accepted it (HTTP 2xx)
+    FAILED     = "failed"      # exhausted max_attempts — needs manual attention
+
+
+class NotifyOutboxEvent(db.Model):
+    """
+    One row per fire-and-forget notification meant for MS-TG. Replaces the
+    old synchronous "POST straight to the bot and hope" in BotNotifyService:
+    the event is durably persisted here first, and a separate drain step
+    (NotifyOutboxService.drain, invoked by `flask outbox-drain` or the
+    optional in-process poller — see create_app()) delivers it with retries
+    and exponential backoff. The bot deduplicates by event_id (see MS-TG's
+    bot/storage.py::is_event_processed), so a retry after a delivered-but-
+    unacknowledged POST can never produce a second Telegram message.
+
+    Not a fully ACID transactional outbox (the row is committed in its own
+    short transaction inside enqueue(), not atomically with whatever
+    business operation triggered it) — see NotifyOutboxService module
+    docstring for why that's an accepted, explicitly-documented trade-off
+    for this increment rather than a full outbox-pattern rewrite of every
+    call site.
+    """
+    __tablename__ = "notify_outbox_events"
+    __allow_unmapped__ = True
+
+    id         = Column(Integer, primary_key=True)
+    event_id   = Column(String(36), nullable=False, unique=True)  # uuid4
+    event_type = Column(String(50), nullable=False)
+    _payload   = Column("payload", Text, nullable=False, default="{}")
+
+    # values_callable=_enum_values: this column's native ENUM is created by
+    # the raw-SQL migration (migrate_notify_outbox.py /
+    # c3e5b9f02a13_notify_outbox_events.py) with lowercase values matching
+    # OutboxEventStatus.value, not SQLAlchemy's create_all()-default
+    # uppercase .name — same reasoning as GameSlot.elimination_type/
+    # live_role above.
+    status         = Column(
+        Enum(OutboxEventStatus, name="outbox_event_status_enum", values_callable=_enum_values),
+        nullable=False, default=OutboxEventStatus.PENDING,
+    )
+    attempts       = Column(Integer, nullable=False, default=0)
+    max_attempts   = Column(Integer, nullable=False, default=8)
+    next_attempt_at = Column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc),
+    )
+    last_error     = Column(Text, nullable=True)
+
+    created_at   = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False,
+    )
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def payload(self) -> dict:
+        try:
+            return json.loads(self._payload or "{}")
+        except Exception:
+            return {}
+
+    @payload.setter
+    def payload(self, value: dict):
+        self._payload = json.dumps(value or {})
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "event_id": self.event_id,
+            "event_type": self.event_type,
+            "status": self.status.value,
+            "attempts": self.attempts,
+            "max_attempts": self.max_attempts,
+            "next_attempt_at": self.next_attempt_at.isoformat(),
+            "last_error": self.last_error,
+            "created_at": self.created_at.isoformat(),
+            "delivered_at": self.delivered_at.isoformat() if self.delivered_at else None,
+        }
+
+
+# ---------------------------------------------------------------------------
 # LegacyImportMap  (Migration API — импорт из старой версии приложения)
 # ---------------------------------------------------------------------------
 from app.models.migration import LegacyImportMap  # noqa: E402,F401

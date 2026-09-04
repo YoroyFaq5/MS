@@ -27,6 +27,12 @@
     <h2 class="mb-0 fw-bold">🎮 Игра #{{ game.id }}</h2>
     <p class="text-muted small mb-0">{{ game.played_at.strftime('%d.%m.%Y %H:%M') }}</p>
   </div>
+  {% set tg_link = telegram_deep_link('g' ~ game.id) %}
+  {% if tg_link %}
+  <a href="{{ tg_link }}" class="btn btn-outline-info btn-sm" target="_blank" rel="noopener">
+    <i class="bi bi-telegram me-1"></i>В боте
+  </a>
+  {% endif %}
   <div class="ms-auto d-flex align-items-center gap-2">
     {% if game.is_finished %}
       {% if game.win_side.value == 'mafia' %}

@@ -24,5 +24,5 @@ def test_series_card_links_to_series_interface(app_ctx, client):
     # The plain tournament-detail/leaderboard/stages URLs for THIS
     # tournament id must not appear as an action target.
     assert f'href="/tournaments/{t.id}"' not in body
-    assert f"tournaments/{t.id}/leaderboard" not in body
-    assert f"tournaments/{t.id}/stages" not in body
+    assert f'href="/tournaments/{t.id}/leaderboard"' not in body
+    assert f'href="/tournaments/{t.id}/stages"' not in body

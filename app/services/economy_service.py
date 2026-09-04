@@ -505,7 +505,7 @@ class EconomyService:
 
             BotNotifyService.notify_player(
                 player.id, "season-award",
-                {"season_name": season.name, "rank": r.rank, "amount": amount},
+                {"season_name": season.name, "rank": r.rank, "amount": amount, "season_id": season.id},
             )
 
         if commit:

@@ -155,6 +155,12 @@
                 </a>
               </li>
               <li>
+                <a class="nav-mega__item" href="{{ url_for('admin_analytics.outbox') }}">
+                  <span class="nav-mega__icon"><i class="bi bi-send-check"></i></span>
+                  <span class="nav-mega__text"><span class="nav-mega__title">Очередь боту</span><span class="nav-mega__desc">Доставка Telegram-уведомлений</span></span>
+                </a>
+              </li>
+              <li>
                 <a class="nav-mega__item" href="{{ url_for('admin_imports.list_imports') }}">
                   <span class="nav-mega__icon"><i class="bi bi-plug-fill"></i></span>
                   <span class="nav-mega__text"><span class="nav-mega__title">Импорт игр</span><span class="nav-mega__desc">Очередь из внешних сервисов</span></span>

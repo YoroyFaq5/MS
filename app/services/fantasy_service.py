@@ -666,7 +666,7 @@ class FantasyService:
             if draft.user and draft.user.player_id:
                 BotNotifyService.notify_player(
                     draft.user.player_id, "fantasy-result",
-                    {"tournament_name": t.name, "points": draft.total_points},
+                    {"tournament_name": t.name, "points": draft.total_points, "tournament_id": tournament_id},
                 )
 
         # ── Prize pool payout — paid drafts only. Practice drafts (see
@@ -701,7 +701,7 @@ class FantasyService:
                 )
                 BotNotifyService.notify_player(
                     user.player.id, "fantasy-prize",
-                    {"tournament_name": t.name, "place": place, "amount": amount},
+                    {"tournament_name": t.name, "place": place, "amount": amount, "tournament_id": tournament_id},
                 )
             if commit:
                 db.session.commit()
@@ -765,7 +765,10 @@ class FantasyService:
             if draft.user and draft.user.player_id:
                 BotNotifyService.notify_player(
                     draft.user.player_id, "fantasy-result",
-                    {"tournament_name": label, "points": draft.total_points},
+                    {
+                        "tournament_name": label, "points": draft.total_points,
+                        "tournament_id": t.id, "tournament_series_id": tournament_series_id,
+                    },
                 )
 
         # ── Prize pool payout — one bank + one leaderboard PER EXCLUSIVITY
@@ -814,7 +817,10 @@ class FantasyService:
                 )
                 BotNotifyService.notify_player(
                     user.player.id, "fantasy-prize",
-                    {"tournament_name": group_label, "place": place, "amount": amount},
+                    {
+                        "tournament_name": group_label, "place": place, "amount": amount,
+                        "tournament_id": t.id, "tournament_series_id": tournament_series_id,
+                    },
                 )
         if commit:
             db.session.commit()
