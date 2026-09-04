@@ -1904,12 +1904,12 @@ class NotifyOutboxEvent(db.Model):
     bot/storage.py::is_event_processed), so a retry after a delivered-but-
     unacknowledged POST can never produce a second Telegram message.
 
-    Not a fully ACID transactional outbox (the row is committed in its own
-    short transaction inside enqueue(), not atomically with whatever
-    business operation triggered it) — see NotifyOutboxService module
-    docstring for why that's an accepted, explicitly-documented trade-off
-    for this increment rather than a full outbox-pattern rewrite of every
-    call site.
+    A real transactional outbox: NotifyOutboxService.enqueue() only stages
+    a row in the caller's own db.session (no commit/rollback of its own),
+    so this row is committed atomically together with whatever business
+    operation triggered it — see NotifyOutboxService module docstring for
+    the full contract and the narrow enqueue_and_commit() exception for
+    call sites with no live surrounding transaction to ride.
     """
     __tablename__ = "notify_outbox_events"
     __allow_unmapped__ = True

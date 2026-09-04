@@ -1,24 +1,44 @@
 """
 NotifyOutboxService
 ====================
-Durable delivery for site -> MS-TG notifications. See NotifyOutboxEvent's
-docstring (app/models) for the overall design and its explicitly-accepted
-limitation (not a fully atomic transactional outbox — enqueue() commits its
-own short transaction rather than riding along with the caller's business
-transaction). What this DOES fix relative to the old fully-synchronous
-BotNotifyService:
+Durable delivery for site -> MS-TG notifications, implemented as a real
+transactional outbox:
 
-- the bot being down/slow no longer blocks or risks the request that
-  triggered the notification (finish_game, a purchase, ...) — enqueue() is
-  a single fast INSERT;
-- a delivery failure is retried with exponential backoff instead of being
-  silently dropped after one attempt;
-- every attempt is visible (status/attempts/last_error) instead of only a
-  log line, and a stuck FAILED event can be manually re-queued.
+- enqueue() only stages a NotifyOutboxEvent in the CALLER's own db.session
+  — it never calls commit() or rollback(). The event rides the exact same
+  commit as whatever business operation triggered it (a purchase, a gift,
+  an achievement unlock, ...): call it BEFORE that operation's own
+  db.session.commit(). If that transaction rolls back, the staged event
+  vanishes with it, exactly like any other pending row; if it commits, the
+  business change and the event become durable together, atomically.
+- enqueue_and_commit() is the deliberate exception: a handful of call
+  sites (see BotNotifyService.notify_player_committed /
+  send_event_committed) fire *after* their triggering business operation
+  already committed — e.g. a route handler notifying about a service call
+  whose own transaction already finished earlier in the same request.
+  There is no live transaction left to ride there, so this opens and
+  commits its own short transaction instead, and never raises into the
+  caller (a notification must not break a request whose business data is
+  already safely committed). Use it only for genuinely detached,
+  best-effort notifications — anywhere a business change and its
+  notification must share fate, use enqueue() inside that operation's own
+  transactional boundary instead.
 
-drain() is safe to run from multiple processes/threads at once: each event
-is claimed via an atomic conditional UPDATE (only succeeds if the row is
-still PENDING), so two workers racing on the same row never both send it.
+What the outbox (either path) still fixes relative to the old fully-
+synchronous BotNotifyService: the bot being down/slow no longer blocks or
+risks the request that triggered the notification — delivery is a
+separate step (drain()); a delivery failure is retried with exponential
+backoff instead of being silently dropped after one attempt; every attempt
+is visible (status/attempts/last_error) instead of only a log line, and a
+stuck FAILED event can be manually re-queued.
+
+drain() is a standalone process/worker path (the `flask outbox-drain` CLI
+command or the optional in-process poller) — never nested inside a
+business request — so it manages its own commits per claimed batch/event;
+that's unrelated to the atomicity guarantee above. It's also safe to run
+from multiple processes/threads at once: each event is claimed via an
+atomic conditional UPDATE (only succeeds if the row is still PENDING), so
+two workers racing on the same row never both send it.
 """
 from __future__ import annotations
 
@@ -50,18 +70,42 @@ def _backoff_seconds(attempts: int) -> int:
 class NotifyOutboxService:
 
     @staticmethod
-    def enqueue(event_type: str, payload: dict) -> Optional[NotifyOutboxEvent]:
-        """Persist an event for later delivery. Returns None (and logs)
-        without raising if the DB write itself fails — a notification is
-        never allowed to break the business operation that triggered it,
-        the same guarantee the old synchronous BotNotifyService made."""
+    def enqueue(event_type: str, payload: dict) -> NotifyOutboxEvent:
+        """Stage an outbox event in the CALLER's current transaction —
+        deliberately no commit/rollback here (see module docstring): the
+        caller's own eventual db.session.commit() is what makes this event
+        durable, atomically together with whatever business row(s) it just
+        changed. Call this BEFORE that commit.
+
+        Issues a flush (not a commit) so the row gets its primary key and
+        is visible to any query run later in the same transaction — a
+        flush is fully undone by a rollback like any other pending change,
+        so this does not weaken atomicity.
+
+        Raises on genuine failure (e.g. a non-JSON-serializable payload) —
+        deliberately not swallowed: silently returning here while the
+        caller goes on to commit its business change would leave that
+        change committed with no matching event, exactly the atomicity
+        break this pattern exists to prevent. Let it propagate so the
+        caller's own transaction fails/rolls back as a whole."""
+        event = NotifyOutboxEvent(
+            event_id=str(uuid.uuid4()),
+            event_type=event_type,
+        )
+        event.payload = payload
+        db.session.add(event)
+        db.session.flush()
+        return event
+
+    @staticmethod
+    def enqueue_and_commit(event_type: str, payload: dict) -> Optional[NotifyOutboxEvent]:
+        """Standalone variant for the few call sites that fire *after*
+        their triggering business transaction already committed (see
+        module docstring) — opens and commits its own short transaction.
+        Never raises into the caller: a notification is not allowed to
+        break a request whose business data is already safely committed."""
         try:
-            event = NotifyOutboxEvent(
-                event_id=str(uuid.uuid4()),
-                event_type=event_type,
-            )
-            event.payload = payload
-            db.session.add(event)
+            event = NotifyOutboxService.enqueue(event_type, payload)
             db.session.commit()
             return event
         except Exception:

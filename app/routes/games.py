@@ -104,8 +104,12 @@ def _notify_next_slot(round_data: dict) -> None:
     if not players_payload:
         return
 
+    # Called from the route layer strictly AFTER TournamentService's own
+    # commit (see callers in routes/tournaments.py, series_tournaments.py)
+    # — there is no live transaction left to ride, hence the explicit
+    # standalone/self-committing variant (see BotNotifyService docstring).
     from app.services.bot_notify_service import BotNotifyService
-    BotNotifyService.send_event("next-slot", {"players": players_payload})
+    BotNotifyService.send_event_committed("next-slot", {"players": players_payload})
 
 
 def _lock_series_fantasy_if_needed(stage_id: int | None) -> None:
@@ -885,13 +889,16 @@ def finish_game(game_id: int):
     else:
         flash("Игра завершена! Рейтинг и монеты обновлены.", "success")
 
+    # PostGameOrchestrator.run() already committed (and ran achievement
+    # checks) above — no live transaction left to ride, hence the explicit
+    # standalone/self-committing variant (see BotNotifyService docstring).
     from app.services.bot_notify_service import BotNotifyService
     for slot in game.slots:
         won = (
             (slot.is_mafia_side and game.win_side == WinSide.MAFIA)
             or (slot.is_city_side and game.win_side == WinSide.CITY)
         )
-        BotNotifyService.notify_player(
+        BotNotifyService.notify_player_committed(
             slot.player_id, "game-finished",
             {
                 "won": won, "total_score": slot.total_score, "bonus_score": slot.bonus_score,

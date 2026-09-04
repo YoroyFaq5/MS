@@ -82,15 +82,16 @@ class GiftService:
             message=message,
         )
         db.session.add(transfer)
-        db.session.commit()
-
-        logger.info(f"Gift: player#{sender.id} -> player#{to_player_id}, item={item.name!r}")
 
         from app.services.bot_notify_service import BotNotifyService
         BotNotifyService.notify_player(
             to_player_id, "gift-received",
             {"item_name": item.name, "sender_name": sender.display_name, "message": message},
         )
+
+        db.session.commit()
+
+        logger.info(f"Gift: player#{sender.id} -> player#{to_player_id}, item={item.name!r}")
 
         try:
             from app.services.achievement_service import AchievementService

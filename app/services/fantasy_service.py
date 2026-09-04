@@ -658,9 +658,6 @@ class FantasyService:
                 data=draft,
             ))
 
-        if commit:
-            db.session.commit()
-
         from app.services.bot_notify_service import BotNotifyService
         for draft in unscored:
             if draft.user and draft.user.player_id:
@@ -668,6 +665,9 @@ class FantasyService:
                     draft.user.player_id, "fantasy-result",
                     {"tournament_name": t.name, "points": draft.total_points, "tournament_id": tournament_id},
                 )
+
+        if commit:
+            db.session.commit()
 
         # ── Prize pool payout — paid drafts only. Practice drafts (see
         # module docstring) are scored above like any other draft, but
@@ -757,9 +757,6 @@ class FantasyService:
                 data=draft,
             ))
 
-        if commit:
-            db.session.commit()
-
         from app.services.bot_notify_service import BotNotifyService
         for draft in unscored:
             if draft.user and draft.user.player_id:
@@ -770,6 +767,9 @@ class FantasyService:
                         "tournament_id": t.id, "tournament_series_id": tournament_series_id,
                     },
                 )
+
+        if commit:
+            db.session.commit()
 
         # ── Prize pool payout — one bank + one leaderboard PER EXCLUSIVITY
         # GROUP, not one for the whole series (see _assign_group — groups

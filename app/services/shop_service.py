@@ -195,11 +195,6 @@ class ShopService:
             source="buyout",
         )
         db.session.add(new_inv)
-        db.session.commit()
-        logger.info(
-            f"Player #{challenger.id} bought out ShopItem #{item.id} "
-            f"from player #{previous_owner.id if previous_owner else '?'} for {offer_price}"
-        )
 
         if previous_owner:
             from app.services.bot_notify_service import BotNotifyService
@@ -212,6 +207,12 @@ class ShopService:
                     "payout": payout,
                 },
             )
+
+        db.session.commit()
+        logger.info(
+            f"Player #{challenger.id} bought out ShopItem #{item.id} "
+            f"from player #{previous_owner.id if previous_owner else '?'} for {offer_price}"
+        )
 
         try:
             from app.services.achievement_service import AchievementService
