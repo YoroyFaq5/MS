@@ -18,7 +18,7 @@ window.MSOverlayChat = (function () {
   // StreamVI hands out for embedding (and what any browser, including
   // OBS's CEF one, resolves the same way), so it's reproduced as-is
   // rather than "corrected" into something never actually tested there.
-  const WIDGET_URL = 'https://chat.streamvi.io/?lang=ru&mode=widget&elements=input,emoji&token=ch_b7e4bd11pimNG9Ej2568smwMWoIondMdQbKVmclj&background=#141414&color=#FFFFFF&nameColor=#ADADAD&messageBoxColor=#FFFFFF99&scale=211&messageMargin=100&scrollbarVisibility=visible&inputVisibility=visible&messageAnimation=none&messageAlignment=bottom&messageTime=true&messageHidden=none&messageHiddenDelay=2&messageIcon=platform&messageTheme=compact';
+  const WIDGET_URL = 'https://chat.streamvi.io/?lang=ru&mode=widget&elements=input%2Cemoji&token=ch_b7e4bd11pimNG9Ej2568smwMWoIondMdQbKVmclj&background=%23141414&color=%23ffffff&nameColor=%233b56f8&messageBoxColor=%2300000000&scale=171&messageMargin=100&scrollbarVisibility=visible&inputVisibility=visible&messageAnimation=fromRightToLeft&messageAlignment=bottom&messageTime=true&messageHidden=none&messageHiddenDelay=2&messageIcon=platform&messageTheme=compact';
 
   let iframe = null;
 
